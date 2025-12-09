@@ -1,6 +1,7 @@
 AddCSLuaFile();
 
 --todo: fix regular breakables (dont gib properly)
+--todo: fix drag
 
 local CLIENT = CLIENT;
 local SERVER = SERVER;
@@ -144,8 +145,10 @@ local function move_projectile(shooter, projectile_data)
             debug_box(exit_pos, vector(-1, -1, -1), vector(1, 1, 1), dur, color(255, 0, 0, 150), true);
 
             local dmg_lost = current_hit_damage - projectile_data.damage;
-            local enter_mat = enter_trace and enter_trace.SurfaceProps and get_surface_data(enter_trace.SurfaceProps).name or "unknown";
-            local exit_mat = exit_trace and exit_trace.SurfaceProps and get_surface_data(exit_trace.SurfaceProps).name or "unknown";
+            local enter_map_props = enter_trace and enter_trace.SurfaceProps and get_surface_data(enter_trace.SurfaceProps);
+            local exit_map_props = exit_trace and exit_trace.SurfaceProps and get_surface_data(exit_trace.SurfaceProps);
+            local enter_mat = enter_map_props and enter_map_props.name or "unknown";
+            local exit_mat = exit_map_props and exit_map_props.name or "unknown";
             
             debug_text(exit_pos + vector(0, 0, 10), string_format("lost: %.1f\nremaining: %.1f\nmat_in: %s\nmat_out: %s", dmg_lost, projectile_data.damage, enter_mat, exit_mat), dur, false);
         end
@@ -166,7 +169,7 @@ local function move_projectile(shooter, projectile_data)
             local final_damage = current_hit_damage * dmg_mult;
             
             if SERVER then
-                if get_class(hit_entity) == "func_breakable_surf" then
+                if get_class(hit_entity) == "func_breakable_surf" or get_class(hit_entity) == "func_breakable" then
                     projectiles.disable_fire_bullets = true;
                     fire_bullets(shooter, {
                         Attacker = shooter,
