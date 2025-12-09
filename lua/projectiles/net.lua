@@ -25,10 +25,14 @@ if SERVER then
     local write_uint = net.WriteUInt;
     local send_pvs = net.SendPVS;
 
-    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, constpen, reliable)
+    local crc = util.CRC;
+    local tonumber = tonumber;
+
+    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, constpen, mass, drop, min_speed, max_distance, reliable)
         weapon.bullet_idx = (weapon.bullet_idx or 0) + 1;
 
         local time = cur_time();
+        local random_seed = tonumber(crc(tostring(pos) .. tostring(dir))); -- random seed for ricochet
 
         net_start("projectile", reliable and true or false);
         write_entity(shooter);
@@ -49,6 +53,11 @@ if SERVER then
         write_float(drag);
         write_float(penetration_power);
         write_float(constpen);
+        write_float(mass);
+        write_float(drop);
+        write_float(min_speed);
+        write_float(max_distance);
+        write_uint(random_seed, 32); -- random seed for ricochet
         --send_pvs(eye_pos(shooter));
         send_pvs(pos);
 
@@ -78,6 +87,12 @@ if SERVER then
             constpen = constpen,
             last_hit_entity = nil,
             hit = false,
+            mass = mass,
+            drop = drop,
+            min_speed = min_speed,
+            distance_traveled = 0.0,
+            max_distance = max_distance,
+            random_seed = random_seed,
         };
 
         --[[print("broadcasted projectile", 
@@ -126,7 +141,11 @@ if CLIENT then
         local drag = read_float();
         local penetration_power = read_float();
         local constpen = read_float();
-
+        local mass = read_float();
+        local drop = read_float();
+        local min_speed = read_float();
+        local max_distance = read_float();
+        local random_seed = read_uint(32);
         --print("received projectile", shooter, weapon, time, pos, dir, speed, damage, penetration_count, drag, penetration_power, constpen);
 
         if not projectile_store[shooter] then 
@@ -155,6 +174,12 @@ if CLIENT then
             constpen = constpen,
             last_hit_entity = nil,
             hit = false,
+            mass = mass,
+            drop = drop,
+            min_speed = min_speed,
+            distance_traveled = 0.0,
+            max_distance = max_distance,
+            random_seed = random_seed,
         };
     end)
 end

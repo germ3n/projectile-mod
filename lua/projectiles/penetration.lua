@@ -3,7 +3,7 @@ AddCSLuaFile();
 local projectiles = projectiles;
 local trace_to_exit = trace_to_exit;
 local get_surface_data = util.GetSurfaceData;
-local math_random = math.random;
+local rand = math.Rand;
 local vector_rand = VectorRand;
 local MAT_GRATE = MAT_GRATE;
 local MAT_GLASS = MAT_GLASS;
@@ -16,31 +16,45 @@ local random_seed = math.randomseed;
 local get_convar = GetConVar;
 
 local cv_ricochet_enabled = get_convar("pro_ricochet_enabled");
+local cv_ricochet_chance = get_convar("pro_ricochet_chance");
+local cv_ricochet_spread = get_convar("pro_ricochet_spread");
+local cv_ricochet_speed_multiplier = get_convar("pro_ricochet_speed_multiplier");
+local cv_ricochet_damage_multiplier = get_convar("pro_ricochet_damage_multiplier");
+local cv_ricochet_distance_multiplier = get_convar("pro_ricochet_distance_multiplier");
 local convar_meta = FindMetaTable("ConVar");
 local get_bool = convar_meta.GetBool;
+local get_float = convar_meta.GetFloat;
 
-function handle_penetration(shooter, projectile_data, src, dir, constpen, enter_trace)
+local vector_meta = FindMetaTable("Vector");
+local dot = vector_meta.Dot;
+local get_normalized = vector_meta.GetNormalized;
+local len = vector_meta.Length;
+
+local tick_count = engine.TickCount;
+
+--todo: use penetration_power
+function handle_penetration(shooter, projectile_data, src, dir, constpen, penetration_power, enter_trace)
     if not enter_trace.MatType then 
         return true, nil, nil;
     end
 
     if get_bool(cv_ricochet_enabled) then
-        random_seed(tonumber(util.CRC(tostring(src + dir))));
-    end
+        random_seed(projectile_data.random_seed + projectile_data.penetration_count);
 
-    local hit_normal = enter_trace.HitNormal;
-    local dot = dir:Dot(hit_normal);
-
-    if get_bool(cv_ricochet_enabled) and enter_trace.MatType ~= MAT_FLESH and enter_trace.MatType ~= MAT_GLASS and math_random() < 0.25 then -- todo: make this configurable
-        local reflect = dir - (2 * dot * hit_normal);
-        local spread = vector_rand() * 0.2;
-
-        projectile_data.dir = (reflect + spread):GetNormalized();
-        projectile_data.speed = projectile_data.speed * 0.6;
-        projectile_data.damage = projectile_data.damage * 0.5;
-        projectile_data.pos = enter_trace.HitPos + (projectile_data.dir * 2.0);
-
-        return false, nil, nil;
+        local hit_normal = enter_trace.HitNormal;
+        local dot_result = dot(dir, hit_normal);
+    
+        if enter_trace.MatType ~= MAT_FLESH and enter_trace.MatType ~= MAT_GLASS and rand(0, 1) < get_float(cv_ricochet_chance) then
+            local reflect = dir - (2 * dot_result * hit_normal);
+            local spread = vector_rand() * get_float(cv_ricochet_spread);
+    
+            projectile_data.dir = get_normalized(reflect + spread);
+            projectile_data.speed = projectile_data.speed * get_float(cv_ricochet_speed_multiplier);
+            projectile_data.damage = projectile_data.damage * get_float(cv_ricochet_damage_multiplier);
+            projectile_data.pos = enter_trace.HitPos + (projectile_data.dir * get_float(cv_ricochet_distance_multiplier));
+    
+            return false, nil, nil;
+        end
     end
 
     if projectile_data.penetration_count <= 0 or projectile_data.penetration_power <= 0.0 then 
@@ -91,7 +105,7 @@ function handle_penetration(shooter, projectile_data, src, dir, constpen, enter_
 
     local lost_damage = (pen_mod_inv * 3.0 * pen_ratio) + (dmg_mod * projectile_data.damage);
     
-    local dist = (exit_trace.HitPos - enter_trace.HitPos):Length();
+    local dist = len(exit_trace.HitPos - enter_trace.HitPos);
     if dist > 90 then 
         return true, nil, nil;
     end
@@ -108,6 +122,7 @@ function handle_penetration(shooter, projectile_data, src, dir, constpen, enter_
     return false, exit_trace.HitPos, exit_trace;
 end
 
+--todo: make this configurable
 local HITGROUP_MULTIPLIERS = {
     [HITGROUP_GENERIC] = 1.0,
     [HITGROUP_HEAD] = 4.0,

@@ -31,6 +31,7 @@ local debug_box = debug_overlay.Box;
 local debug_text = debug_overlay.Text;
 local string_split = string.Split;
 local tonumber = tonumber;
+local tostring = tostring;
 local NULL = NULL;
 
 local entity_meta = FindMetaTable("Entity");
@@ -76,20 +77,27 @@ local BREAKABLE_CLASSES = {
     ["prop_physics_multiplayer"] = true,
 };
 
-local function move_projectile(shooter, projectile_data)
-    if not projectile_data or projectile_data.hit or projectile_data.penetration_count <= 0 or projectile_data.damage < 1.0 then 
-        return;
-    end
+local cv_drag_enabled = get_convar("pro_drag_enabled");
+local cv_drag_multiplier = get_convar("pro_drag_multiplier");
+local cv_drag_water_multiplier = get_convar("pro_drag_water_multiplier");
+local cv_gravity_enabled = get_convar("pro_gravity_enabled");
+local cv_gravity_multiplier = get_convar("pro_gravity_multiplier");
+local cv_gravity_water_multiplier = get_convar("pro_gravity_water_multiplier");
+local cv_drop_multiplier = get_convar("pro_drop_multiplier");
+local cv_sv_gravity = get_convar("sv_gravity");
 
-    local interval = tick_interval;
-    local velocity = projectile_data.dir * projectile_data.speed;
-    local drag_offset = vector(0, 0, -projectile_data.drag * interval);
-    
-    local step = (velocity * interval) + drag_offset;
-    local new_pos = projectile_data.pos + step;
-    
-    local filter = {shooter, projectile_data.weapon, projectile_data.last_hit_entity};
+local convar_meta = FindMetaTable("ConVar");
+local get_bool = convar_meta.GetBool;
+local get_float = convar_meta.GetFloat;
+local get_int = convar_meta.GetInt;
+local get_string = convar_meta.GetString;
 
+local vector_meta = FindMetaTable("Vector");
+local vec_len = vector_meta.Length;
+
+local max = math.max;
+
+local function do_water_trace(projectile_data, new_pos, filter)
     local was_in_water = band(point_contents(projectile_data.pos), CONTENTS_WATER) ~= 0;
     local is_in_water = band(point_contents(new_pos), CONTENTS_WATER) ~= 0;
 
@@ -113,13 +121,84 @@ local function move_projectile(shooter, projectile_data)
             projectile_data.drag = projectile_data.drag * 4;
         end
     end
+end
+
+local function move_projectile(shooter, projectile_data)
+    if not projectile_data or projectile_data.hit or projectile_data.penetration_count <= 0 or projectile_data.damage < 1.0 then 
+        return;
+    end
+
+    if projectile_data.distance_traveled >= projectile_data.max_distance then
+        projectile_data.hit = true;
+        return;
+    end
+
+    if get_bool(cv_drag_enabled) then
+        local drag_factor = projectile_data.drag * tick_interval * get_float(cv_drag_multiplier);
+        if band(point_contents(projectile_data.pos), CONTENTS_WATER) ~= 0 then
+            drag_factor = drag_factor * get_float(cv_drag_water_multiplier);
+        end
+
+        projectile_data.speed = max(0, (projectile_data.speed - projectile_data.speed * drag_factor));
+    end
+
+    if projectile_data.speed <= 10.0 then
+        projectile_data.hit = true;
+        return;
+    end
+
+    local current_velocity = projectile_data.dir * projectile_data.speed;
+    
+    if get_bool(cv_gravity_enabled) then
+        local gravity_strength = get_float(cv_sv_gravity) * projectile_data.drop * get_float(cv_gravity_multiplier);
+        local gravity_vector = vector(0, 0, -gravity_strength);
+        if band(point_contents(projectile_data.pos), CONTENTS_WATER) ~= 0 then
+            gravity_vector = gravity_vector * get_float(cv_gravity_water_multiplier);
+        end
+
+        current_velocity = current_velocity + gravity_vector * tick_interval;
+
+        projectile_data.dir = current_velocity:GetNormalized();
+        projectile_data.speed = vec_len(current_velocity);
+    end
+    
+    local step = current_velocity * tick_interval;
+    local new_pos = projectile_data.pos + step;
+    
+    local filter = {shooter, projectile_data.weapon, projectile_data.last_hit_entity};
+
+    --[[local was_in_water = band(point_contents(projectile_data.pos), CONTENTS_WATER) ~= 0;
+    local is_in_water = band(point_contents(new_pos), CONTENTS_WATER) ~= 0;
+
+    if not was_in_water and is_in_water then
+        local water_trace = trace_line_ex({
+            start = projectile_data.pos,
+            endpos = new_pos,
+            mask = MASK_WATER,
+            filter = filter
+        });
+
+        if water_trace.Hit then
+            if CLIENT then
+                local effectdata = effect_data();
+                set_origin(effectdata, water_trace.HitPos);
+                set_scale(effectdata, projectile_data.damage * 0.1);
+                set_flags(effectdata, 0);
+                effect("gunshotsplash", effectdata);
+            end
+            
+            projectile_data.drag = projectile_data.drag * 4;
+        end
+    end]]
+
+    do_water_trace(projectile_data, new_pos, filter); -- had to move to seperate funcs cuz i hit more than 60 upvalues
     
     local enter_trace = projectile_move_trace(projectile_data.pos, new_pos, filter);
 
-    if cv_debug and cv_debug:GetBool() then
-        local dur = cv_debug_dur:GetFloat();
-        local col_vec = string_split(cv_debug_col:GetString(), " ");
-        local col = color(tonumber(col_vec[1]), tonumber(col_vec[2]), tonumber(col_vec[3]), col_vec[4] or 150);
+    if get_bool(cv_debug) then
+        local dur = get_float(cv_debug_dur);
+        local col_vec = string_split(get_string(cv_debug_col), " ");
+        local col = color(tonumber(col_vec[1]), tonumber(col_vec[2]), tonumber(col_vec[3]), col_vec[4] and tonumber(col_vec[4]) or 150);
 
         debug_line(projectile_data.pos, enter_trace.HitPos, dur, col, true);
         
@@ -143,11 +222,11 @@ local function move_projectile(shooter, projectile_data)
         local hit_entity = enter_trace.Entity;
         local current_hit_damage = projectile_data.damage;
 
-        local stop_bullet, exit_pos, exit_trace = handle_penetration(shooter, projectile_data, enter_trace.HitPos, projectile_data.dir, projectile_data.constpen, enter_trace);
+        local stop_bullet, exit_pos, exit_trace = handle_penetration(shooter, projectile_data, enter_trace.HitPos, projectile_data.dir, projectile_data.constpen, projectile_data.penetration_power, enter_trace);
 
         -- todo: fix
-        if cv_debug_pen and cv_debug_pen:GetBool() and exit_pos then
-            local dur = cv_debug_dur:GetFloat();
+        if get_bool(cv_debug_pen) and exit_pos then
+            local dur = get_float(cv_debug_dur);
             debug_line(enter_trace.HitPos, exit_pos, dur, color(255, 0, 0, 150), true);
             debug_box(exit_pos, vector(-1, -1, -1), vector(1, 1, 1), dur, color(255, 0, 0, 150), true);
 
@@ -216,16 +295,17 @@ local function move_projectile(shooter, projectile_data)
 
             if exit_pos then
                 projectile_data.pos = exit_pos;
+                projectile_data.distance_traveled = projectile_data.distance_traveled + vec_len(exit_pos - projectile_data.pos);
             end
         end
 
     else
         projectile_data.pos = new_pos;
+        projectile_data.distance_traveled = projectile_data.distance_traveled + vec_len(step);
     end
-    
-    projectile_data.drag = projectile_data.drag + (projectile_data.drag * interval);
 end
 
+--todo: optimize?
 local function move_projectiles(ply, mv, cmd)
     local projectiles = projectile_store[ply];
     if not projectiles then return; end
