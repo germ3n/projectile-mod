@@ -1,8 +1,5 @@
 AddCSLuaFile();
 
---todo: fix regular breakables (dont gib properly)
---todo: fix drag
-
 local CLIENT = CLIENT;
 local SERVER = SERVER;
 local next = next;
@@ -163,31 +160,6 @@ local function move_projectile(shooter, projectile_data)
     local new_pos = projectile_data.pos + step;
     
     local filter = {shooter, projectile_data.weapon, projectile_data.last_hit_entity};
-
-    --[[local was_in_water = band(point_contents(projectile_data.pos), CONTENTS_WATER) ~= 0;
-    local is_in_water = band(point_contents(new_pos), CONTENTS_WATER) ~= 0;
-
-    if not was_in_water and is_in_water then
-        local water_trace = trace_line_ex({
-            start = projectile_data.pos,
-            endpos = new_pos,
-            mask = MASK_WATER,
-            filter = filter
-        });
-
-        if water_trace.Hit then
-            if CLIENT then
-                local effectdata = effect_data();
-                set_origin(effectdata, water_trace.HitPos);
-                set_scale(effectdata, projectile_data.damage * 0.1);
-                set_flags(effectdata, 0);
-                effect("gunshotsplash", effectdata);
-            end
-            
-            projectile_data.drag = projectile_data.drag * 4;
-        end
-    end]]
-
     if CLIENT then do_water_trace(projectile_data, new_pos, filter); end -- had to move to seperate funcs cuz i hit more than 60 upvalues
     
     local enter_trace = projectile_move_trace(projectile_data.pos, new_pos, filter);

@@ -52,7 +52,7 @@ function handle_penetration(shooter, projectile_data, src, dir, constpen, penetr
             projectile_data.dir = get_normalized(reflect + spread);
             projectile_data.speed = projectile_data.speed * get_float(cv_ricochet_speed_multiplier);
             projectile_data.damage = projectile_data.damage * get_float(cv_ricochet_damage_multiplier);
-            projectile_data.pos = enter_trace.HitPos + (projectile_data.dir * get_float(cv_ricochet_distance_multiplier));
+            projectile_data.pos = enter_trace.HitPos + (projectile_data.dir * 2);
     
             return false, nil, nil;
         end
