@@ -28,13 +28,17 @@ local function render_projectiles()
     local cur_time_val = tick_count() * tick_interval;
     local real_time = unpredicted_cur_time();
 
-    local pulse_wave = sin(cur_time_val * 20) * 0.35 + 1.15;
+    local pulse_wave = sin(real_time * 20) * 0.35 + 1.15;
     local flicker = rand(0.9, 1.1);
     local scale_mod = pulse_wave * flicker;
 
     local time_since_tick = real_time - cur_time_val;
-    local interp_fraction = clamp(time_since_tick / tick_interval, 0, 1);
+    local interp_fraction = time_since_tick / tick_interval;--clamp(time_since_tick / tick_interval, 0, 1);
 
+    if interp_fraction > 3.0 then interp_fraction = 3.0; end
+
+    --print(cur_time_val, real_time, time_since_tick, tick_interval, interp_fraction);
+    
     for shooter, projs in next, projectile_store do
         local projectile_idx = projs.last_received_idx;
         local buffer_size = projs.buffer_size;
