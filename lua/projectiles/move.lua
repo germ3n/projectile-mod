@@ -28,6 +28,7 @@ local debug_box = debug_overlay.Box;
 local debug_text = debug_overlay.Text;
 local string_split = string.Split;
 local tonumber = tonumber;
+local NULL = NULL;
 
 local entity_meta = FindMetaTable("Entity");
 local is_valid = entity_meta.IsValid;
@@ -156,22 +157,25 @@ local function move_projectile(shooter, projectile_data)
             effect("Impact", effect_data);
         end
 
-        if hit_entity and is_valid(hit_entity) then
+        if hit_entity and hit_entity ~= NULL then
             local dmg_mult = get_damage_multiplier(enter_trace.HitGroup);
             local final_damage = current_hit_damage * dmg_mult;
             
             if SERVER then
+                print(hit_entity, get_class(hit_entity));
                 if get_class(hit_entity) == "func_breakable_surf" then
-                    fire_bullets(hit_entity, {
+                    projectiles.disable_fire_bullets = true;
+                    fire_bullets(shooter, {
                         Attacker = shooter,
                         Damage = final_damage,
                         Force = final_damage,
-                        Distance = 32,
+                        Distance = 1,
                         Dir = projectile_data.dir,
-                        Src = enter_trace.HitPos,
+                        Src = enter_trace.HitPos - (projectile_data.dir * 0.5),
                         Tracer = 0,
                         AmmoType = "Pistol" 
                     });
+                    projectiles.disable_fire_bullets = false;
                 else
                     local dmg_info = damage_info();
                     set_damage(dmg_info, final_damage);
