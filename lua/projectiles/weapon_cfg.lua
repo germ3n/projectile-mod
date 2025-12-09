@@ -84,6 +84,10 @@ function get_weapon_speed(weapon, class_name)
 end
 
 function get_weapon_damage(weapon, class_name, damage)
+    if weapon ~= NULL and weapon.ArcCW then
+        return weapon:GetDamage(0, true);
+    end
+
     local val = WEAPON_DAMAGES[class_name];
     if val then
         if is_function(val) then return val(weapon, class_name, damage) end
