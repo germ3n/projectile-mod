@@ -1,5 +1,7 @@
 AddCSLuaFile();
 
+--todo: fix regular breakables (dont gib properly)
+
 local CLIENT = CLIENT;
 local SERVER = SERVER;
 local next = next;
@@ -45,6 +47,8 @@ local set_attacker = damage_info_meta.SetAttacker;
 local dmg_set_damage_type = damage_info_meta.SetDamageType;
 local set_damage_position = damage_info_meta.SetDamagePosition;
 local set_damage_force = damage_info_meta.SetDamageForce;
+local set_inflictor = damage_info_meta.SetInflictor;
+local set_weapon = damage_info_meta.SetWeapon;
 
 local effect_data_meta = FindMetaTable("CEffectData");
 local set_origin = effect_data_meta.SetOrigin;
@@ -178,6 +182,8 @@ local function move_projectile(shooter, projectile_data)
                 else
                     local dmg_info = damage_info();
                     set_damage(dmg_info, final_damage);
+                    set_inflictor(dmg_info, projectile_data.weapon);
+                    set_weapon(dmg_info, projectile_data.weapon);
                     set_attacker(dmg_info, shooter);
                     dmg_set_damage_type(dmg_info, DMG_BULLET);
                     set_damage_position(dmg_info, enter_trace.HitPos);
@@ -217,7 +223,7 @@ local function move_projectiles(ply, mv, cmd)
     local projectile_idx = projectiles.last_received_idx;
     local buffer_size = projectiles.buffer_size;
 
-    if SERVER then toggle_lag_compensation(ply, true); end
+    if SERVER and ply:IsPlayer() then toggle_lag_compensation(ply, true); end
         
     for idx = 1, buffer_size do
         local data = projectiles.buffer[projectile_idx];
@@ -232,11 +238,18 @@ local function move_projectiles(ply, mv, cmd)
         end
     end
 
-    if SERVER then toggle_lag_compensation(ply, false); end
+    if SERVER and ply:IsPlayer() then toggle_lag_compensation(ply, false); end
 end
 
 if SERVER then
     hook.Add("SetupMove", "projectiles_tick", move_projectiles)
+    hook.Add("Tick", "projectiles_tick", function()
+        for shooter, _ in next, projectile_store do
+            if shooter:IsValid() and shooter:IsNPC() then 
+                move_projectiles(shooter, nil, nil);
+            end
+        end
+    end)
 else    
     hook.Add("CreateMove", "projectiles_tick", function(cmd)
         if get_command_number(cmd) ~= 0 then
