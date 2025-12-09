@@ -31,6 +31,7 @@ local get_normalized = vector_meta.GetNormalized;
 local len = vector_meta.Length;
 
 local tick_count = engine.TickCount;
+local max = math.max;
 
 --todo: use penetration_power
 function handle_penetration(shooter, projectile_data, src, dir, constpen, penetration_power, enter_trace)
@@ -74,20 +75,23 @@ function handle_penetration(shooter, projectile_data, src, dir, constpen, penetr
 
     local is_grate_surf = (enter_mat == MAT_GRATE) or (enter_mat == MAT_GLASS);
     local pen_mod = 1.0;
-    local dmg_mod = 0.16;
+    --local dmg_mod = 0.16;
 
     if is_grate_surf then
         pen_mod = 3.0;
-        dmg_mod = 0.05;
+        --dmg_mod = 0.05;
     elseif enter_mat == MAT_FLESH then 
         pen_mod = 1.0;
-        dmg_mod = 0.16;
+        --dmg_mod = 0.16;
     else
         local exit_pen = exit_surf_data and SURFACE_PROPS_PENETRATION[exit_surf_data.name] or 1.0;
         local enter_pen = enter_surf_data and SURFACE_PROPS_PENETRATION[enter_surf_data.name] or 1.0;
+        print(enter_pen, exit_pen);
         pen_mod = (enter_pen + exit_pen) * 0.5;
-        dmg_mod = 0.16;
+        --dmg_mod = 0.16;
     end
+
+    local dmg_mod = 0.16 / max(0.01, pen_mod);
 
     local pen_mod_inv = 1.0 / pen_mod;
     if pen_mod_inv < 0.0 then pen_mod_inv = 0.0; end

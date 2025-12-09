@@ -141,6 +141,7 @@ if SERVER then
                     
                     if SURFACE_PROPS_PENETRATION[key] then
                         SURFACE_PROPS_PENETRATION[key] = val;
+                        print("loaded surfaceprop: " .. key .. " -> " .. val);
                     end
                 end
                 print("loaded " .. #data .. " surfaceprops from database.");
@@ -197,7 +198,7 @@ end
 
 if CLIENT then
     net.Receive("projectile_surfaceprop_sync", function()
-        SURFACE_PROPS_PENETRATION = net.ReadTable();
+        table.CopyFromTo(net.ReadTable(), SURFACE_PROPS_PENETRATION);
         print("received full surfaceprop sync");
     end)
 
