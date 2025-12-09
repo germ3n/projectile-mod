@@ -88,14 +88,6 @@ function handle_penetration(shooter, projectile_data, src, dir, constpen, penetr
         pen_mod = (enter_pen + exit_pen) * 0.5;
         dmg_mod = 0.16;
     end
-    
-    if enter_mat == exit_mat then
-        if exit_mat == MAT_WOOD or exit_mat == MAT_METAL then
-            pen_mod = 3.0;
-        elseif exit_mat == MAT_PLASTIC then
-            pen_mod = 2.0;
-        end
-    end
 
     local pen_mod_inv = 1.0 / pen_mod;
     if pen_mod_inv < 0.0 then pen_mod_inv = 0.0; end
