@@ -86,7 +86,6 @@ function handle_penetration(shooter, projectile_data, src, dir, constpen, penetr
     else
         local exit_pen = exit_surf_data and SURFACE_PROPS_PENETRATION[exit_surf_data.name] or 1.0;
         local enter_pen = enter_surf_data and SURFACE_PROPS_PENETRATION[enter_surf_data.name] or 1.0;
-        print(enter_pen, exit_pen);
         pen_mod = (enter_pen + exit_pen) * 0.5;
         --dmg_mod = 0.16;
     end
