@@ -69,6 +69,13 @@ local cv_debug_dur = get_convar("pro_debug_duration");
 local cv_debug_col = get_convar("pro_debug_color");
 local cv_debug_pen = get_convar("pro_debug_penetration");
 
+local BREAKABLE_CLASSES = {
+    ["func_breakable_surf"] = true,
+    ["func_breakable"] = true,
+    ["prop_physics"] = true,
+    ["prop_physics_multiplayer"] = true,
+};
+
 local function move_projectile(shooter, projectile_data)
     if not projectile_data or projectile_data.hit or projectile_data.penetration_count <= 0 or projectile_data.damage < 1.0 then 
         return;
@@ -169,7 +176,7 @@ local function move_projectile(shooter, projectile_data)
             local final_damage = current_hit_damage * dmg_mult;
             
             if SERVER then
-                if get_class(hit_entity) == "func_breakable_surf" or get_class(hit_entity) == "func_breakable" then
+                if BREAKABLE_CLASSES[get_class(hit_entity)] then
                     projectiles.disable_fire_bullets = true;
                     fire_bullets(shooter, {
                         Attacker = shooter,
