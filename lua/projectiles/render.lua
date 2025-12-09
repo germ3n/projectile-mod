@@ -24,13 +24,12 @@ local mat_beam = Material("effects/laser1");
 local col_core = Color(255, 200, 100, 255);
 local col_glow = Color(255, 140, 0, 150);
 
+local entity_meta = FindMetaTable("Entity");
+local entindex = entity_meta.EntIndex;
+
 local function render_projectiles()
     local cur_time_val = tick_count() * tick_interval;
     local real_time = unpredicted_cur_time();
-
-    local pulse_wave = sin(real_time * 20) * 0.35 + 1.15;
-    local flicker = rand(0.9, 1.1);
-    local scale_mod = pulse_wave * flicker;
 
     local time_since_tick = real_time - cur_time_val;
     local interp_fraction = time_since_tick / tick_interval;--clamp(time_since_tick / tick_interval, 0, 1);
@@ -38,15 +37,23 @@ local function render_projectiles()
     if interp_fraction > 3.0 then interp_fraction = 3.0; end
 
     --print(cur_time_val, real_time, time_since_tick, tick_interval, interp_fraction);
-    
+
+    --randomseed(real_time * 1000);
+
     for shooter, projs in next, projectile_store do
         local projectile_idx = projs.last_received_idx;
         local buffer_size = projs.buffer_size;
         local loop_idx = 0;
+        local shooter_entindex = entindex(shooter) * 13;
 
         while loop_idx < buffer_size do
             local p_data = projs.buffer[projectile_idx];
             if p_data and not p_data.hit and p_data.penetration_count > 0 and p_data.damage >= 1.0 then
+                local pulse_offset = shooter_entindex + loop_idx * 0.5;
+                local pulse_wave = sin(real_time * 20 + pulse_offset) * 0.35 + 1.15;
+                local flicker = rand(0.8, 1.2);
+                local scale_mod = pulse_wave * flicker;
+
                 local render_pos = p_data.pos;
                 if p_data.old_pos then
                     render_pos = lerp_vector(interp_fraction, p_data.old_pos, p_data.pos);

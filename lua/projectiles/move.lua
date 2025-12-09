@@ -110,15 +110,11 @@ local function do_water_trace(projectile_data, new_pos, filter)
         });
 
         if water_trace.Hit then
-            if CLIENT then
-                local effectdata = effect_data();
-                set_origin(effectdata, water_trace.HitPos);
-                set_scale(effectdata, projectile_data.damage * 0.1);
-                set_flags(effectdata, 0);
-                effect("gunshotsplash", effectdata);
-            end
-            
-            projectile_data.drag = projectile_data.drag * 4;
+            local effectdata = effect_data();
+            set_origin(effectdata, water_trace.HitPos);
+            set_scale(effectdata, projectile_data.damage * 0.1);
+            set_flags(effectdata, 0);
+            effect("gunshotsplash", effectdata);
         end
     end
 end
@@ -192,7 +188,7 @@ local function move_projectile(shooter, projectile_data)
         end
     end]]
 
-    do_water_trace(projectile_data, new_pos, filter); -- had to move to seperate funcs cuz i hit more than 60 upvalues
+    if CLIENT then do_water_trace(projectile_data, new_pos, filter); end -- had to move to seperate funcs cuz i hit more than 60 upvalues
     
     local enter_trace = projectile_move_trace(projectile_data.pos, new_pos, filter);
 
