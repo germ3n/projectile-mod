@@ -341,9 +341,11 @@ if SERVER then
         end
     end)
 else    
+    local is_valid = is_valid;
     hook.Add("CreateMove", "projectiles_tick", function(cmd)
         if get_command_number(cmd) ~= 0 then
             for shooter, _ in next, projectile_store do
+                if not is_valid(shooter) then continue; end
                 move_projectiles(shooter, nil, nil);
             end
         end
