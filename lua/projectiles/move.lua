@@ -162,7 +162,6 @@ local function move_projectile(shooter, projectile_data)
             local final_damage = current_hit_damage * dmg_mult;
             
             if SERVER then
-                print(hit_entity, get_class(hit_entity));
                 if get_class(hit_entity) == "func_breakable_surf" then
                     projectiles.disable_fire_bullets = true;
                     fire_bullets(shooter, {
