@@ -93,6 +93,7 @@ if SERVER then
             distance_traveled = 0.0,
             max_distance = max_distance,
             random_seed = random_seed,
+            old_pos = pos,
         };
 
         --[[print("broadcasted projectile", 
@@ -180,6 +181,7 @@ if CLIENT then
             distance_traveled = 0.0,
             max_distance = max_distance,
             random_seed = random_seed,
+            old_pos = pos,
         };
     end)
 end

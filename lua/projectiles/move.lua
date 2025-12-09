@@ -163,6 +163,7 @@ local function move_projectile(shooter, projectile_data)
     end
     
     local step = current_velocity * tick_interval;
+    local current_pos = projectile_data.pos;
     local new_pos = projectile_data.pos + step;
     
     local filter = {shooter, projectile_data.weapon, projectile_data.last_hit_entity};
@@ -303,6 +304,8 @@ local function move_projectile(shooter, projectile_data)
         projectile_data.pos = new_pos;
         projectile_data.distance_traveled = projectile_data.distance_traveled + vec_len(step);
     end
+
+    projectile_data.old_pos = current_pos;
 end
 
 --todo: optimize?
