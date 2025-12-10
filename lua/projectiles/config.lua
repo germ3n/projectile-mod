@@ -471,6 +471,7 @@ if CLIENT then
             end
 
             slider.UpdateValue = function(s)
+                if s.Slider:GetDragging() or s.TextArea:IsEditing() then return; end
                 slider:SetValue(GetConVar(data.cvar):GetFloat());
             end
             
@@ -478,7 +479,6 @@ if CLIENT then
             slider.TextArea:SetTextColor(THEME.text)
             
             return panel;
-
         elseif data.type == "color" then
             local panel = vgui.Create("DPanel", parent);
             panel:SetTall(160);
@@ -543,11 +543,8 @@ if CLIENT then
         local sheet = vgui.Create("DPropertySheet", frame);
         sheet:Dock(FILL);
         sheet:DockMargin(5, 5, 5, 5);
-        
-        sheet.Paint = function(s, w, h) end
 
         local function RecursiveRefresh(pnl)
-            print("RecursiveRefresh", pnl);
             if IsValid(pnl) and pnl.UpdateValue then pnl:UpdateValue(); end
             
             local children = pnl:GetChildren();
@@ -558,6 +555,13 @@ if CLIENT then
                 end
             end
         end
+        
+        sheet.Paint = function(s, w, h)
+            if (CurTime() - (s.LastUpdated or 0)) > 0.1 then
+                RecursiveRefresh(s);
+                s.LastUpdated = CurTime();
+            end
+         end
 
         sheet.OnActiveTabChanged = function(s, old, new)
             if not IsValid(new) then return end
