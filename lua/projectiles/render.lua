@@ -28,7 +28,13 @@ local entity_meta = FindMetaTable("Entity");
 local entindex = entity_meta.EntIndex;
 local is_valid = IsValid;
 
+local cv_render_enabled = GetConVar("pro_render_enabled");
+
+local convar_meta = FindMetaTable("ConVar");
+local get_bool = convar_meta.GetBool;
+
 local function render_projectiles()
+    if not get_bool(cv_render_enabled) then return; end
     local cur_time_val = tick_count() * tick_interval;
     local real_time = unpredicted_cur_time();
 

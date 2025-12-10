@@ -26,7 +26,6 @@ local color = Color;
 local vector = Vector;
 
 local cv_ricochet_enabled = get_convar("pro_ricochet_enabled");
-local cv_penetration_damage_modifier = get_convar("pro_penetration_damage_modifier");
 local cv_ricochet_chance = get_convar("pro_ricochet_chance");
 local cv_ricochet_spread = get_convar("pro_ricochet_spread");
 local cv_ricochet_speed_multiplier = get_convar("pro_ricochet_speed_multiplier");

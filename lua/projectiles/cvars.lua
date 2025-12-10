@@ -1,7 +1,6 @@
 AddCSLuaFile();
 
 pro_projectiles_enabled = CreateConVar("pro_projectiles_enabled", "1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Enable projectiles");
-pro_penetration_damage_modifier = CreateConVar("pro_penetration_damage_modifier", "0.5", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Penetration damage modifier");
 pro_penetration_power_cost_multiplier = CreateConVar("pro_penetration_power_cost_multiplier", "0.15", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Penetration power cost multiplier");
 pro_penetration_dmg_tax_per_unit = CreateConVar("pro_penetration_dmg_tax_per_unit", "2.5", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Penetration damage tax per unit");
 pro_penetration_entry_cost_multiplier = CreateConVar("pro_penetration_entry_cost_multiplier", "0.5", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Penetration entry cost multiplier");
@@ -25,3 +24,4 @@ pro_drag_water_multiplier = CreateConVar("pro_drag_water_multiplier", "4", bit.b
 pro_gravity_enabled = CreateConVar("pro_gravity_enabled", "1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Enable gravity");
 pro_gravity_multiplier = CreateConVar("pro_gravity_multiplier", "1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Gravity multiplier");
 pro_gravity_water_multiplier = CreateConVar("pro_gravity_water_multiplier", "100", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Gravity water multiplier");
+pro_render_enabled = CreateConVar("pro_render_enabled", "1", bit.bor(FCVAR_ARCHIVE), "Enable render");

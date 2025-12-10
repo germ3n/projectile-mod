@@ -229,7 +229,10 @@ if SERVER then
     end)
 
     net.Receive("projectile_config_update", function(len, ply)
-        if not IsValid(ply) or not ply:IsSuperAdmin() then 
+        if not IsValid(ply) then 
+            return;
+        elseif not ply:IsSuperAdmin() then 
+            ply:ChatPrint("You are not authorized to use this command.");
             return;
         end
 
@@ -289,7 +292,7 @@ if CLIENT then
         local target_table = CONFIG_TYPES[cfg_type];
         if target_table then
             target_table[class_name] = val;
-            print("updated " .. cfg_type .. " for " .. class_name .. " to " .. val);
+            LocalPlayer():ChatPrint("Updated " .. cfg_type .. " for " .. class_name .. " to " .. val);
         end
     end)
 end

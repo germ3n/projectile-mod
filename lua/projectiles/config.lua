@@ -4,7 +4,10 @@ if SERVER then
     util.AddNetworkString("projectile_update_cvar");
 
     net.Receive("projectile_update_cvar", function(len, ply)
-        if not IsValid(ply) or not ply:IsSuperAdmin() then 
+        if not IsValid(ply) then 
+            return;
+        elseif not ply:IsSuperAdmin() then 
+            ply:ChatPrint("You are not authorized to use this command.");
             return;
         end
 
@@ -12,7 +15,7 @@ if SERVER then
         local value = net.ReadString();
 
         RunConsoleCommand(cvar, value);
-    end)
+    end);
 end
 
 if CLIENT then
@@ -46,8 +49,20 @@ if CLIENT then
             vars = {
                 { type = "header", label = "Global Settings" },
                 { type = "bool", cvar = "pro_projectiles_enabled", label = "Enable Projectiles" },
+                { type = "bool", cvar = "pro_ricochet_enabled", label = "Enable Ricochet" },
+                { type = "bool", cvar = "pro_drag_enabled", label = "Enable Drag" },
+                { type = "bool", cvar = "pro_gravity_enabled", label = "Enable Gravity" },
                 { type = "float", cvar = "pro_speed_scale", label = "Speed Scale", min = 0.1, max = 5.0, decimals = 2 },
-                { type = "float", cvar = "pro_weapon_damage_scale", label = "Weapon Damage Scale", min = 0.1, max = 5.0, decimals = 2 },
+                { type = "float", cvar = "pro_weapon_damage_scale", label = "Damage Scale", min = 0.1, max = 5.0, decimals = 2 },
+                { type = "float", cvar = "pro_penetration_power_scale", label = "Power Scale", min = 0.1, max = 5.0, decimals = 2 },
+            }
+        },
+        {
+            name = "Render",
+            icon = "icon16/paintbrush.png",
+            vars = {
+                { type = "header", label = "Render Settings" },
+                { type = "bool", cvar = "pro_render_enabled", label = "Enable Projectile Rendering" },
             }
         },
         {
@@ -55,7 +70,6 @@ if CLIENT then
             icon = "icon16/arrow_in.png",
             vars = {
                 { type = "header", label = "Mechanics" },
-                { type = "float", cvar = "pro_penetration_damage_modifier", label = "Damage Modifier", min = 0.0, max = 1.0, decimals = 2 },
                 { type = "float", cvar = "pro_penetration_power_scale", label = "Power Scale", min = 0.1, max = 5.0, decimals = 2 },
                 { type = "header", label = "Costs & Taxes" },
                 { type = "float", cvar = "pro_penetration_power_cost_multiplier", label = "Power Cost Multiplier", min = 0.0, max = 5.0, decimals = 2 },
@@ -169,7 +183,6 @@ if CLIENT then
                         slider.TextArea:SetTextColor(THEME.text)
                         
                         local function send_update()
-                            if not LocalPlayer():IsSuperAdmin() then return; end
                             net.Start("projectile_surfaceprop_update");
                             net.WriteString(key);
                             net.WriteFloat(math.Round(slider:GetValue(), 2));
@@ -203,8 +216,8 @@ if CLIENT then
         {
             name = "Weapons",
             icon = "icon16/gun.png",
+            lazy_load = true,
             custom_draw = function(parent)
-                -- Dependencies Check
                 if not CONFIG_TYPES or not HL2_WEAPON_CLASSES then
                     local label = vgui.Create("DLabel", parent);
                     label:SetText("Error: Weapon configuration tables (CONFIG_TYPES/HL2_WEAPON_CLASSES) not found.");
@@ -215,7 +228,6 @@ if CLIENT then
                     return;
                 end
 
-                -- Search Bar
                 local search_panel = vgui.Create("DPanel", parent)
                 search_panel:Dock(TOP)
                 search_panel:SetTall(40)
@@ -242,7 +254,6 @@ if CLIENT then
                 list_layout:Dock(FILL);
                 list_layout:DockPadding(5, 5, 5, 5);
 
-                -- Prepare Data
                 local weapon_list = weapons.GetList();
                 local sorted_weapons = {};
                 local seen = {};
@@ -268,7 +279,7 @@ if CLIENT then
                     panel:Dock(TOP);
                     panel:SetTall(30);
                     panel:DockMargin(0, 0, 0, 2);
-                    panel.Paint = function(s, w, h) end -- transparent
+                    panel.Paint = function(s, w, h) end
                     
                     local label = vgui.Create("DLabel", panel);
                     label:SetText(label_text);
@@ -299,7 +310,6 @@ if CLIENT then
                     end
 
                     local function send_update()
-                        if not LocalPlayer():IsSuperAdmin() then return; end
                         net.Start("projectile_config_update");
                         net.WriteString(cfg_type);
                         net.WriteString(class_name);
@@ -358,10 +368,9 @@ if CLIENT then
                         create_slider(content, "Pen Power", "penetration_power", class_name, 2.5, 50, 2);
                         create_slider(content, "Pen Count", "penetration_count", class_name, 10, 50, 0);
                         create_slider(content, "Drag", "drag", class_name, 0, 10, 3);
-                        create_slider(content, "Mass", "mass", class_name, 1, 500, 2);
-                        create_slider(content, "Drop Multi", "drop", class_name, 1, 5, 3);
-                        create_slider(content, "Min Speed", "min_speed", class_name, 0, 500, 0);
-                        create_slider(content, "Max Dist", "max_distance", class_name, 10000, 50000, 0);
+                        create_slider(content, "Drop", "drop", class_name, 0, 5, 3);
+                        create_slider(content, "Min Speed (Units/s)", "min_speed", class_name, 0, 500, 0);
+                        create_slider(content, "Max Dist (Units)", "max_distance", class_name, 500, 50000, 0);
 
                         content:SetTall(290); 
                         category:SetContents(content);
@@ -418,6 +427,10 @@ if CLIENT then
                 net.WriteString(value and "1" or "0");
                 net.SendToServer();
             end
+
+            panel.UpdateValue = function(s)
+                check:SetChecked(GetConVar(data.cvar):GetBool());
+            end
             
             local label = vgui.Create("DLabel", panel);
             label:SetText(data.label);
@@ -454,6 +467,10 @@ if CLIENT then
                     net.WriteString(tostring(value));
                     net.SendToServer();
                 end);
+            end
+
+            slider.UpdateValue = function(s)
+                slider:SetValue(GetConVar(data.cvar):GetFloat());
             end
             
             slider.Label:SetTextColor(THEME.text)
@@ -498,18 +515,20 @@ if CLIENT then
                 end);
             end
 
+            mixer.UpdateValue = function(s)
+                local current_str = GetConVar(data.cvar):GetString();
+                local parts = string.Split(current_str, " ");
+                local init_col = color(tonumber(parts[1]) or 0, tonumber(parts[2]) or 0, tonumber(parts[3]) or 255, parts[4] and tonumber(parts[4]) or 255);
+                mixer:SetColor(init_col);
+            end
+
             return panel;
         end
     end
 
     local function OpenConfigMenu()
-        if not LocalPlayer():IsSuperAdmin() then 
-            chat.AddText(Color(255, 0, 0), "You are not authorized to access the projectile configuration menu.");
-            return; 
-        end
-
         local frame = vgui.Create("DFrame");
-        frame:SetSize(600, 650);
+        frame:SetSize(650, 650);
         frame:Center();
         frame:SetTitle(""); 
         frame:MakePopup();
@@ -525,24 +544,58 @@ if CLIENT then
         sheet:DockMargin(5, 5, 5, 5);
         
         sheet.Paint = function(s, w, h) end
+
+        local function RecursiveRefresh(pnl)
+            print("RecursiveRefresh", pnl);
+            if IsValid(pnl) and pnl.UpdateValue then pnl:UpdateValue(); end
+            
+            local children = pnl:GetChildren();
+            for idx = 1, #children do
+                local child = children[idx];
+                if IsValid(child) then
+                    RecursiveRefresh(child);
+                end
+            end
+        end
+
+        sheet.OnActiveTabChanged = function(s, old, new)
+            if not IsValid(new) then return end
+            
+            local panel = new:GetPanel();
+            if panel and panel.DoBuild and not panel.HasBuilt then
+                panel.DoBuild(panel);
+                panel.HasBuilt = true;
+            end
+
+            RecursiveRefresh(panel);
+        end
         
         for idx, tab_data in ipairs(menu_tabs) do
             local panel = vgui.Create("DPanel", sheet);
             panel:Dock(FILL);
             panel.Paint = function(s, w, h)
-                draw.RoundedBox(4, 0, 0, w, h, Color(0,0,0,50))
+                draw.RoundedBox(4, 0, 0, w, h, Color(0,0,0,50));
             end
 
-            if tab_data.custom_draw then
-                tab_data.custom_draw(panel);
-            else
-                local scroll = vgui.Create("DScrollPanel", panel);
-                scroll:Dock(FILL);
-                scroll:DockPadding(10, 10, 10, 10);
+            local function BuildTab(pnl)
+                if tab_data.custom_draw then
+                    tab_data.custom_draw(pnl);
+                else
+                    local scroll = vgui.Create("DScrollPanel", pnl);
+                    scroll:Dock(FILL);
+                    scroll:DockPadding(10, 10, 10, 10);
 
-                for _, var_data in ipairs(tab_data.vars) do
-                    CreateControl(scroll, var_data);
+                    for _, var_data in ipairs(tab_data.vars) do
+                        CreateControl(scroll, var_data);
+                    end
                 end
+            end
+
+            if tab_data.lazy_load then
+                panel.DoBuild = BuildTab;
+            else
+                BuildTab(panel);
+                panel.HasBuilt = true;
             end
 
             sheet:AddSheet(tab_data.name, panel, tab_data.icon);
@@ -552,12 +605,12 @@ if CLIENT then
             if v.Tab then
                 v.Tab.Paint = function(s, w, h)
                     if s:IsActive() then
-                        draw.RoundedBox(4, 0, 0, w, h, THEME.accent)
+                        draw.RoundedBox(4, 0, 0, w, h, THEME.accent);
                     else
-                        draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter)
+                        draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
                     end
                 end
-                v.Tab:SetTextColor(THEME.text)
+                v.Tab:SetTextColor(THEME.text);
             end
         end
     end
