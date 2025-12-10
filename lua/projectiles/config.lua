@@ -62,7 +62,7 @@ if CLIENT then
             icon = "icon16/paintbrush.png",
             vars = {
                 { type = "header", label = "Render Settings" },
-                { type = "bool", cvar = "pro_render_enabled", label = "Enable Projectile Rendering" },
+                { type = "bool", cvar = "pro_render_enabled", label = "Enable Projectile Rendering", client = true },
             }
         },
         {
@@ -422,6 +422,7 @@ if CLIENT then
             --check:SetConVar(data.cvar);
             check:SetChecked(GetConVar(data.cvar):GetBool());
             check.OnChange = function(s, value)
+                if data.client then RunConsoleCommand(data.cvar, value and "1" or "0"); return; end
                 net.Start("projectile_update_cvar");
                 net.WriteString(data.cvar);
                 net.WriteString(value and "1" or "0");
