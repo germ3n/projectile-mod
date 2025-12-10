@@ -9,7 +9,7 @@ if SERVER then
         end
 
         local cvar = net.ReadString();
-        local value = net.ReadFloat();
+        local value = net.ReadString();
 
         RunConsoleCommand(cvar, value);
     end)
@@ -28,7 +28,6 @@ if CLIENT then
     local HL2_WEAPON_CLASSES = HL2_WEAPON_CLASSES;
     local SURFACE_PROPS_PENETRATION = SURFACE_PROPS_PENETRATION;
     
-    -- Design Constants
     local THEME = {
         bg_dark = Color(30, 30, 35, 250),
         bg_lighter = Color(40, 40, 45, 255),
@@ -105,7 +104,6 @@ if CLIENT then
                     return;
                 end
                 
-                -- Search Bar container
                 local search_panel = vgui.Create("DPanel", parent)
                 search_panel:Dock(TOP)
                 search_panel:SetTall(40)
@@ -125,7 +123,6 @@ if CLIENT then
                     s:DrawTextEntryText(THEME.text, THEME.accent, THEME.text)
                 end
                 
-                -- List Container
                 local scroll = vgui.Create("DScrollPanel", parent);
                 scroll:Dock(FILL);
                 scroll:DockMargin(0, 0, 0, 0);
@@ -342,7 +339,6 @@ if CLIENT then
                         category:Dock(TOP);
                         category:DockMargin(0, 0, 0, 5);
                         
-                        -- Styling the category header
                         category.Paint = function(s, w, h)
                             draw.RoundedBox(4, 0, 0, w, 20, THEME.bg_lighter)
                         end
@@ -414,11 +410,12 @@ if CLIENT then
 
             local check = vgui.Create("DCheckBox", panel);
             check:SetPos(0, 7);
-            check:SetConVar(data.cvar);
+            --check:SetConVar(data.cvar);
+            check:SetChecked(GetConVar(data.cvar):GetBool());
             check.OnChange = function(s, value)
                 net.Start("projectile_update_cvar");
                 net.WriteString(data.cvar);
-                net.WriteString(value);
+                net.WriteString(value and "1" or "0");
                 net.SendToServer();
             end
             
@@ -446,15 +443,19 @@ if CLIENT then
             slider:SetMin(data.min);
             slider:SetMax(data.max);
             slider:SetDecimals(data.decimals);
-            slider:SetConVar(data.cvar);
+            --slider:SetConVar(data.cvar);
+            slider:SetValue(GetConVar(data.cvar):GetFloat());
             slider.OnValueChanged = function(s, value)
-                net.Start("projectile_update_cvar");
-                net.WriteString(data.cvar);
-                net.WriteString(value);
-                net.SendToServer();
+                if math.abs(GetConVar(data.cvar):GetFloat() - value) < 0.001 then return end
+                
+                timer.Create("projectile_update_cvar_timer_" .. data.cvar, 0.2, 1, function()
+                    net.Start("projectile_update_cvar");
+                    net.WriteString(data.cvar);
+                    net.WriteString(tostring(value));
+                    net.SendToServer();
+                end);
             end
             
-            -- Styling the slider
             slider.Label:SetTextColor(THEME.text)
             slider.TextArea:SetTextColor(THEME.text)
             
@@ -488,11 +489,13 @@ if CLIENT then
             mixer:SetColor(init_col);
 
             mixer.ValueChanged = function(s, col)
-                local val = string.format("%d %d %d", col.r, col.g, col.b);
-                net.Start("projectile_update_cvar");
-                net.WriteString(data.cvar);
-                net.WriteString(val);
-                net.SendToServer();
+                timer.Create("projectile_update_cvar_timer_" .. data.cvar, 0.2, 1, function()
+                    local val = string.format("%d %d %d", col.r, col.g, col.b);
+                    net.Start("projectile_update_cvar");
+                    net.WriteString(data.cvar);
+                    net.WriteString(val);
+                    net.SendToServer();
+                end);
             end
 
             return panel;
@@ -511,7 +514,6 @@ if CLIENT then
         frame:SetTitle(""); 
         frame:MakePopup();
         
-        -- Custom Frame Paint
         frame.Paint = function(s, w, h)
             draw.RoundedBox(6, 0, 0, w, h, THEME.bg_dark)
             draw.RoundedBoxEx(6, 0, 0, w, 25, THEME.header_bg, true, true, false, false)
