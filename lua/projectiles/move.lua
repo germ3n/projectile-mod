@@ -165,6 +165,7 @@ local function debug_penetration(projectile_data, current_hit_damage, current_pe
     debug_text(exit_pos + vector(0, 0, 60), string_format("mat_out: %s", exit_mat), dur, false);
 end
 
+local _is_valid = IsValid;
 local function move_projectile(shooter, projectile_data)
     if projectile_data.hit or projectile_data.penetration_count <= 0 or projectile_data.damage < 1.0 or projectile_data.distance_traveled >= projectile_data.max_distance then 
         return true;
@@ -265,8 +266,10 @@ local function move_projectile(shooter, projectile_data)
                 else
                     local dmg_info = damage_info();
                     set_damage(dmg_info, final_damage);
-                    set_inflictor(dmg_info, projectile_data.weapon);
-                    set_weapon(dmg_info, projectile_data.weapon);
+                    if _is_valid(projectile_data.weapon) then 
+                        set_inflictor(dmg_info, projectile_data.weapon); 
+                        set_weapon(dmg_info, projectile_data.weapon);
+                    end
                     set_attacker(dmg_info, shooter);
                     dmg_set_damage_type(dmg_info, DMG_BULLET);
                     set_damage_position(dmg_info, enter_trace.HitPos);
@@ -344,7 +347,7 @@ if SERVER then
                 move_projectiles(shooter, nil, nil);
             end
         end
-    end)
+    end);
 else    
     local is_valid = IsValid;
     hook.Add("CreateMove", "projectiles_tick", function(cmd)
@@ -354,7 +357,7 @@ else
                 move_projectiles(shooter, nil, nil);
             end
         end
-    end)
+    end);
 end
 
 print("loaded projectiles move");

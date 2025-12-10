@@ -1,5 +1,20 @@
 AddCSLuaFile();
 
+if SERVER then
+    util.AddNetworkString("projectile_update_cvar");
+
+    net.Receive("projectile_update_cvar", function(len, ply)
+        if not IsValid(ply) or not ply:IsSuperAdmin() then 
+            return;
+        end
+
+        local cvar = net.ReadString();
+        local value = net.ReadFloat();
+
+        RunConsoleCommand(cvar, value);
+    end)
+end
+
 if CLIENT then
     local surface = surface;
     local vgui = vgui;
@@ -371,6 +386,7 @@ if CLIENT then
                 { type = "header", label = "Visualization" },
                 { type = "bool", cvar = "pro_debug_projectiles", label = "Draw Projectiles (Cheat)" },
                 { type = "bool", cvar = "pro_debug_penetration", label = "Draw Penetration (Cheat)" },
+                { type = "bool", cvar = "pro_debug_ricochet", label = "Draw Ricochet (Cheat)" },
                 { type = "float", cvar = "pro_debug_duration", label = "Debug Draw Duration", min = 0.1, max = 10.0, decimals = 1 },
                 { type = "color", cvar = "pro_debug_color", label = "Debug Color" },
             }
@@ -399,6 +415,12 @@ if CLIENT then
             local check = vgui.Create("DCheckBox", panel);
             check:SetPos(0, 7);
             check:SetConVar(data.cvar);
+            check.OnChange = function(s, value)
+                net.Start("projectile_update_cvar");
+                net.WriteString(data.cvar);
+                net.WriteString(value);
+                net.SendToServer();
+            end
             
             local label = vgui.Create("DLabel", panel);
             label:SetText(data.label);
@@ -425,6 +447,12 @@ if CLIENT then
             slider:SetMax(data.max);
             slider:SetDecimals(data.decimals);
             slider:SetConVar(data.cvar);
+            slider.OnValueChanged = function(s, value)
+                net.Start("projectile_update_cvar");
+                net.WriteString(data.cvar);
+                net.WriteString(value);
+                net.SendToServer();
+            end
             
             -- Styling the slider
             slider.Label:SetTextColor(THEME.text)
@@ -461,7 +489,10 @@ if CLIENT then
 
             mixer.ValueChanged = function(s, col)
                 local val = string.format("%d %d %d", col.r, col.g, col.b);
-                RunConsoleCommand(data.cvar, val);
+                net.Start("projectile_update_cvar");
+                net.WriteString(data.cvar);
+                net.WriteString(val);
+                net.SendToServer();
             end
 
             return panel;
@@ -469,6 +500,11 @@ if CLIENT then
     end
 
     local function OpenConfigMenu()
+        if not LocalPlayer():IsSuperAdmin() then 
+            chat.AddText(Color(255, 0, 0), "You are not authorized to access the projectile configuration menu.");
+            return; 
+        end
+
         local frame = vgui.Create("DFrame");
         frame:SetSize(600, 650);
         frame:Center();
