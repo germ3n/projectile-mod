@@ -13,5 +13,6 @@ include("render.lua");
 include("weapon_cfg.lua");
 include("firebullets.lua");
 include("props.lua");
+include("config.lua");
 
 print("loaded projectiles system");

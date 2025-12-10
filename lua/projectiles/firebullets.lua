@@ -41,7 +41,7 @@ end
 local SPREAD_VALUES = {
     ["default"] = calc_spread,
     ["weapon_shotgun"] = function(weapon, dir, spread, bias)
-        return calc_spread(weapon, dir, spread, 0.0);
+        return calc_spread(weapon, dir, spread, -1.0);
     end,
 };
 
@@ -54,8 +54,12 @@ end
 
 local convar_meta = FindMetaTable("ConVar");
 local get_bool = convar_meta.GetBool;
+local get_float = convar_meta.GetFloat;
 
 local cv_projectiles_enabled = GetConVar("pro_projectiles_enabled");
+local cv_penetration_power_scale = GetConVar("pro_penetration_power_scale");
+local cv_weapon_damage_scale = GetConVar("pro_weapon_damage_scale");
+local cv_speed_scale = GetConVar("pro_speed_scale");
 
 if SERVER then
     local broadcast_projectile = broadcast_projectile;
@@ -110,10 +114,10 @@ if SERVER then
         end
 
         local inflictor_class = get_class(inflictor);
-        local speed = get_weapon_speed(inflictor, inflictor_class);
-        local damage = get_weapon_damage(inflictor, inflictor_class, data.Damage);
+        local speed = get_weapon_speed(inflictor, inflictor_class) * get_float(cv_speed_scale);
+        local damage = get_weapon_damage(inflictor, inflictor_class, data.Damage) * get_float(cv_weapon_damage_scale);
         local src = calculate_lean_pos and calculate_lean_pos(data.Src, angle(data.Dir), lean_amount, shooter) or data.Src;
-        local penetration_power = get_weapon_penetration_power(inflictor, inflictor_class);
+        local penetration_power = get_weapon_penetration_power(inflictor, inflictor_class) * get_float(cv_penetration_power_scale);
         local penetration_count = get_weapon_penetration_count(inflictor, inflictor_class);
         local drag = get_weapon_drag(inflictor, inflictor_class);
         local mass = get_weapon_mass(inflictor, inflictor_class);

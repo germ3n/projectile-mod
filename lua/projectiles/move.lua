@@ -67,6 +67,7 @@ local get_normalized = vector_meta.GetNormalized;
 local vec_len = vector_meta.Length;
 local vec_mul = vector_meta.Mul;
 local vec_add = vector_meta.Add;
+local to_screen = vector_meta.ToScreen;
 
 local cv_debug = get_convar("pro_debug_projectiles");
 local cv_debug_dur = get_convar("pro_debug_duration");
@@ -133,6 +134,37 @@ local fire_bullets_config = {
     Tracer = 0,
 };
 
+local function debug_projectile_course(projectile_data, enter_trace)
+    local dur = get_float(cv_debug_dur);
+    local col_vec = string_split(get_string(cv_debug_col), " ");
+    local col = color(tonumber(col_vec[1]), tonumber(col_vec[2]), tonumber(col_vec[3]), col_vec[4] and tonumber(col_vec[4]) or 150);
+
+    debug_line(projectile_data.pos, enter_trace.HitPos, dur, col, true);
+    
+    if enter_trace.Hit then
+        debug_box(enter_trace.HitPos, vector(-2, -2, -2), vector(2, 2, 2), dur, col, true);
+    end
+end
+
+local function debug_penetration(projectile_data, current_hit_damage, current_penetration_power, exit_pos, enter_trace, exit_trace)
+    local dur = get_float(cv_debug_dur);
+    debug_line(enter_trace.HitPos, exit_pos, dur, color(255, 0, 0, 150), true);
+    debug_box(exit_pos, vector(-1, -1, -1), vector(1, 1, 1), dur, color(255, 0, 0, 150), true);
+
+    local dmg_lost = current_hit_damage - projectile_data.damage;
+    local enter_map_props = enter_trace and enter_trace.SurfaceProps and get_surface_data(enter_trace.SurfaceProps);
+    local exit_map_props = exit_trace and exit_trace.SurfaceProps and get_surface_data(exit_trace.SurfaceProps);
+    local enter_mat = enter_map_props and enter_map_props.name or "unknown";
+    local exit_mat = exit_map_props and exit_map_props.name or "unknown";
+    
+    debug_text(exit_pos + vector(0, 0, 10), string_format("dmg_lost: %.1f", dmg_lost), dur, false);
+    debug_text(exit_pos + vector(0, 0, 20), string_format("dmg_remaining: %.1f", current_hit_damage - dmg_lost), dur, false);
+    debug_text(exit_pos + vector(0, 0, 30), string_format("old_penetration_power: %.1f", current_penetration_power), dur, false);
+    debug_text(exit_pos + vector(0, 0, 40), string_format("new_penetration_power: %.1f", projectile_data.penetration_power), dur, false);
+    debug_text(exit_pos + vector(0, 0, 50), string_format("mat_in: %s", enter_mat), dur, false);
+    debug_text(exit_pos + vector(0, 0, 60), string_format("mat_out: %s", exit_mat), dur, false);
+end
+
 local function move_projectile(shooter, projectile_data)
     if projectile_data.hit or projectile_data.penetration_count <= 0 or projectile_data.damage < 1.0 or projectile_data.distance_traveled >= projectile_data.max_distance then 
         return true;
@@ -144,7 +176,7 @@ local function move_projectile(shooter, projectile_data)
             drag_factor = drag_factor * get_float(cv_drag_water_multiplier);
         end
 
-        projectile_data.speed = max(0, (projectile_data.speed - projectile_data.speed * drag_factor));
+        projectile_data.speed = projectile_data.speed - projectile_data.speed * drag_factor;
     end
 
     if projectile_data.speed <= 50.0 then
@@ -178,17 +210,7 @@ local function move_projectile(shooter, projectile_data)
     
     local enter_trace = projectile_move_trace(projectile_data.pos, new_pos, trace_filter);
 
-    --[[if get_bool(cv_debug) then
-        local dur = get_float(cv_debug_dur);
-        local col_vec = string_split(get_string(cv_debug_col), " ");
-        local col = color(tonumber(col_vec[1]), tonumber(col_vec[2]), tonumber(col_vec[3]), col_vec[4] and tonumber(col_vec[4]) or 150);
-
-        debug_line(projectile_data.pos, enter_trace.HitPos, dur, col, true);
-        
-        if enter_trace.Hit then
-            debug_box(enter_trace.HitPos, vector(-2, -2, -2), vector(2, 2, 2), dur, col, true);
-        end
-    end]]
+    if get_bool(cv_debug) then debug_projectile_course(projectile_data, enter_trace); end
 
     if enter_trace.Hit then
         if CLIENT then
@@ -204,22 +226,13 @@ local function move_projectile(shooter, projectile_data)
     
         local hit_entity = enter_trace.Entity;
         local current_hit_damage = projectile_data.damage;
+        local current_penetration_power = projectile_data.penetration_power;
 
         local stop_bullet, exit_pos, exit_trace = handle_penetration(shooter, projectile_data, enter_trace.HitPos, projectile_data.dir, projectile_data.constpen, projectile_data.penetration_power, enter_trace);
 
         -- todo: fix
         if get_bool(cv_debug_pen) and exit_pos then
-            local dur = get_float(cv_debug_dur);
-            debug_line(enter_trace.HitPos, exit_pos, dur, color(255, 0, 0, 150), true);
-            debug_box(exit_pos, vector(-1, -1, -1), vector(1, 1, 1), dur, color(255, 0, 0, 150), true);
-
-            local dmg_lost = current_hit_damage - projectile_data.damage;
-            local enter_map_props = enter_trace and enter_trace.SurfaceProps and get_surface_data(enter_trace.SurfaceProps);
-            local exit_map_props = exit_trace and exit_trace.SurfaceProps and get_surface_data(exit_trace.SurfaceProps);
-            local enter_mat = enter_map_props and enter_map_props.name or "unknown";
-            local exit_mat = exit_map_props and exit_map_props.name or "unknown";
-            
-            debug_text(exit_pos + vector(0, 0, 10), string_format("lost: %.1f\nremaining: %.1f\nmat_in: %s\nmat_out: %s", dmg_lost, projectile_data.damage, enter_mat, exit_mat), dur, false);
+            debug_penetration(projectile_data, current_hit_damage, current_penetration_power, exit_pos, enter_trace, exit_trace);
         end
 
         if CLIENT and exit_trace and exit_trace.Hit then
@@ -290,6 +303,15 @@ local function move_projectile(shooter, projectile_data)
     return false;
 end
 
+
+local function debug_final_pos(projectile_data)
+    local dur = get_float(cv_debug_dur);
+    local col_vec = string_split(get_string(cv_debug_col), " ");
+    local col = color(tonumber(col_vec[1]), tonumber(col_vec[2]), tonumber(col_vec[3]), col_vec[4] and tonumber(col_vec[4]) or 150);
+
+    debug_box(projectile_data.pos, vector(-1, -1, -1), vector(1, 1, 1), dur, col, true);
+end
+
 local function move_projectiles(ply, mv, cmd)
     local projectiles = projectile_store[ply];
     if not projectiles then return; end
@@ -301,6 +323,7 @@ local function move_projectiles(ply, mv, cmd)
     while idx <= active_projectile_count do
         local hit = move_projectile(ply, projectiles.active_projectiles[idx]);
         if hit then
+            if get_bool(cv_debug) then debug_final_pos(projectiles.active_projectiles[idx]); end
             projectiles.active_projectiles[idx] = projectiles.active_projectiles[active_projectile_count];
             projectiles.active_projectiles[active_projectile_count] = nil;
             active_projectile_count = active_projectile_count - 1;

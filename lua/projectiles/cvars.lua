@@ -1,11 +1,19 @@
 AddCSLuaFile();
 
 pro_projectiles_enabled = CreateConVar("pro_projectiles_enabled", "1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Enable projectiles");
+pro_penetration_damage_modifier = CreateConVar("pro_penetration_damage_modifier", "0.5", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Penetration damage modifier");
+pro_penetration_power_cost_multiplier = CreateConVar("pro_penetration_power_cost_multiplier", "0.15", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Penetration power cost multiplier");
+pro_penetration_dmg_tax_per_unit = CreateConVar("pro_penetration_dmg_tax_per_unit", "2.5", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Penetration damage tax per unit");
+pro_penetration_entry_cost_multiplier = CreateConVar("pro_penetration_entry_cost_multiplier", "0.5", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Penetration entry cost multiplier");
+pro_weapon_damage_scale = CreateConVar("pro_weapon_damage_scale", "1.0", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Penetration weapon damage scale");
+pro_penetration_power_scale = CreateConVar("pro_penetration_power_scale", "1.0", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Penetration power scale");
+pro_speed_scale = CreateConVar("pro_speed_scale", "1.0", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Speed scale");
 pro_debug = CreateConVar("pro_debug_projectiles", "0", bit.bor(FCVAR_NOTIFY, FCVAR_CHEAT, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Debug projectiles");
 pro_debug_duration = CreateConVar("pro_debug_duration", "4", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Debug projectiles duration");
 pro_debug_color = CreateConVar("pro_debug_color", "0 0 255", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Debug projectiles color");
 pro_debug_penetration = CreateConVar("pro_debug_penetration", "0", bit.bor(FCVAR_NOTIFY, FCVAR_CHEAT, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Debug penetration");
 pro_ricochet_enabled = CreateConVar("pro_ricochet_enabled", "0", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Enable ricochet");
+pro_debug_ricochet = CreateConVar("pro_debug_ricochet", "0", bit.bor(FCVAR_NOTIFY, FCVAR_CHEAT, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Debug ricochet");
 pro_ricochet_chance = CreateConVar("pro_ricochet_chance", "0.25", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Ricochet chance");
 pro_ricochet_spread = CreateConVar("pro_ricochet_spread", "0.2", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Ricochet spread");
 pro_ricochet_speed_multiplier = CreateConVar("pro_ricochet_speed_multiplier", "0.6", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Ricochet speed multiplier");

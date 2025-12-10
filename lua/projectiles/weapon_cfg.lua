@@ -7,7 +7,7 @@ local NULL = NULL;
 
 local WEAPON_BLACKLIST = {};
 
-local HL2_WEAPON_CLASSES = {
+HL2_WEAPON_CLASSES = {
     "weapon_pistol",
     "weapon_357",
     "weapon_shotgun",
@@ -63,7 +63,7 @@ local WEAPON_MAX_DISTANCE = {
     ["weapon_shotgun"] = 1500.0,
 };
 
-local CONFIG_TYPES = {
+CONFIG_TYPES = {
     ["speed"] = WEAPON_SPEEDS,
     ["damage"] = WEAPON_DAMAGES,
     ["penetration_power"] = WEAPON_PENETRATION_POWERS,
@@ -74,6 +74,9 @@ local CONFIG_TYPES = {
     ["min_speed"] = WEAPON_MIN_SPEED,
     ["max_distance"] = WEAPON_MAX_DISTANCE,
 };
+
+local CONFIG_TYPES = CONFIG_TYPES;
+local HL2_WEAPON_CLASSES = HL2_WEAPON_CLASSES;
 
 function get_weapon_speed(weapon, class_name)
     local val = WEAPON_SPEEDS[class_name];
@@ -288,141 +291,6 @@ if CLIENT then
             target_table[class_name] = val;
             print("updated " .. cfg_type .. " for " .. class_name .. " to " .. val);
         end
-    end)
-
-    local function open_editor()
-        local frame = vgui.Create("DFrame");
-        frame:SetSize(500, 700);
-        frame:Center();
-        frame:SetTitle("Weapon Config Editor");
-        frame:MakePopup();
-
-        local search = vgui.Create("DTextEntry", frame);
-        search:Dock(TOP);
-        search:SetPlaceholderText("Search Weapon Class...");
-        
-        local scroll = vgui.Create("DScrollPanel", frame);
-        scroll:Dock(FILL);
-
-        local list_layout = vgui.Create("DListLayout", scroll);
-        list_layout:Dock(FILL);
-
-        local weapon_list = weapons.GetList();
-        local sorted_weapons = {};
-        for idx = 1, #weapon_list do
-            local wep = weapon_list[idx];
-            table.insert(sorted_weapons, wep.ClassName);
-        end
-        for idx = 1, #HL2_WEAPON_CLASSES do
-            local class_name = HL2_WEAPON_CLASSES[idx];
-            table.insert(sorted_weapons, class_name);
-        end
-        table.sort(sorted_weapons);
-
-        local function create_slider(parent, label_text, cfg_type, class_name, default_val, max_val, decimals)
-            local panel = vgui.Create("DPanel", parent);
-            panel:Dock(TOP);
-            panel:SetTall(30);
-            panel:SetBackgroundColor(Color(0, 0, 0, 0));
-            
-            local label = vgui.Create("DLabel", panel);
-            label:SetText(label_text);
-            label:Dock(LEFT);
-            label:SetWide(120);
-            label:SetTextColor(color_white);
-
-            local slider = vgui.Create("DNumSlider", panel);
-            slider:Dock(FILL);
-            slider:SetMin(0);
-            slider:SetMax(max_val);
-            slider:SetDecimals(decimals);
-            
-            local current_table = CONFIG_TYPES[cfg_type];
-            local current_val = current_table[class_name];
-
-            if current_val and isnumber(current_val) then
-                slider:SetValue(current_val);
-            else
-                local def = current_table["default"];
-                if isnumber(def) then
-                    slider:SetValue(def);
-                else
-                    slider:SetValue(default_val);
-                end
-            end
-
-            local function send_update()
-                if not LocalPlayer():IsSuperAdmin() then return; end
-                net.Start("projectile_config_update");
-                net.WriteString(cfg_type);
-                net.WriteString(class_name);
-                net.WriteFloat(math.Round(slider:GetValue(), decimals));
-                net.SendToServer();
-            end
-
-            slider.Think = function(s)
-                local isInteracting = s.Slider:GetDragging() or s.TextArea:IsEditing();
-                if isInteracting then
-                    s.HasChanged = true;
-                elseif s.HasChanged then
-                    s.HasChanged = false;
-                    send_update();
-                end
-            end
-
-            slider.TextArea.OnEnter = function()
-                send_update();
-                slider.HasChanged = false;
-            end
-        end
-
-        local function populate_list(filter)
-            list_layout:Clear();
-
-            for _, class_name in ipairs(sorted_weapons) do
-                if WEAPON_BLACKLIST[class_name] then continue end
-                
-                if filter and not string.find(string.lower(class_name), string.lower(filter), 1, true) then
-                    continue;
-                end
-
-                local category = list_layout:Add("DCollapsibleCategory");
-                category:SetLabel(class_name);
-                category:SetExpanded(false);
-                category:Dock(TOP);
-                category:DockMargin(0, 0, 0, 5);
-
-                local content = vgui.Create("DPanel");
-                content:SetBackgroundColor(Color(40, 40, 40));
-                
-                create_slider(content, "Speed", "speed", class_name, 2000, 10000, 0);
-                create_slider(content, "Damage", "damage", class_name, 10, 500, 0);
-                create_slider(content, "Pen Power", "penetration_power", class_name, 2.5, 50, 2);
-                create_slider(content, "Pen Count", "penetration_count", class_name, 10, 50, 0);
-                create_slider(content, "Drag", "drag", class_name, 0, 10, 3);
-                create_slider(content, "Mass", "mass", class_name, 1, 500, 2);
-                create_slider(content, "Drop Multi", "drop", class_name, 1, 5, 3);
-                create_slider(content, "Min Speed", "min_speed", class_name, 0, 500, 0);
-                create_slider(content, "Max Dist", "max_distance", class_name, 10000, 50000, 0);
-
-                content:SetTall(290); 
-                category:SetContents(content);
-            end
-        end
-
-        populate_list();
-
-        search.OnChange = function(s)
-            populate_list(s:GetValue());
-        end
-    end
-
-    concommand.Add("pro_weaponconfig", function()
-        if not LocalPlayer():IsSuperAdmin() then
-            chat.AddText(Color(255, 50, 50), "You must be a SuperAdmin to use this menu.");
-            return;
-        end
-        open_editor();
     end)
 end
 

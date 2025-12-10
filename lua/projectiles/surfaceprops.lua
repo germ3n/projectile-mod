@@ -1,125 +1,151 @@
 AddCSLuaFile();
 
 SURFACE_PROPS_PENETRATION = {
-    ["default"] = 1.0,
-    ["default_silent"] = 1.0,
-    ["player"] = 1.0,
-    ["player_control_clip"] = 1.0,
-    ["no_decal"] = 1.0,
-    ["solidmetal"] = 0.27,
-    ["metal"] = 0.4,
-    ["metal_barrel"] = 0.5,
-    ["metal_vehicle"] = 0.4,
-    ["metal_survivalCase"] = 0.4,
-    ["metal_survivalCase_unpunchable"] = 0.4,
-    ["metaldogtags"] = 0.4,
-    ["metalgrate"] = 0.95,
-    ["Metal_Box"] = 0.5,
-    ["metal_bouncy"] = 0.27,
-    ["slipperymetal"] = 0.4,
-    ["grate"] = 0.95,
-    ["metalvent"] = 0.6,
-    ["metalpanel"] = 0.5,
-    ["canister"] = 0.5,
-    ["metal_barrel_exploding"] = 0.5,
-    ["floating_metal_barrel"] = 0.5,
-    ["roller"] = 0.5,
-    ["popcan"] = 0.5,
-    ["paintcan"] = 0.5,
-    ["slipperyslide"] = 0.27,
-    ["strongman_bell"] = 0.27,
+    ["popcan"] = 0.9,
+    ["concrete_block"] = 0.35,
+    ["unknown"] = 0.5,
     ["grenade"] = 0.5,
-    ["weapon"] = 0.4,
-    ["metal_shield"] = 0.4,
-    ["metalvehicle"] = 0.5,
-    ["metal_sand_barrel"] = 0.01,
-    ["jalopy"] = 0.4,
-    ["brass_bell_large"] = 1.0,
-    ["brass_bell_medium"] = 1.0,
-    ["brass_bell_small"] = 1.0,
-    ["brass_bell_smallest"] = 1.0,
-    ["computer"] = 0.4,
-    ["weapon_magazine"] = 0.4,
-    ["ladder"] = 0.4,
-    ["chainlink"] = 0.99,
-    ["chain"] = 0.99,
-    ["dirt"] = 0.6,
-    ["mud"] = 0.6,
-    ["slipperyslime"] = 0.6,
-    ["grass"] = 0.6,
-    ["slowgrass"] = 0.6,
-    ["sugarcane"] = 0.6,
-    ["sand"] = 0.3,
-    ["gravel"] = 0.4,
-    ["foliage"] = 0.95,
-    ["floatingstandable"] = 0.6,
-    ["water"] = 0.3,
-    ["wet"] = 1.0,
-    ["puddle"] = 1.0,
-    ["slime"] = 1.0,
-    ["quicksand"] = 0.2,
-    ["wade"] = 0.3,
-    ["Wood"] = 0.9,
-    ["Wood_lowdensity"] = 0.9,
-    ["Wood_Box"] = 0.9,
-    ["Wood_Basket"] = 0.9,
-    ["Wood_Crate"] = 0.9,
-    ["Wood_Plank"] = 0.85,
-    ["Wood_Solid"] = 0.8,
-    ["Wood_Furniture"] = 0.9,
-    ["Wood_Panel"] = 0.9,
-    ["Wood_Dense"] = 0.5,
-    ["woodladder"] = 0.9,
-    ["tile"] = 0.7,
-    ["tile_survivalCase"] = 0.7,
-    ["tile_survivalCase_GIB"] = 0.7,
-    ["clay"] = 0.95,
-    ["ceiling_tile"] = 0.95,
-    ["glass"] = 0.99,
-    ["glassfloor"] = 0.99,
-    ["glassbottle"] = 0.99,
-    ["pottery"] = 0.95,
-    ["concrete"] = 0.5,
-    ["asphalt"] = 0.55,
-    ["rock"] = 0.5,
-    ["porcelain"] = 0.95,
-    ["boulder"] = 0.5,
-    ["brick"] = 0.47,
-    ["concrete_block"] = 0.5,
-    ["stucco"] = 0.5,
-    ["flesh"] = 0.9,
-    ["bloodyflesh"] = 0.9,
-    ["alienflesh"] = 0.9,
-    ["armorflesh"] = 0.5,
-    ["watermelon"] = 0.95,
-    ["carpet"] = 0.75,
+    ["wade"] = 0.9,
+    ["phx_tire_normal"] = 0.5,
+    ["canister"] = 0.35,
+    ["paper"] = 0.98,
+    ["tile"] = 0.5,
     ["dufflebag_survivalCase"] = 0.75,
-    ["upholstery"] = 0.75,
-    ["rubber"] = 0.85,
-    ["rubbertire"] = 0.85,
-    ["jeeptire"] = 0.85,
-    ["jalopytire"] = 0.85,
-    ["slidingrubbertire"] = 0.85,
-    ["brakingrubbertire"] = 0.85,
-    ["slidingrubbertire_front"] = 0.85,
-    ["slidingrubbertire_rear"] = 0.85,
-    ["slidingrubbertire_jalopyfront"] = 0.85,
+    ["woodladder"] = 0.7,
+    ["plastic_barrel_buoyant"] = 0.8,
+    ["rubbertire"] = 0.6,
+    ["rubber"] = 0.7,
+    ["metalvehicle"] = 0.25,
+    ["wood_panel"] = 0.7,
+    ["soccerball"] = 0.95,
+    ["weapon_magazine"] = 0.4,
+    ["metal_shield"] = 0.4,
+    ["wood_basket"] = 0.9,
+    ["metaldogtags"] = 0.4,
+    ["rock"] = 0.3,
+    ["wood_furniture"] = 0.75,
+    ["slowgrass"] = 0.65,
     ["slidingrubbertire_jalopyrear"] = 0.85,
-    ["soccerball"] = 1.0,
-    ["plaster"] = 0.7,
-    ["sheetrock"] = 0.85,
-    ["cardboard"] = 0.95,
-    ["paper"] = 0.95,
-    ["papercup"] = 0.95,
+    ["hunter"] = 0.75,
+    ["slidingrubbertire"] = 0.65,
+    ["solidmetal"] = 0.15,
+    ["metalpanel"] = 0.35,
+    ["gravel"] = 0.5,
+    ["tile_survivalcase_gib"] = 0.7,
+    ["glassbottle"] = 0.95,
+    ["flesh"] = 0.85,
+    ["crowbar"] = 0.3,
+    ["brass_bell_medium"] = 0.25,
+    ["combine_metal"] = 0.2,
+    ["foliage"] = 0.95,
+    ["wood_plank"] = 0.75,
+    ["ladder"] = 0.5,
+    ["sugarcane"] = 0.7,
+    ["slidingrubbertire_front"] = 0.85,
+    ["grate"] = 0.95,
+    ["brick"] = 0.4,
+    ["brass_bell_smallest"] = 0.35,
+    ["chainlink"] = 0.98,
+    ["concrete"] = 0.35,
+    ["antlionsand"] = 0.5,
+    ["dirt"] = 0.6,
+    ["gm_ps_metaltire"] = 0.25,
+    ["strider"] = 0.2,
+    ["upholstery"] = 0.9,
+    ["player"] = 0.8,
+    ["jeeptire"] = 0.6,
+    ["tile_survivalcase"] = 0.5,
+    ["zombieflesh"] = 0.85,
+    ["ceiling_tile"] = 0.9,
+    ["brakingrubbertire"] = 0.85,
+    ["gm_torpedo"] = 0.4,
+    ["wood_lowdensity"] = 0.8,
+    ["slipperyslime"] = 0.6,
+    ["slipperyslide"] = 0.27,
     ["plastic_barrel"] = 0.7,
-    ["plastic_barrel_buoyant"] = 0.7,
-    ["Plastic_Box"] = 0.75,
-    ["plastic"] = 0.75,
-    ["plastic_survivalCase"] = 0.75,
-    ["item"] = 0.75,
-    ["ice"] = 0.75,
-    ["snow"] = 0.85,
-    ["blockbullets"] = 0.01
+    ["snow"] = 0.7,
+    ["player_control_clip"] = 1.0,
+    ["blockbullets"] = 0.01,
+    ["water"] = 0.9,
+    ["ice"] = 0.6,
+    ["wood"] = 0.7,
+    ["slidingrubbertire_rear"] = 0.85,
+    ["metal_bouncy"] = 0.15,
+    ["metal_barrellight_hl"] = 0.5,
+    ["weapon"] = 0.35,
+    ["pottery"] = 0.9,
+    ["plaster"] = 0.8,
+    ["watermelon"] = 0.9,
+    ["phx_ww2bomb"] = 0.2,
+    ["jalopy"] = 0.25,
+    ["metalgrate"] = 0.95,
+    ["default"] = 0.5,
+    ["metal_survivalcase_unpunchable"] = 0.4,
+    ["chain"] = 0.98,
+    ["metal_barrel_hl"] = 0.45,
+    ["plastic"] = 0.8,
+    ["alienflesh"] = 0.85,
+    ["wet"] = 0.95,
+    ["hay"] = 0.85,
+    ["strongman_bell"] = 0.27,
+    ["wood_box"] = 0.75,
+    ["no_decal"] = 1.0,
+    ["slidingrubbertire_jalopyfront"] = 0.85,
+    ["clay"] = 0.95,
+    ["gmod_ice"] = 0.6,
+    ["combine_glass"] = 0.95,
+    ["gm_ps_woodentire"] = 0.7,
+    ["metal_vehicle"] = 0.4,
+    ["papercup"] = 0.98,
+    ["gunship"] = 0.2,
+    ["mud"] = 0.55,
+    ["cement"] = 0.35,
+    ["plastic_barrel_verybuoyant"] = 0.9,
+    ["phx_explosiveball"] = 0.2,
+    ["cavern_rock"] = 0.3,
+    ["wood_crate"] = 0.75,
+    ["antlion"] = 0.75,
+    ["gmod_bouncy"] = 0.6,
+    ["slipperymetal"] = 0.35,
+    ["gm_ps_egg"] = 0.9,
+    ["sheetrock"] = 0.8,
+    ["sand"] = 0.5,
+    ["metal_barrel_exploding"] = 0.5,
+    ["roller"] = 0.5,
+    ["grass"] = 0.65,
+    ["metal_box"] = 0.4,
+    ["bloodyflesh"] = 0.85,
+    ["stucco"] = 0.5,
+    ["wood_dense"] = 0.5,
+    ["floating_metal_barrel"] = 0.45,
+    ["carpet"] = 0.9,
+    ["plastic_survivalcase"] = 0.75,
+    ["floatingstandable"] = 0.6,
+    ["plastic_box"] = 0.8,
+    ["cardboard"] = 0.95,
+    ["metalvent"] = 0.6,
+    ["wood_solid"] = 0.6,
+    ["metal_survivalcase"] = 0.4,
+    ["brass_bell_large"] = 0.2,
+    ["default_silent"] = 1.0,
+    ["porcelain"] = 0.9,
+    ["asphalt"] = 0.4,
+    ["armorflesh"] = 0.5,
+    ["boulder"] = 0.25,
+    ["slime"] = 0.8,
+    ["glassfloor"] = 0.98,
+    ["metal_sand_barrel"] = 0.01,
+    ["computer"] = 0.5,
+    ["metal_barrel"] = 0.4,
+    ["glass"] = 0.98,
+    ["phx_flakshell"] = 0.2,
+    ["paintcan"] = 0.85,
+    ["item"] = 0.7,
+    ["metal"] = 0.35,
+    ["jalopytire"] = 0.6,
+    ["quicksand"] = 0.4,
+    ["puddle"] = 0.95,
+    ["brass_bell_small"] = 0.3,
 };
 
 if SERVER then
@@ -207,96 +233,5 @@ if CLIENT then
         local prop_val = net.ReadFloat();
         SURFACE_PROPS_PENETRATION[prop_name] = prop_val;
         print("updated surfaceprop " .. prop_name .. " to " .. prop_val);
-    end)
-
-    local function open_editor()
-        local frame = vgui.Create("DFrame");
-        frame:SetSize(400, 600);
-        frame:Center();
-        frame:SetTitle("Surface Prop Penetration Editor");
-        frame:MakePopup();
-
-        local search = vgui.Create("DTextEntry", frame);
-        search:Dock(TOP);
-        search:SetPlaceholderText("Search...");
-        
-        local scroll = vgui.Create("DScrollPanel", frame);
-        scroll:Dock(FILL);
-
-        local list_layout = vgui.Create("DListLayout", scroll);
-        list_layout:Dock(FILL);
-
-        local sorted_keys = {};
-        for k, v in pairs(SURFACE_PROPS_PENETRATION) do
-            table.insert(sorted_keys, k);
-        end
-        table.sort(sorted_keys);
-
-        local function populate_list(filter)
-            list_layout:Clear();
-
-            for idx, key in ipairs(sorted_keys) do
-                if filter and not string.find(string.lower(key), string.lower(filter), 1, true) then
-                    continue;
-                end
-
-                local panel = list_layout:Add("DPanel");
-                panel:SetTall(40);
-                panel:SetBackgroundColor(Color(40, 40, 40));
-                panel:DockPadding(5, 0, 5, 0);
-                panel:DockMargin(0, 0, 0, 2);
-
-                local label = vgui.Create("DLabel", panel);
-                label:SetText(key);
-                label:SetFont("DermaDefaultBold");
-                label:SetTextColor(color_white);
-                label:Dock(LEFT);
-                label:SetWide(150);
-
-                local slider = vgui.Create("DNumSlider", panel);
-                slider:Dock(FILL);
-                slider:SetMin(0);
-                slider:SetMax(1.0);
-                slider:SetDecimals(2);
-                slider:SetValue(SURFACE_PROPS_PENETRATION[key]);
-                
-                local function send_update()
-                    if not LocalPlayer():IsSuperAdmin() then return; end
-                    net.Start("projectile_surfaceprop_update");
-                    net.WriteString(key);
-                    net.WriteFloat(math.Round(slider:GetValue(), 2));
-                    net.SendToServer();
-                end
-
-                slider.Think = function(s)
-                    local isInteracting = s.Slider:GetDragging() or s.TextArea:IsEditing();
-                    if isInteracting then
-                        s.HasChanged = true;
-                    elseif s.HasChanged then
-                        s.HasChanged = false;
-                        send_update();
-                    end
-                end
-
-                slider.TextArea.OnEnter = function()
-                    send_update();
-                    slider.HasChanged = false;
-                end
-            end
-        end
-
-        populate_list();
-
-        search.OnChange = function(s)
-            populate_list(s:GetValue());
-        end
-    end
-
-    concommand.Add("pro_surfaceprops", function()
-        if not LocalPlayer():IsSuperAdmin() then
-            chat.AddText(Color(255, 50, 50), "You must be a SuperAdmin to use this menu.");
-            return;
-        end
-        open_editor();
     end)
 end
