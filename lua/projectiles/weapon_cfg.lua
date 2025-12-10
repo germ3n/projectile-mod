@@ -3,6 +3,7 @@ AddCSLuaFile();
 local is_function = isfunction;
 local tonumber = tonumber;
 local tostring = tostring;
+local NULL = NULL;
 
 local WEAPON_BLACKLIST = {};
 
@@ -84,7 +85,7 @@ function get_weapon_speed(weapon, class_name)
 end
 
 function get_weapon_damage(weapon, class_name, damage)
-    if weapon ~= NULL and weapon.ArcCW then
+    if damage == 0 and weapon ~= NULL and weapon.ArcCW then
         return weapon:GetDamage(0, true);
     end
 

@@ -15,6 +15,14 @@ local point_contents = util.PointContents;
 local band = bit.band;
 local is_valid = IsValid;
 
+local entity_meta = FindMetaTable("Entity");
+local get_class = entity_meta.GetClass;
+
+local vector_meta = FindMetaTable("Vector");
+local vec_dot = vector_meta.Dot;
+
+local string_find = string.find;
+
 local projectile_trace_config = {
     start = vector(0, 0, 0),
     endpos = vector(0, 0, 0),
@@ -65,8 +73,8 @@ function trace_to_exit(enter_trace, start_pos, dir, mins, maxs, shooter)
 
             if not (exit_trace.Fraction < 1.0 or exit_trace.AllSolid or exit_trace.StartSolid) or exit_trace.StartSolid then
                 if enter_trace.Entity and is_valid(enter_trace.Entity) then
-                    local class = enter_trace.Entity:GetClass();
-                    if class:find("func_breakable") or class:find("prop_physics") then
+                    local class = get_class(enter_trace.Entity);
+                    if string_find(class, "func_breakable", 1, true) or string_find(class, "prop_physics", 1, true) then
                         return start_pos + dir, enter_trace;
                     end
                 end
@@ -79,7 +87,7 @@ function trace_to_exit(enter_trace, start_pos, dir, mins, maxs, shooter)
                 end
             end
 
-            if exit_trace.HitNormal:Dot(dir) <= 1.0 then
+            if vec_dot(exit_trace.HitNormal, dir) <= 1.0 then
                 return exit_trace.HitPos, exit_trace;
             end
         end

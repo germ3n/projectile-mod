@@ -29,9 +29,14 @@ local vector_meta = FindMetaTable("Vector");
 local dot = vector_meta.Dot;
 local get_normalized = vector_meta.GetNormalized;
 local len = vector_meta.Length;
+local len_sqr = vector_meta.LengthSqr;
+local mul = vector_meta.Mul;
+local dist_sqr = vector_meta.DistToSqr;
 
 local tick_count = engine.TickCount;
 local max = math.max;
+
+local MAX_DISTANCE = 90 * 90;
 
 --todo: use penetration_power
 function handle_penetration(shooter, projectile_data, src, dir, constpen, penetration_power, enter_trace)
@@ -47,7 +52,8 @@ function handle_penetration(shooter, projectile_data, src, dir, constpen, penetr
     
         if enter_trace.MatType ~= MAT_FLESH and enter_trace.MatType ~= MAT_GLASS and rand(0, 1) < get_float(cv_ricochet_chance) then
             local reflect = dir - (2 * dot_result * hit_normal);
-            local spread = vector_rand() * get_float(cv_ricochet_spread);
+            local spread = vector_rand();
+            mul(spread, get_float(cv_ricochet_spread));
     
             projectile_data.dir = get_normalized(reflect + spread);
             projectile_data.speed = projectile_data.speed * get_float(cv_ricochet_speed_multiplier);
@@ -100,12 +106,12 @@ function handle_penetration(shooter, projectile_data, src, dir, constpen, penetr
 
     local lost_damage = (pen_mod_inv * 3.0 * pen_ratio) + (dmg_mod * projectile_data.damage);
     
-    local dist = len(exit_trace.HitPos - enter_trace.HitPos);
-    if dist > 90 then 
+    local dist = dist_sqr(exit_trace.HitPos, enter_trace.HitPos);
+    if dist > MAX_DISTANCE then 
         return true, nil, nil;
     end
 
-    local final_damage_loss = (((dist * dist) * pen_mod_inv) / 24.0) + lost_damage;
+    local final_damage_loss = ((dist * pen_mod_inv) / 24.0) + lost_damage;
     projectile_data.damage = projectile_data.damage - final_damage_loss;
 
     if projectile_data.damage < 1.0 then 

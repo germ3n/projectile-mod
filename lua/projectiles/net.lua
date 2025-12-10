@@ -12,7 +12,7 @@ local cur_time = CurTime;
 projectile_store = projectile_store or {};
 local projectile_store = projectile_store;
 
-local BUFFER_SIZE = 0x800; -- must be power of 2
+local BUFFER_SIZE = 0x400; -- must be power of 2
 
 if SERVER then
     local entity_meta = FindMetaTable("Entity");
@@ -27,6 +27,8 @@ if SERVER then
 
     local crc = util.CRC;
     local tonumber = tonumber;
+
+    local vector = Vector;
 
     function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, constpen, mass, drop, min_speed, max_distance, reliable)
         weapon.bullet_idx = (weapon.bullet_idx or 0) + 1;
@@ -66,50 +68,69 @@ if SERVER then
                 received = 0,
                 last_received_idx = 0,
                 buffer = {},
+                active_projectiles = {},
                 buffer_size = BUFFER_SIZE, -- N projectiles
             };
+
+            for i = 1, BUFFER_SIZE do
+                projectile_store[shooter].buffer[i] = {
+                    hit = true,
+                    weapon = nil,
+                    time = nil,
+                    pos = vector(),
+                    dir = vector(),
+                    speed = nil,
+                    damage = nil,
+                    drag = nil,
+                    penetration_power = nil,
+                    penetration_count = nil,
+                    constpen = nil,
+                    last_hit_entity = nil,
+                    mass = nil,
+                    drop = nil,
+                    min_speed = nil,
+                    distance_traveled = nil,
+                    max_distance = nil,
+                    random_seed = nil,
+                    old_pos = vector(),
+                    trace_filter = {nil, nil, nil},
+                };
+            end
+
+            projectile_store[shooter].active_projectiles = {};
         end
 
         projectile_store[shooter].last_received_idx = projectile_store[shooter].last_received_idx + 1;
         local projectile_idx = band(projectile_store[shooter].last_received_idx - 1, projectile_store[shooter].buffer_size - 1) + 1;
 
-        projectile_store[shooter].buffer[projectile_idx] = {
-            weapon = weapon,
-            --bullet_idx = band(weapon.bullet_idx, 255),
-            time = time,
-            pos = pos,
-            dir = dir,
-            speed = speed,
-            damage = damage,
-            drag = drag,
-            penetration_power = penetration_power,
-            penetration_count = penetration_count,
-            constpen = constpen,
-            last_hit_entity = nil,
-            hit = false,
-            mass = mass,
-            drop = drop,
-            min_speed = min_speed,
-            distance_traveled = 0.0,
-            max_distance = max_distance,
-            random_seed = random_seed,
-            old_pos = pos,
-        };
+        local projectile = projectile_store[shooter].buffer[projectile_idx];
+        projectile.weapon = weapon;
+        projectile.time = time;
+        projectile.pos.x = pos.x;
+        projectile.pos.y = pos.y;
+        projectile.pos.z = pos.z;
+        projectile.dir.x = dir.x;
+        projectile.dir.y = dir.y;
+        projectile.dir.z = dir.z;
+        projectile.speed = speed;
+        projectile.damage = damage;
+        projectile.drag = drag;
+        projectile.penetration_power = penetration_power;
+        projectile.penetration_count = penetration_count;
+        projectile.constpen = constpen;
+        projectile.last_hit_entity = nil;
+        projectile.hit = false;
+        projectile.mass = mass;
+        projectile.drop = drop;
+        projectile.min_speed = min_speed;
+        projectile.distance_traveled = 0.0;
+        projectile.max_distance = max_distance;
+        projectile.random_seed = random_seed;
+        projectile.old_pos.x = pos.x;
+        projectile.old_pos.y = pos.y;
+        projectile.old_pos.z = pos.z;
 
-        --[[print("broadcasted projectile", 
-            shooter, 
-            projectile_store[shooter].buffer[projectile_idx].weapon, 
-            --projectile_store[shooter].buffer[projectile_idx].bullet_idx, 
-            projectile_store[shooter].buffer[projectile_idx].time, 
-            projectile_store[shooter].buffer[projectile_idx].pos, 
-            projectile_store[shooter].buffer[projectile_idx].dir, 
-            projectile_store[shooter].buffer[projectile_idx].speed, 
-            projectile_store[shooter].buffer[projectile_idx].damage, 
-            projectile_store[shooter].buffer[projectile_idx].penetration_count, 
-            projectile_store[shooter].buffer[projectile_idx].drag, 
-            projectile_store[shooter].buffer[projectile_idx].penetration_power, 
-            projectile_store[shooter].buffer[projectile_idx].constpen
-        );]]
+        projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
     end
 end
 
@@ -126,7 +147,6 @@ if CLIENT then
         --if shooter == local_player then return; end -- no need to process own projectiles
 
         local weapon = read_entity();
-        --local bullet_idx = net.ReadUInt(8);
         local time = read_float();
         local pos_x = read_float();
         local pos_y = read_float();
@@ -134,8 +154,6 @@ if CLIENT then
         local dir_x = read_float();
         local dir_y = read_float();
         local dir_z = read_float();
-        local pos = vector(pos_x, pos_y, pos_z);
-        local dir = vector(dir_x, dir_y, dir_z);
         local speed = read_uint(16);
         local damage = read_uint(16);
         local penetration_count = read_uint(8);
@@ -147,7 +165,6 @@ if CLIENT then
         local min_speed = read_float();
         local max_distance = read_float();
         local random_seed = read_uint(32);
-        --print("received projectile", shooter, weapon, time, pos, dir, speed, damage, penetration_count, drag, penetration_power, constpen);
 
         if not projectile_store[shooter] then 
             projectile_store[shooter] = {
@@ -156,33 +173,66 @@ if CLIENT then
                 buffer = {},
                 buffer_size = BUFFER_SIZE, -- N projectiles
             };
+
+            for i = 1, BUFFER_SIZE do
+                projectile_store[shooter].buffer[i] = {
+                    hit = true,
+                    weapon = nil,
+                    time = nil,
+                    pos = vector(),
+                    dir = vector(),
+                    speed = nil,
+                    damage = nil,
+                    drag = nil,
+                    penetration_power = nil,
+                    penetration_count = nil,
+                    constpen = nil,
+                    last_hit_entity = nil,
+                    mass = nil,
+                    drop = nil,
+                    min_speed = nil,
+                    distance_traveled = nil,
+                    max_distance = nil,
+                    random_seed = nil,
+                    old_pos = vector(),
+                    trace_filter = {nil, nil, nil},
+                };
+            end
+
+            projectile_store[shooter].active_projectiles = {};
         end
 
         projectile_store[shooter].last_received_idx = projectile_store[shooter].last_received_idx + 1;
         local projectile_idx = band(projectile_store[shooter].last_received_idx - 1, projectile_store[shooter].buffer_size - 1) + 1;
 
-        projectile_store[shooter].buffer[projectile_idx] = {
-            weapon = weapon,
-            --bullet_idx = bullet_idx,
-            time = time,
-            pos = pos,
-            dir = dir,
-            speed = speed,
-            damage = damage,
-            drag = drag,
-            penetration_power = penetration_power,
-            penetration_count = penetration_count,
-            constpen = constpen,
-            last_hit_entity = nil,
-            hit = false,
-            mass = mass,
-            drop = drop,
-            min_speed = min_speed,
-            distance_traveled = 0.0,
-            max_distance = max_distance,
-            random_seed = random_seed,
-            old_pos = pos,
-        };
+        local projectile = projectile_store[shooter].buffer[projectile_idx];
+        projectile.weapon = weapon;
+        projectile.time = time;
+        projectile.pos.x = pos_x;
+        projectile.pos.y = pos_y;
+        projectile.pos.z = pos_z;
+        projectile.dir.x = dir_x;
+        projectile.dir.y = dir_y;
+        projectile.dir.z = dir_z;
+        projectile.speed = speed;
+        projectile.damage = damage;
+        projectile.drag = drag;
+        projectile.penetration_power = penetration_power;
+        projectile.penetration_count = penetration_count;
+        projectile.constpen = constpen;
+        projectile.last_hit_entity = nil;
+        projectile.hit = false;
+        projectile.mass = mass;
+        projectile.drop = drop;
+        projectile.min_speed = min_speed;
+        projectile.distance_traveled = 0.0;
+        projectile.max_distance = max_distance;
+        projectile.random_seed = random_seed;
+        projectile.old_pos.x = pos_x;
+        projectile.old_pos.y = pos_y;
+        projectile.old_pos.z = pos_z;
+
+        projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
     end)
 end
 

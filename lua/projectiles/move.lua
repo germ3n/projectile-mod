@@ -62,6 +62,12 @@ local set_damage_type = effect_data_meta.SetDamageType;
 local cusercmd_meta = FindMetaTable("CUserCmd");
 local get_command_number = cusercmd_meta.CommandNumber;
 
+local vector_meta = FindMetaTable("Vector");
+local get_normalized = vector_meta.GetNormalized;
+local vec_len = vector_meta.Length;
+local vec_mul = vector_meta.Mul;
+local vec_add = vector_meta.Add;
+
 local cv_debug = get_convar("pro_debug_projectiles");
 local cv_debug_dur = get_convar("pro_debug_duration");
 local cv_debug_col = get_convar("pro_debug_color");
@@ -89,10 +95,9 @@ local get_float = convar_meta.GetFloat;
 local get_int = convar_meta.GetInt;
 local get_string = convar_meta.GetString;
 
-local vector_meta = FindMetaTable("Vector");
-local vec_len = vector_meta.Length;
-
 local max = math.max;
+
+local trace_filter = {nil, nil, nil};
 
 local function do_water_trace(projectile_data, new_pos, filter)
     local was_in_water = band(point_contents(projectile_data.pos), CONTENTS_WATER) ~= 0;
@@ -116,14 +121,21 @@ local function do_water_trace(projectile_data, new_pos, filter)
     end
 end
 
-local function move_projectile(shooter, projectile_data)
-    if not projectile_data or projectile_data.hit or projectile_data.penetration_count <= 0 or projectile_data.damage < 1.0 then 
-        return;
-    end
+local gravity_vector = vector(0, 0, 0);
 
-    if projectile_data.distance_traveled >= projectile_data.max_distance then
-        projectile_data.hit = true;
-        return;
+local fire_bullets_config = {
+    Attacker = nil,
+    Damage = 0,
+    Force = 0,
+    Distance = 0,
+    Dir = vector(0, 0, 0),
+    Src = vector(0, 0, 0),
+    Tracer = 0,
+};
+
+local function move_projectile(shooter, projectile_data)
+    if projectile_data.hit or projectile_data.penetration_count <= 0 or projectile_data.damage < 1.0 or projectile_data.distance_traveled >= projectile_data.max_distance then 
+        return true;
     end
 
     if get_bool(cv_drag_enabled) then
@@ -135,36 +147,38 @@ local function move_projectile(shooter, projectile_data)
         projectile_data.speed = max(0, (projectile_data.speed - projectile_data.speed * drag_factor));
     end
 
-    if projectile_data.speed <= 10.0 then
+    if projectile_data.speed <= 50.0 then
         projectile_data.hit = true;
-        return;
+        return true;
     end
 
     local current_velocity = projectile_data.dir * projectile_data.speed;
     
     if get_bool(cv_gravity_enabled) then
         local gravity_strength = get_float(cv_sv_gravity) * projectile_data.drop * get_float(cv_gravity_multiplier);
-        local gravity_vector = vector(0, 0, -gravity_strength);
+        gravity_vector.z = -gravity_strength;
         if band(point_contents(projectile_data.pos), CONTENTS_WATER) ~= 0 then
-            gravity_vector = gravity_vector * get_float(cv_gravity_water_multiplier);
+            gravity_vector.z = gravity_vector.z * get_float(cv_gravity_water_multiplier);
         end
 
-        current_velocity = current_velocity + gravity_vector * tick_interval;
+        current_velocity.z = current_velocity.z + gravity_vector.z * tick_interval;
 
-        projectile_data.dir = current_velocity:GetNormalized();
+        projectile_data.dir = get_normalized(current_velocity);
         projectile_data.speed = vec_len(current_velocity);
     end
     
-    local step = current_velocity * tick_interval;
+    vec_mul(current_velocity, tick_interval);
     local current_pos = projectile_data.pos;
-    local new_pos = projectile_data.pos + step;
+    local new_pos = projectile_data.pos + current_velocity;
     
-    local filter = {shooter, projectile_data.weapon, projectile_data.last_hit_entity};
-    if CLIENT then do_water_trace(projectile_data, new_pos, filter); end -- had to move to seperate funcs cuz i hit more than 60 upvalues
+    trace_filter[1] = shooter;
+    trace_filter[2] = projectile_data.weapon;
+    trace_filter[3] = projectile_data.last_hit_entity;
+    if CLIENT then do_water_trace(projectile_data, new_pos, trace_filter); end -- had to move to seperate funcs cuz i hit more than 60 upvalues
     
-    local enter_trace = projectile_move_trace(projectile_data.pos, new_pos, filter);
+    local enter_trace = projectile_move_trace(projectile_data.pos, new_pos, trace_filter);
 
-    if get_bool(cv_debug) then
+    --[[if get_bool(cv_debug) then
         local dur = get_float(cv_debug_dur);
         local col_vec = string_split(get_string(cv_debug_col), " ");
         local col = color(tonumber(col_vec[1]), tonumber(col_vec[2]), tonumber(col_vec[3]), col_vec[4] and tonumber(col_vec[4]) or 150);
@@ -174,7 +188,7 @@ local function move_projectile(shooter, projectile_data)
         if enter_trace.Hit then
             debug_box(enter_trace.HitPos, vector(-2, -2, -2), vector(2, 2, 2), dur, col, true);
         end
-    end
+    end]]
 
     if enter_trace.Hit then
         if CLIENT then
@@ -220,22 +234,20 @@ local function move_projectile(shooter, projectile_data)
         end
 
         if hit_entity and hit_entity ~= NULL then
-            local dmg_mult = get_damage_multiplier(enter_trace.HitGroup);
-            local final_damage = current_hit_damage * dmg_mult;
+            local final_damage = current_hit_damage * get_damage_multiplier(enter_trace.HitGroup);
             
             if SERVER then
                 if BREAKABLE_CLASSES[get_class(hit_entity)] then
                     projectiles.disable_fire_bullets = true;
-                    fire_bullets(shooter, {
-                        Attacker = shooter,
-                        Damage = final_damage,
-                        Force = final_damage,
-                        Distance = 1,
-                        Dir = projectile_data.dir,
-                        Src = enter_trace.HitPos - (projectile_data.dir * 0.5),
-                        Tracer = 0,
-                        AmmoType = "Pistol" 
-                    });
+                    fire_bullets_config.Attacker = shooter;
+                    fire_bullets_config.Damage = final_damage;
+                    fire_bullets_config.Force = final_damage;
+                    fire_bullets_config.Distance = 1;
+                    fire_bullets_config.Dir = projectile_data.dir;
+                    fire_bullets_config.Src = enter_trace.HitPos - (projectile_data.dir * 0.5);
+                    fire_bullets_config.Tracer = 0;
+                    fire_bullets_config.AmmoType = "Pistol";
+                    fire_bullets(shooter, fire_bullets_config);
                     projectiles.disable_fire_bullets = false;
                 else
                     local dmg_info = damage_info();
@@ -256,7 +268,7 @@ local function move_projectile(shooter, projectile_data)
             projectile_data.hit = true;
             projectile_data.pos = enter_trace.HitPos;
 
-            return; 
+            return true; 
         else
             if hit_entity and is_valid(hit_entity) then
                 projectile_data.last_hit_entity = hit_entity;
@@ -270,32 +282,30 @@ local function move_projectile(shooter, projectile_data)
 
     else
         projectile_data.pos = new_pos;
-        projectile_data.distance_traveled = projectile_data.distance_traveled + vec_len(step);
+        projectile_data.distance_traveled = projectile_data.distance_traveled + vec_len(current_velocity);
     end
 
     projectile_data.old_pos = current_pos;
+
+    return false;
 end
 
---todo: optimize?
 local function move_projectiles(ply, mv, cmd)
     local projectiles = projectile_store[ply];
     if not projectiles then return; end
-    
-    local projectile_idx = projectiles.last_received_idx;
-    local buffer_size = projectiles.buffer_size;
 
     if SERVER and ply:IsPlayer() then toggle_lag_compensation(ply, true); end
-        
-    for idx = 1, buffer_size do
-        local data = projectiles.buffer[projectile_idx];
-        if data then
-            move_projectile(ply, data);
-        end
-
-        if projectile_idx == 1 then
-            projectile_idx = buffer_size;
+    
+    local active_projectile_count = #projectiles.active_projectiles;
+    local idx = 1;
+    while idx <= active_projectile_count do
+        local hit = move_projectile(ply, projectiles.active_projectiles[idx]);
+        if hit then
+            projectiles.active_projectiles[idx] = projectiles.active_projectiles[active_projectile_count];
+            projectiles.active_projectiles[active_projectile_count] = nil;
+            active_projectile_count = active_projectile_count - 1;
         else
-            projectile_idx = projectile_idx - 1;
+            idx = idx + 1;
         end
     end
 
@@ -303,16 +313,17 @@ local function move_projectiles(ply, mv, cmd)
 end
 
 if SERVER then
+    local is_valid = IsValid;
     hook.Add("SetupMove", "projectiles_tick", move_projectiles)
     hook.Add("Tick", "projectiles_tick", function()
         for shooter, _ in next, projectile_store do
-            if shooter:IsValid() and shooter:IsNPC() then 
+            if is_valid(shooter) and shooter:IsNPC() then 
                 move_projectiles(shooter, nil, nil);
             end
         end
     end)
 else    
-    local is_valid = is_valid;
+    local is_valid = IsValid;
     hook.Add("CreateMove", "projectiles_tick", function(cmd)
         if get_command_number(cmd) ~= 0 then
             for shooter, _ in next, projectile_store do

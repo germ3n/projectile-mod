@@ -2,7 +2,8 @@ AddCSLuaFile();
 
 projectiles = projectiles or {};
 
-include("config.lua");
+include("cvars.lua");
+include("cache.lua");
 include("surfaceprops.lua");
 include("ray.lua");
 include("net.lua");

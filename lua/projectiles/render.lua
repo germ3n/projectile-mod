@@ -26,6 +26,7 @@ local col_glow = Color(255, 140, 0, 150);
 
 local entity_meta = FindMetaTable("Entity");
 local entindex = entity_meta.EntIndex;
+local is_valid = IsValid;
 
 local function render_projectiles()
     local cur_time_val = tick_count() * tick_interval;
@@ -41,15 +42,16 @@ local function render_projectiles()
     --randomseed(real_time * 1000);
 
     for shooter, projs in next, projectile_store do
-        local projectile_idx = projs.last_received_idx;
-        local buffer_size = projs.buffer_size;
-        local loop_idx = 0;
+        if not is_valid(shooter) then continue; end
+
+        local idx = 1;
+        local active_projectile_count = #projectile_store[shooter].active_projectiles;
         local shooter_entindex = entindex(shooter) * 13;
 
-        while loop_idx < buffer_size do
-            local p_data = projs.buffer[projectile_idx];
-            if p_data and not p_data.hit and p_data.penetration_count > 0 and p_data.damage >= 1.0 then
-                local pulse_offset = shooter_entindex + loop_idx * 0.5;
+        for idx = 1, active_projectile_count do
+            local p_data = projectile_store[shooter].active_projectiles[idx];
+            --if p_data and not p_data.hit and p_data.penetration_count > 0 and p_data.damage >= 1.0 then
+                local pulse_offset = shooter_entindex + idx;
                 local pulse_wave = sin(real_time * 20 + pulse_offset) * 0.35 + 1.15;
                 local flicker = rand(0.8, 1.2);
                 local scale_mod = pulse_wave * flicker;
@@ -72,15 +74,7 @@ local function render_projectiles()
 
                 set_material(mat_beam);
                 draw_beam(render_pos, tail_end, final_size * 0.5, 0, 1, col_glow);
-            end
-
-            if projectile_idx == 1 then 
-                projectile_idx = buffer_size;
-            else
-                projectile_idx = projectile_idx - 1;
-            end
-
-            loop_idx = loop_idx + 1;
+            --end
         end
     end
 end
