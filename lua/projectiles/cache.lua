@@ -11,7 +11,6 @@ local get_convar = GetConVar;
 
 local next = next;
 
-local add_text = chat.AddText;
 local red = Color(255, 0, 0);
 local green = Color(0, 255, 0);
 local blue = Color(0, 0, 255);
