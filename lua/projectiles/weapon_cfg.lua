@@ -209,6 +209,91 @@ if SERVER then
         end
     end
 
+    local ORIGINAL_TABLES = {
+        ["speed"] = table.Copy(WEAPON_SPEEDS),
+        ["damage"] = table.Copy(WEAPON_DAMAGES),
+        ["penetration_power"] = table.Copy(WEAPON_PENETRATION_POWERS),
+        ["penetration_count"] = table.Copy(WEAPON_PENETRATION_COUNTS),
+        ["drag"] = table.Copy(WEAPON_DRAG),
+        ["mass"] = table.Copy(WEAPON_MASS),
+        ["drop"] = table.Copy(WEAPON_DROP),
+        ["min_speed"] = table.Copy(WEAPON_MIN_SPEED),
+        ["max_distance"] = table.Copy(WEAPON_MAX_DISTANCE),
+    };
+
+    local player_meta = FindMetaTable("Player");
+    local is_superadmin = player_meta.IsSuperAdmin;
+    local NULL = NULL;
+
+    local function reset_config_to_db(cfg_type, class_name)
+        local key = cfg_type .. "|" .. class_name;
+        local safe_key = sql.SQLStr(key);
+        local query = "DELETE FROM projectile_weapon_data WHERE key = " .. safe_key;
+        local res = sql.Query(query);
+        
+        if res == false then
+            print("sql error resetting config: " .. key .. ": " .. sql.LastError());
+        end
+
+        if CONFIG_TYPES[cfg_type] then
+            CONFIG_TYPES[cfg_type][class_name] = ORIGINAL_TABLES[cfg_type][class_name];
+        end
+    end
+
+    concommand.Add("pro_weapon_config_reset_single", function(ply, cmd, args)
+        if ply ~= NULL and (not is_superadmin(ply)) then return; end
+        local cfg_type = args[1];
+        local class_name = args[2];
+        reset_config_to_db(cfg_type, class_name);
+
+        net.Start("projectile_config_update");
+        net.WriteString(cfg_type);
+        net.WriteString(class_name);
+        net.WriteFloat(ORIGINAL_TABLES[cfg_type][class_name] or ORIGINAL_TABLES[cfg_type]["default"]);
+        net.Broadcast();
+
+        print("reset weapon config: " .. cfg_type .. " for " .. class_name);
+    end, nil, "Reset a single weapon config");
+
+    concommand.Add("pro_weapon_config_reset_all", function(ply, cmd, args)
+        if ply ~= NULL and (not is_superadmin(ply)) then return; end
+        sql.Query("DELETE FROM projectile_weapon_data");
+
+        table.CopyFromTo(ORIGINAL_TABLES["speed"], WEAPON_SPEEDS);
+        table.CopyFromTo(ORIGINAL_TABLES["damage"], WEAPON_DAMAGES);
+        table.CopyFromTo(ORIGINAL_TABLES["penetration_power"], WEAPON_PENETRATION_POWERS);
+        table.CopyFromTo(ORIGINAL_TABLES["penetration_count"], WEAPON_PENETRATION_COUNTS);
+        table.CopyFromTo(ORIGINAL_TABLES["drag"], WEAPON_DRAG);
+        table.CopyFromTo(ORIGINAL_TABLES["mass"], WEAPON_MASS);
+        table.CopyFromTo(ORIGINAL_TABLES["drop"], WEAPON_DROP);
+        table.CopyFromTo(ORIGINAL_TABLES["min_speed"], WEAPON_MIN_SPEED);
+        table.CopyFromTo(ORIGINAL_TABLES["max_distance"], WEAPON_MAX_DISTANCE);
+
+        CONFIG_TYPES["speed"] = WEAPON_SPEEDS;
+        CONFIG_TYPES["damage"] = WEAPON_DAMAGES;
+        CONFIG_TYPES["penetration_power"] = WEAPON_PENETRATION_POWERS;
+        CONFIG_TYPES["penetration_count"] = WEAPON_PENETRATION_COUNTS;
+        CONFIG_TYPES["drag"] = WEAPON_DRAG;
+        CONFIG_TYPES["mass"] = WEAPON_MASS;
+        CONFIG_TYPES["drop"] = WEAPON_DROP;
+        CONFIG_TYPES["min_speed"] = WEAPON_MIN_SPEED;
+        CONFIG_TYPES["max_distance"] = WEAPON_MAX_DISTANCE;
+
+        net.Start("projectile_config_sync");
+        net.WriteTable(WEAPON_SPEEDS);
+        net.WriteTable(WEAPON_DAMAGES);
+        net.WriteTable(WEAPON_PENETRATION_POWERS);
+        net.WriteTable(WEAPON_PENETRATION_COUNTS);
+        net.WriteTable(WEAPON_DRAG);
+        net.WriteTable(WEAPON_MASS);
+        net.WriteTable(WEAPON_DROP);
+        net.WriteTable(WEAPON_MIN_SPEED);
+        net.WriteTable(WEAPON_MAX_DISTANCE);
+        net.Broadcast();
+
+        print("reset all weapon configs");
+    end, nil, "Reset all weapon configs");
+
     initialize_db();
 
     hook.Add("PlayerInitialSpawn", "projectile_config_full_sync", function(ply)

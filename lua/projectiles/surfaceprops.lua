@@ -241,7 +241,7 @@ if SERVER then
     local is_superadmin = player_meta.IsSuperAdmin;
     
     concommand.Add("pro_surfaceprop_reset_single", function(ply, cmd, args)
-        if ply ~= NULL or (not is_superadmin(ply)) then return; end
+        if ply ~= NULL and (not is_superadmin(ply)) then return; end
         local prop_name = args[1];
         if SURFACE_PROPS_PENETRATION[prop_name] then
             SURFACE_PROPS_PENETRATION[prop_name] = SURFACE_PROPS_ORIGINAL[prop_name];
@@ -252,10 +252,12 @@ if SERVER then
             net.WriteFloat(SURFACE_PROPS_ORIGINAL[prop_name]);
             net.Broadcast();
         end
+
+        print("reset surfaceprop: " .. prop_name .. " to " .. SURFACE_PROPS_ORIGINAL[prop_name]);
     end, nil, "Reset a single surfaceprop");
 
     concommand.Add("pro_surfaceprop_reset_all", function(ply, cmd, args)
-        if ply ~= NULL or (not is_superadmin(ply)) then return; end
+        if ply ~= NULL and (not is_superadmin(ply)) then return; end
         sql.Query("DELETE FROM surface_props_data");
         table.CopyFromTo(SURFACE_PROPS_ORIGINAL, SURFACE_PROPS_PENETRATION);
 

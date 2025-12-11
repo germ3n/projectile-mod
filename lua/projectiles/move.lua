@@ -341,7 +341,6 @@ local function move_projectiles(ply, mv, cmd)
 end
 
 if SERVER then
-    local is_valid = IsValid;
     hook.Add("SetupMove", "projectiles_tick", move_projectiles)
     hook.Add("Tick", "projectiles_tick", function()
         for shooter, _ in next, projectile_store do
@@ -350,14 +349,40 @@ if SERVER then
             end
         end
     end);
+
+    util.AddNetworkString("projectiles_cleanup");
+    local net_start = net.Start;
+    local write_entity = net.WriteEntity;
+    local broadcast = net.Broadcast;
+
+    hook.Add("EntityRemoved", "projectiles_cleanup", function(ent)
+        projectile_store[ent] = nil;
+
+        --net_start("projectiles_cleanup");
+        --write_entity(ent);
+        --broadcast();
+    end);
+    
 else    
-    local is_valid = IsValid;
     hook.Add("CreateMove", "projectiles_tick", function(cmd)
         if get_command_number(cmd) ~= 0 then
             for shooter, _ in next, projectile_store do
                 if not is_valid(shooter) then continue; end
                 move_projectiles(shooter, nil, nil);
             end
+        end
+    end);
+
+    --[[local read_entity = net.ReadEntity;
+    net.Receive("projectiles_cleanup", function()
+        local ent = read_entity();
+        projectile_store[ent] = nil;
+    end);]]
+
+    timer.Create("projectiles_cleanup", 120.0, 0, function()
+        for ent, _ in next, projectile_store do
+            if is_valid(ent) then continue; end
+            projectile_store[ent] = nil;
         end
     end);
 end
