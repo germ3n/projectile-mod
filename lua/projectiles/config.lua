@@ -40,7 +40,7 @@ if CLIENT then
         text = Color(230, 230, 230),
         text_dim = Color(150, 150, 150),
         divider = Color(60, 60, 65)
-    }
+    };
 
     local menu_tabs = {
         {
@@ -123,8 +123,8 @@ if CLIENT then
                 search_panel:SetTall(40)
                 search_panel:DockMargin(0,0,0,5)
                 search_panel.Paint = function(s, w, h)
-                    draw.RoundedBox(0, 0, 0, w, h, THEME.bg_lighter)
-                    draw.RoundedBox(0, 0, h-1, w, 1, THEME.divider)
+                    draw.RoundedBox(0, 0, 0, w, h, THEME.bg_lighter);
+                    draw.RoundedBox(0, 0, h-1, w, 1, THEME.divider);
                 end
 
                 local search = vgui.Create("DTextEntry", search_panel);
@@ -133,8 +133,20 @@ if CLIENT then
                 search:SetPlaceholderText("Search surface properties...");
                 search:SetFont("DermaDefault")
                 search.Paint = function(s, w, h)
-                    draw.RoundedBox(4, 0, 0, w, h, Color(20, 20, 20, 200))
-                    s:DrawTextEntryText(THEME.text, THEME.accent, THEME.text)
+                    draw.RoundedBox(4, 0, 0, w, h, Color(20, 20, 20, 200));
+                    s:DrawTextEntryText(THEME.text, THEME.accent, THEME.text);
+
+                    if (s:GetValue() == "" and s:GetPlaceholderText()) then
+                        draw.SimpleText(
+                            s:GetPlaceholderText(), 
+                            s:GetFont(), 
+                            5,
+                            h / 2,
+                            THEME.text_dim,
+                            TEXT_ALIGN_LEFT, 
+                            TEXT_ALIGN_CENTER
+                        );
+                    end
                 end
                 
                 local scroll = vgui.Create("DScrollPanel", parent);
@@ -163,7 +175,7 @@ if CLIENT then
                         panel:DockPadding(10, 0, 10, 0);
                         panel:DockMargin(5, 0, 5, 2);
                         panel.Paint = function(s, w, h)
-                            draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter)
+                            draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
                         end
                         
                         local label = vgui.Create("DLabel", panel);
@@ -179,8 +191,8 @@ if CLIENT then
                         slider:SetMax(1.0);
                         slider:SetDecimals(2);
                         slider:SetValue(SURFACE_PROPS_PENETRATION[key]);
-                        slider.Label:SetVisible(false) 
-                        slider.TextArea:SetTextColor(THEME.text)
+                        slider.Label:SetVisible(false);
+                        slider.TextArea:SetTextColor(THEME.text);
                         
                         local function send_update()
                             net.Start("projectile_surfaceprop_update");
@@ -233,8 +245,8 @@ if CLIENT then
                 search_panel:SetTall(40)
                 search_panel:DockMargin(0,0,0,5)
                 search_panel.Paint = function(s, w, h)
-                    draw.RoundedBox(0, 0, 0, w, h, THEME.bg_lighter)
-                    draw.RoundedBox(0, 0, h-1, w, 1, THEME.divider)
+                    draw.RoundedBox(0, 0, 0, w, h, THEME.bg_lighter);
+                    draw.RoundedBox(0, 0, h-1, w, 1, THEME.divider);
                 end
 
                 local search = vgui.Create("DTextEntry", search_panel);
@@ -243,15 +255,27 @@ if CLIENT then
                 search:SetPlaceholderText("Search Weapon Class...");
                 search:SetFont("DermaDefault")
                 search.Paint = function(s, w, h)
-                    draw.RoundedBox(4, 0, 0, w, h, Color(20, 20, 20, 200))
-                    s:DrawTextEntryText(THEME.text, THEME.accent, THEME.text)
+                    draw.RoundedBox(4, 0, 0, w, h, Color(20, 20, 20, 200));
+                    s:DrawTextEntryText(THEME.text, THEME.accent, THEME.text);
+
+                    if (s:GetValue() == "" and s:GetPlaceholderText()) then
+                        draw.SimpleText(
+                            s:GetPlaceholderText(), 
+                            s:GetFont(), 
+                            5,
+                            h / 2,
+                            THEME.text_dim,
+                            TEXT_ALIGN_LEFT, 
+                            TEXT_ALIGN_CENTER
+                        );
+                    end
                 end
                 
                 local scroll = vgui.Create("DScrollPanel", parent);
                 scroll:Dock(FILL);
                 
                 local list_layout = vgui.Create("DListLayout", scroll);
-                list_layout:Dock(FILL);
+                list_layout:Dock(TOP);
                 list_layout:DockPadding(5, 5, 5, 5);
 
                 local weapon_list = weapons.GetList();
@@ -284,7 +308,7 @@ if CLIENT then
                     local label = vgui.Create("DLabel", panel);
                     label:SetText(label_text);
                     label:Dock(LEFT);
-                    label:SetWide(100);
+                    label:SetWide(120);
                     label:SetTextColor(THEME.text_dim);
 
                     local slider = vgui.Create("DNumSlider", panel);
@@ -337,7 +361,7 @@ if CLIENT then
                     list_layout:Clear();
 
                     for _, class_name in ipairs(sorted_weapons) do
-                        if WEAPON_BLACKLIST and WEAPON_BLACKLIST[class_name] then continue end
+                        if WEAPON_BLACKLIST and WEAPON_BLACKLIST[class_name] then continue; end
                         
                         if filter and filter ~= "" and not string.find(string.lower(class_name), string.lower(filter), 1, true) then
                             continue;
@@ -350,23 +374,23 @@ if CLIENT then
                         category:DockMargin(0, 0, 0, 5);
                         
                         category.Paint = function(s, w, h)
-                            draw.RoundedBox(4, 0, 0, w, 20, THEME.bg_lighter)
+                            draw.RoundedBox(4, 0, 0, w, 20, THEME.bg_lighter);
                         end
-                        category.Header:SetTextColor(THEME.text)
-                        category.Header:SetFont("DermaDefaultBold")
+                        category.Header:SetTextColor(THEME.text);
+                        category.Header:SetFont("DermaDefaultBold");
 
                         local content = vgui.Create("DPanel");
                         content:SetBackgroundColor(THEME.bg_dark); 
                         content.Paint = function(s, w, h)
-                            draw.RoundedBoxEx(4, 0, 0, w, h, Color(0,0,0,100), false, false, true, true)
+                            draw.RoundedBoxEx(4, 0, 0, w, h, Color(0,0,0,100), false, false, true, true);
                         end
                         
                         content:DockPadding(10, 10, 10, 10);
                         
                         create_slider(content, "Speed", "speed", class_name, 2000, 10000, 0);
                         create_slider(content, "Damage", "damage", class_name, 10, 500, 0);
-                        create_slider(content, "Pen Power", "penetration_power", class_name, 2.5, 50, 2);
-                        create_slider(content, "Pen Count", "penetration_count", class_name, 10, 50, 0);
+                        create_slider(content, "Penetration Power", "penetration_power", class_name, 2.5, 50, 2);
+                        create_slider(content, "Max Penetration Count", "penetration_count", class_name, 10, 50, 0);
                         create_slider(content, "Drag", "drag", class_name, 0, 10, 3);
                         create_slider(content, "Drop", "drop", class_name, 0, 5, 3);
                         create_slider(content, "Min Speed (Units/s)", "min_speed", class_name, 0, 500, 0);

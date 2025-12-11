@@ -319,9 +319,11 @@ local function move_projectiles(ply, mv, cmd)
     local projectiles = projectile_store[ply];
     if not projectiles then return; end
 
+    local active_projectile_count = #projectiles.active_projectiles;
+    if active_projectile_count == 0 then return; end
+
     if SERVER and ply:IsPlayer() then toggle_lag_compensation(ply, true); end
     
-    local active_projectile_count = #projectiles.active_projectiles;
     local idx = 1;
     while idx <= active_projectile_count do
         local hit = move_projectile(ply, projectiles.active_projectiles[idx]);

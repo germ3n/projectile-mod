@@ -187,7 +187,15 @@ if SERVER then
         end
     end
 
-    initialize_db();
+    local function remove_surface_prop_from_db(key)
+        local safe_key = sql.SQLStr(key);
+        local query = "DELETE FROM surface_props_data WHERE key = " .. safe_key;
+        local res = sql.Query(query);
+        
+        if res == false then
+            print("sql error removing surfaceprop: " .. key .. ": " .. sql.LastError());
+        end
+    end
 
     hook.Add("PlayerInitialSpawn", "projectile_surfaceprop_full_sync", function(ply)
         timer.Simple(1, function()
@@ -220,7 +228,45 @@ if SERVER then
             net.WriteFloat(prop_val);
             net.Broadcast();
         end
-    end)
+    end);
+
+    concommand.Add("pro_surfaceprop_list", function()
+        PrintTable(SURFACE_PROPS_PENETRATION);
+    end, nil, "List all surfaceprops");
+
+    local SURFACE_PROPS_ORIGINAL = table.Copy(SURFACE_PROPS_PENETRATION);
+    local NULL = NULL;
+
+    local player_meta = FindMetaTable("Player");
+    local is_superadmin = player_meta.IsSuperAdmin;
+    
+    concommand.Add("pro_surfaceprop_reset_single", function(ply, cmd, args)
+        if ply ~= NULL or (not is_superadmin(ply)) then return; end
+        local prop_name = args[1];
+        if SURFACE_PROPS_PENETRATION[prop_name] then
+            SURFACE_PROPS_PENETRATION[prop_name] = SURFACE_PROPS_ORIGINAL[prop_name];
+            remove_surface_prop_from_db(prop_name);
+
+            net.Start("projectile_surfaceprop_update");
+            net.WriteString(prop_name);
+            net.WriteFloat(SURFACE_PROPS_ORIGINAL[prop_name]);
+            net.Broadcast();
+        end
+    end, nil, "Reset a single surfaceprop");
+
+    concommand.Add("pro_surfaceprop_reset_all", function(ply, cmd, args)
+        if ply ~= NULL or (not is_superadmin(ply)) then return; end
+        sql.Query("DELETE FROM surface_props_data");
+        table.CopyFromTo(SURFACE_PROPS_ORIGINAL, SURFACE_PROPS_PENETRATION);
+
+        net.Start("projectile_surfaceprop_sync");
+        net.WriteTable(SURFACE_PROPS_PENETRATION);
+        net.Broadcast();
+
+        print("reset all surfaceprops");
+    end, nil, "Reset all surfaceprops");
+
+    initialize_db();
     
     print("loaded surfaceprop sql");
 end
@@ -229,12 +275,12 @@ if CLIENT then
     net.Receive("projectile_surfaceprop_sync", function()
         table.CopyFromTo(net.ReadTable(), SURFACE_PROPS_PENETRATION);
         print("received full surfaceprop sync");
-    end)
+    end);
 
     net.Receive("projectile_surfaceprop_update", function()
         local prop_name = net.ReadString();
         local prop_val = net.ReadFloat();
         SURFACE_PROPS_PENETRATION[prop_name] = prop_val;
         print("updated surfaceprop " .. prop_name .. " to " .. prop_val);
-    end)
+    end);
 end
