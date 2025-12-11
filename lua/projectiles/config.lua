@@ -3,6 +3,19 @@ AddCSLuaFile();
 if SERVER then
     util.AddNetworkString("projectile_update_cvar");
 
+    local IsValid = IsValid;
+    local RunConsoleCommand = RunConsoleCommand;
+    local PROJECTILE_CVAR_NAMES = PROJECTILE_CVAR_NAMES;
+    local NULL = NULL;
+    local get_convar = GetConVar;
+    local next = next;
+
+    local player_meta = FindMetaTable("Player");
+    local is_superadmin = player_meta.IsSuperAdmin;
+
+    local convar_meta = FindMetaTable("ConVar");
+    local get_default = convar_meta.GetDefault;
+
     net.Receive("projectile_update_cvar", function(len, ply)
         if not IsValid(ply) then 
             return;
@@ -16,6 +29,15 @@ if SERVER then
 
         RunConsoleCommand(cvar, value);
     end);
+
+    concommand.Add("pro_config_reset_cvars", function(ply, cmd, args)
+        if ply ~= NULL and (not is_superadmin(ply)) then return; end
+        for _, cvar_name in next, PROJECTILE_CVAR_NAMES do
+            RunConsoleCommand(cvar_name, get_default(get_convar(cvar_name)));
+        end
+
+        print("reset all projectile cvars");
+    end, nil, "Reset all projectile cvars");
 end
 
 if CLIENT then
@@ -30,6 +52,8 @@ if CLIENT then
     local CONFIG_TYPES = CONFIG_TYPES;
     local HL2_WEAPON_CLASSES = HL2_WEAPON_CLASSES;
     local SURFACE_PROPS_PENETRATION = SURFACE_PROPS_PENETRATION;
+    local RICOCHET_MAT_CHANCE_MULTIPLIERS = RICOCHET_MAT_CHANCE_MULTIPLIERS;
+    local MAT_TYPE_NAMES = MAT_TYPE_NAMES;
     
     local THEME = {
         bg_dark = Color(30, 30, 35, 250),
@@ -41,6 +65,135 @@ if CLIENT then
         text_dim = Color(150, 150, 150),
         divider = Color(60, 60, 65)
     };
+
+    local function CreateControl(parent, data)
+        if data.type == "header" then
+            local panel = vgui.Create("DPanel", parent);
+            panel:SetTall(30);
+            panel:Dock(TOP);
+            panel:DockMargin(0, 5, 0, 5);
+            panel.Paint = function(s, w, h)
+                draw.SimpleText(data.label, "DermaDefaultBold", 0, h/2, THEME.accent, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                draw.RoundedBox(0, 0, h-2, w, 2, THEME.divider)
+            end
+            return panel;
+            
+        elseif data.type == "bool" then
+            local panel = vgui.Create("DPanel", parent);
+            panel:SetTall(30);
+            panel:Dock(TOP);
+            panel:DockMargin(0, 0, 0, 2);
+            panel.Paint = function(s, w, h) end
+
+            local check = vgui.Create("DCheckBox", panel);
+            check:SetPos(0, 7);
+            --check:SetConVar(data.cvar);
+            check:SetChecked(GetConVar(data.cvar):GetBool());
+            check.OnChange = function(s, value)
+                if data.client then RunConsoleCommand(data.cvar, value and "1" or "0"); return; end
+                net.Start("projectile_update_cvar");
+                net.WriteString(data.cvar);
+                net.WriteString(value and "1" or "0");
+                net.SendToServer();
+            end
+
+            panel.UpdateValue = function(s)
+                check:SetChecked(GetConVar(data.cvar):GetBool());
+            end
+            
+            local label = vgui.Create("DLabel", panel);
+            label:SetText(data.label);
+            label:SetPos(25, 0);
+            label:SetSize(300, 30);
+            label:SetTextColor(THEME.text);
+            
+            return panel;
+
+        elseif data.type == "float" then
+            local panel = vgui.Create("DPanel", parent);
+            panel:SetTall(40);
+            panel:Dock(TOP);
+            panel:DockMargin(0, 0, 0, 5);
+            panel.Paint = function(s, w, h)
+                draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter)
+            end
+
+            local slider = vgui.Create("DNumSlider", panel);
+            slider:Dock(FILL);
+            slider:DockMargin(10, 0, 10, 0);
+            slider:SetText(data.label);
+            slider:SetMin(data.min);
+            slider:SetMax(data.max);
+            slider:SetDecimals(data.decimals);
+            --slider:SetConVar(data.cvar);
+            slider:SetValue(GetConVar(data.cvar):GetFloat());
+            slider.OnValueChanged = function(s, value)
+                if math.abs(GetConVar(data.cvar):GetFloat() - value) < 0.001 then return end
+                
+                timer.Create("projectile_update_cvar_timer_" .. data.cvar, 0.2, 1, function()
+                    net.Start("projectile_update_cvar");
+                    net.WriteString(data.cvar);
+                    net.WriteString(tostring(value));
+                    net.SendToServer();
+                end);
+            end
+
+            slider.UpdateValue = function(s)
+                if s.Slider:GetDragging() or s.TextArea:IsEditing() then return; end
+                slider:SetValue(GetConVar(data.cvar):GetFloat());
+            end
+            
+            slider.Label:SetTextColor(THEME.text)
+            slider.TextArea:SetTextColor(THEME.text)
+            
+            return panel;
+        elseif data.type == "color" then
+            local panel = vgui.Create("DPanel", parent);
+            panel:SetTall(160);
+            panel:Dock(TOP);
+            panel:DockMargin(0, 5, 0, 5);
+            panel.Paint = function(s, w, h)
+                draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter)
+            end
+
+            local label = vgui.Create("DLabel", panel);
+            label:SetText(data.label);
+            label:SetTextColor(THEME.text);
+            label:Dock(TOP);
+            label:DockMargin(10, 5, 0, 0);
+
+            local mixer = vgui.Create("DColorMixer", panel);
+            mixer:Dock(FILL);
+            mixer:DockMargin(10, 5, 10, 10);
+            mixer:SetPalette(false);
+            mixer:SetAlphaBar(false);
+            mixer:SetWangs(true);
+            
+            local current_str = GetConVar(data.cvar):GetString();
+            local parts = string.Split(current_str, " ");
+            local init_col = color(tonumber(parts[1]) or 0, tonumber(parts[2]) or 0, tonumber(parts[3]) or 255);
+            mixer:SetColor(init_col);
+
+            mixer.ValueChanged = function(s, col)
+                timer.Create("projectile_update_cvar_timer_" .. data.cvar, 0.2, 1, function()
+                    local val = string.format("%d %d %d", col.r, col.g, col.b);
+                    net.Start("projectile_update_cvar");
+                    net.WriteString(data.cvar);
+                    net.WriteString(val);
+                    net.SendToServer();
+                end);
+            end
+
+            mixer.UpdateValue = function(s)
+                local current_str = GetConVar(data.cvar):GetString();
+                local parts = string.Split(current_str, " ");
+                local init_col = color(tonumber(parts[1]) or 0, tonumber(parts[2]) or 0, tonumber(parts[3]) or 255, parts[4] and tonumber(parts[4]) or 255);
+                mixer:SetColor(init_col);
+            end
+
+            return panel;
+        end
+    end
 
     local menu_tabs = {
         {
@@ -80,16 +233,73 @@ if CLIENT then
         {
             name = "Ricochet",
             icon = "icon16/arrow_rotate_clockwise.png",
-            vars = {
-                { type = "header", label = "Logic" },
-                { type = "bool", cvar = "pro_ricochet_enabled", label = "Enable Ricochet" },
-                { type = "float", cvar = "pro_ricochet_chance", label = "Ricochet Chance", min = 0.0, max = 1.0, decimals = 2 },
-                { type = "float", cvar = "pro_ricochet_spread", label = "Spread", min = 0.0, max = 1.0, decimals = 2 },
-                { type = "header", label = "Multipliers" },
-                { type = "float", cvar = "pro_ricochet_speed_multiplier", label = "Speed Multiplier", min = 0.0, max = 1.0, decimals = 2 },
-                { type = "float", cvar = "pro_ricochet_damage_multiplier", label = "Damage Multiplier", min = 0.0, max = 1.0, decimals = 2 },
-                { type = "float", cvar = "pro_ricochet_distance_multiplier", label = "Distance Multiplier", min = 0.1, max = 5.0, decimals = 1 },
-            }
+            custom_draw = function(parent)
+                local scroll = vgui.Create("DScrollPanel", parent);
+                scroll:Dock(FILL);
+                scroll:DockPadding(10, 10, 10, 10);
+
+                local standard_vars = {
+                    { type = "header", label = "Logic" },
+                    { type = "bool", cvar = "pro_ricochet_enabled", label = "Enable Ricochet" },
+                    { type = "float", cvar = "pro_ricochet_chance", label = "Ricochet Chance", min = 0.0, max = 1.0, decimals = 2 },
+                    { type = "float", cvar = "pro_ricochet_spread", label = "Spread", min = 0.0, max = 1.0, decimals = 2 },
+                    { type = "header", label = "Multipliers" },
+                    { type = "float", cvar = "pro_ricochet_speed_multiplier", label = "Speed Multiplier", min = 0.0, max = 1.0, decimals = 2 },
+                    { type = "float", cvar = "pro_ricochet_damage_multiplier", label = "Damage Multiplier", min = 0.0, max = 1.0, decimals = 2 },
+                    { type = "float", cvar = "pro_ricochet_distance_multiplier", label = "Distance Multiplier", min = 0.1, max = 5.0, decimals = 1 },
+                };
+
+                if CreateControl then 
+                    for _, var_data in ipairs(standard_vars) do
+                        CreateControl(scroll, var_data);
+                    end
+                end
+
+                local header = vgui.Create("DPanel", scroll);
+                header:SetTall(30);
+                header:Dock(TOP);
+                header:DockMargin(0, 15, 0, 5);
+                header.Paint = function(s, w, h)
+                    draw.SimpleText("Material Chance Multipliers", "DermaDefaultBold", 0, h/2, THEME.accent, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER);
+                    draw.RoundedBox(0, 0, h-2, w, 2, THEME.divider);
+                end
+
+                local sorted_mats = {};
+                for mat_id, val in pairs(RICOCHET_MAT_CHANCE_MULTIPLIERS) do
+                    local name = MAT_TYPE_NAMES[mat_id] or "Unknown";
+                    table.insert(sorted_mats, { id = mat_id, name = name, val = val });
+                end
+                table.sort(sorted_mats, function(a, b) return a.name < b.name end);
+
+                for idx, mat_data in ipairs(sorted_mats) do
+                    local panel = vgui.Create("DPanel", scroll);
+                    panel:SetTall(40);
+                    panel:Dock(TOP);
+                    panel:DockMargin(0, 0, 0, 5);
+                    panel.Paint = function(s, w, h)
+                        draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter)
+                    end
+
+                    local slider = vgui.Create("DNumSlider", panel);
+                    slider:Dock(FILL);
+                    slider:DockMargin(10, 0, 10, 0);
+                    slider:SetText(mat_data.name);
+                    slider:SetMin(0.0);
+                    slider:SetMax(1.0);
+                    slider:SetDecimals(2);
+                    slider:SetValue(mat_data.val);
+                    
+                    slider.Label:SetTextColor(THEME.text);
+                    slider.Label:SetWide(150);
+                    slider.TextArea:SetTextColor(THEME.text);
+
+                    slider.OnValueChanged = function(s, value)
+                        timer.Create("pro_ric_mat_update_" .. mat_data.name, 0.2, 1, function()
+                            RunConsoleCommand("pro_ricochet_mat_chance_multipliers_update", mat_data.name, tostring(math.Round(value, 2)));
+                        end);
+                    end
+                end
+            end
         },
         {
             name = "Physics",
@@ -106,7 +316,7 @@ if CLIENT then
             }
         },
         {
-            name = "Materials",
+            name = "Surface Properties",
             icon = "icon16/bricks.png",
             custom_draw = function(parent)
                 if not SURFACE_PROPS_PENETRATION then
@@ -421,135 +631,6 @@ if CLIENT then
             }
         },
     };
-
-    local function CreateControl(parent, data)
-        if data.type == "header" then
-            local panel = vgui.Create("DPanel", parent);
-            panel:SetTall(30);
-            panel:Dock(TOP);
-            panel:DockMargin(0, 5, 0, 5);
-            panel.Paint = function(s, w, h)
-                draw.SimpleText(data.label, "DermaDefaultBold", 0, h/2, THEME.accent, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-                draw.RoundedBox(0, 0, h-2, w, 2, THEME.divider)
-            end
-            return panel;
-            
-        elseif data.type == "bool" then
-            local panel = vgui.Create("DPanel", parent);
-            panel:SetTall(30);
-            panel:Dock(TOP);
-            panel:DockMargin(0, 0, 0, 2);
-            panel.Paint = function(s, w, h) end
-
-            local check = vgui.Create("DCheckBox", panel);
-            check:SetPos(0, 7);
-            --check:SetConVar(data.cvar);
-            check:SetChecked(GetConVar(data.cvar):GetBool());
-            check.OnChange = function(s, value)
-                if data.client then RunConsoleCommand(data.cvar, value and "1" or "0"); return; end
-                net.Start("projectile_update_cvar");
-                net.WriteString(data.cvar);
-                net.WriteString(value and "1" or "0");
-                net.SendToServer();
-            end
-
-            panel.UpdateValue = function(s)
-                check:SetChecked(GetConVar(data.cvar):GetBool());
-            end
-            
-            local label = vgui.Create("DLabel", panel);
-            label:SetText(data.label);
-            label:SetPos(25, 0);
-            label:SetSize(300, 30);
-            label:SetTextColor(THEME.text);
-            
-            return panel;
-
-        elseif data.type == "float" then
-            local panel = vgui.Create("DPanel", parent);
-            panel:SetTall(40);
-            panel:Dock(TOP);
-            panel:DockMargin(0, 0, 0, 5);
-            panel.Paint = function(s, w, h)
-                draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter)
-            end
-
-            local slider = vgui.Create("DNumSlider", panel);
-            slider:Dock(FILL);
-            slider:DockMargin(10, 0, 10, 0);
-            slider:SetText(data.label);
-            slider:SetMin(data.min);
-            slider:SetMax(data.max);
-            slider:SetDecimals(data.decimals);
-            --slider:SetConVar(data.cvar);
-            slider:SetValue(GetConVar(data.cvar):GetFloat());
-            slider.OnValueChanged = function(s, value)
-                if math.abs(GetConVar(data.cvar):GetFloat() - value) < 0.001 then return end
-                
-                timer.Create("projectile_update_cvar_timer_" .. data.cvar, 0.2, 1, function()
-                    net.Start("projectile_update_cvar");
-                    net.WriteString(data.cvar);
-                    net.WriteString(tostring(value));
-                    net.SendToServer();
-                end);
-            end
-
-            slider.UpdateValue = function(s)
-                if s.Slider:GetDragging() or s.TextArea:IsEditing() then return; end
-                slider:SetValue(GetConVar(data.cvar):GetFloat());
-            end
-            
-            slider.Label:SetTextColor(THEME.text)
-            slider.TextArea:SetTextColor(THEME.text)
-            
-            return panel;
-        elseif data.type == "color" then
-            local panel = vgui.Create("DPanel", parent);
-            panel:SetTall(160);
-            panel:Dock(TOP);
-            panel:DockMargin(0, 5, 0, 5);
-            panel.Paint = function(s, w, h)
-                draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter)
-            end
-
-            local label = vgui.Create("DLabel", panel);
-            label:SetText(data.label);
-            label:SetTextColor(THEME.text);
-            label:Dock(TOP);
-            label:DockMargin(10, 5, 0, 0);
-
-            local mixer = vgui.Create("DColorMixer", panel);
-            mixer:Dock(FILL);
-            mixer:DockMargin(10, 5, 10, 10);
-            mixer:SetPalette(false);
-            mixer:SetAlphaBar(false);
-            mixer:SetWangs(true);
-            
-            local current_str = GetConVar(data.cvar):GetString();
-            local parts = string.Split(current_str, " ");
-            local init_col = color(tonumber(parts[1]) or 0, tonumber(parts[2]) or 0, tonumber(parts[3]) or 255);
-            mixer:SetColor(init_col);
-
-            mixer.ValueChanged = function(s, col)
-                timer.Create("projectile_update_cvar_timer_" .. data.cvar, 0.2, 1, function()
-                    local val = string.format("%d %d %d", col.r, col.g, col.b);
-                    net.Start("projectile_update_cvar");
-                    net.WriteString(data.cvar);
-                    net.WriteString(val);
-                    net.SendToServer();
-                end);
-            end
-
-            mixer.UpdateValue = function(s)
-                local current_str = GetConVar(data.cvar):GetString();
-                local parts = string.Split(current_str, " ");
-                local init_col = color(tonumber(parts[1]) or 0, tonumber(parts[2]) or 0, tonumber(parts[3]) or 255, parts[4] and tonumber(parts[4]) or 255);
-                mixer:SetColor(init_col);
-            end
-
-            return panel;
-        end
-    end
 
     local function OpenConfigMenu()
         local frame = vgui.Create("DFrame");

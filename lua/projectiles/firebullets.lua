@@ -99,7 +99,7 @@ if SERVER then
 
         local inflictor;
         local lean_amount = get_lean_amount and shooter:IsPlayer() and get_lean_amount(shooter) or 0.0;
-        if data.Inflictor and data.Inflictor == NULL and shooter ~= NULL then
+        if (not data.Inflictor or data.Inflictor == NULL) and shooter ~= NULL then
             if shooter:IsPlayer() then--if is_player(shooter) then
                 inflictor = player_get_active_weapon(shooter);
             elseif shooter:IsNPC() then--elseif is_npc(shooter) then

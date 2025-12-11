@@ -25,3 +25,31 @@ pro_gravity_enabled = CreateConVar("pro_gravity_enabled", "1", bit.bor(FCVAR_NOT
 pro_gravity_multiplier = CreateConVar("pro_gravity_multiplier", "1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Gravity multiplier");
 pro_gravity_water_multiplier = CreateConVar("pro_gravity_water_multiplier", "100", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Gravity water multiplier");
 pro_render_enabled = CreateConVar("pro_render_enabled", "1", bit.bor(FCVAR_ARCHIVE), "Enable render");
+
+PROJECTILE_CVAR_NAMES = {
+	"pro_projectiles_enabled",
+	"pro_penetration_power_cost_multiplier",
+	"pro_penetration_dmg_tax_per_unit",
+	"pro_penetration_entry_cost_multiplier",
+	"pro_weapon_damage_scale",
+	"pro_penetration_power_scale",
+	"pro_speed_scale",
+	"pro_debug_projectiles",
+	"pro_debug_duration",
+	"pro_debug_color",
+	"pro_debug_penetration",
+	"pro_ricochet_enabled",
+	"pro_debug_ricochet",
+	"pro_ricochet_chance",
+	"pro_ricochet_spread",
+	"pro_ricochet_speed_multiplier",
+	"pro_ricochet_damage_multiplier",
+	"pro_ricochet_distance_multiplier",
+	"pro_drag_enabled",
+	"pro_drag_multiplier",
+	"pro_drag_water_multiplier",
+	"pro_gravity_enabled",
+	"pro_gravity_multiplier",
+	"pro_gravity_water_multiplier",
+	"pro_render_enabled"
+};
