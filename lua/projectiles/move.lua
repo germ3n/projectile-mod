@@ -61,6 +61,7 @@ local set_damage_type = effect_data_meta.SetDamageType;
 
 local cusercmd_meta = FindMetaTable("CUserCmd");
 local get_command_number = cusercmd_meta.CommandNumber;
+local tick_count = cusercmd_meta.TickCount;
 
 local vector_meta = FindMetaTable("Vector");
 local get_normalized = vector_meta.GetNormalized;
@@ -88,6 +89,17 @@ local cv_gravity_enabled = get_convar("pro_gravity_enabled");
 local cv_gravity_multiplier = get_convar("pro_gravity_multiplier");
 local cv_gravity_water_multiplier = get_convar("pro_gravity_water_multiplier");
 local cv_drop_multiplier = get_convar("pro_drop_multiplier");
+local cv_wind_enabled = get_convar("pro_wind_enabled");
+local cv_wind_strength = get_convar("pro_wind_strength");
+local cv_wind_strength_variance = get_convar("pro_wind_strength_variance");
+local cv_wind_gust_chance = get_convar("pro_wind_gust_chance");
+local cv_wind_gust_min_strength = get_convar("pro_wind_gust_min_strength");
+local cv_wind_gust_max_strength = get_convar("pro_wind_gust_max_strength");
+local cv_wind_gust_min_duration = get_convar("pro_wind_gust_min_duration");
+local cv_wind_gust_max_duration = get_convar("pro_wind_gust_max_duration");
+local cv_wind_change_min_duration = get_convar("pro_wind_change_min_duration");
+local cv_wind_change_max_duration = get_convar("pro_wind_change_max_duration");
+local cv_wind_change_speed = get_convar("pro_wind_change_speed");
 local cv_sv_gravity = get_convar("sv_gravity");
 
 local convar_meta = FindMetaTable("ConVar");
@@ -123,6 +135,8 @@ local function do_water_trace(projectile_data, new_pos, filter)
 end
 
 local gravity_vector = vector(0, 0, 0);
+local wind_vector = vector(0, 0, 0);
+local wind_target_vector = vector(0, 0, 0);
 
 local fire_bullets_config = {
     Attacker = nil,
@@ -195,7 +209,14 @@ local function move_projectile(shooter, projectile_data)
         end
 
         current_velocity.z = current_velocity.z + gravity_vector.z * tick_interval;
+    end
 
+    if get_bool(cv_wind_enabled) then
+        current_velocity.x = current_velocity.x + wind_vector.x * tick_interval;
+        current_velocity.y = current_velocity.y + wind_vector.y * tick_interval;
+    end
+
+    if get_bool(cv_gravity_enabled) or get_bool(cv_wind_enabled) then
         projectile_data.dir = get_normalized(current_velocity);
         projectile_data.speed = vec_len(current_velocity);
     end
@@ -315,6 +336,49 @@ local function debug_final_pos(projectile_data)
     debug_box(projectile_data.pos, vector(-1, -1, -1), vector(1, 1, 1), dur, col, true);
 end
 
+local cur_time = CurTime;
+local sin = math.sin;
+local cos = math.cos;
+local rad = math.rad;
+local lerp_vector = LerpVector;
+local floor = math.floor;
+local rand = math.Rand;
+
+local gust_end_time = 0;
+local next_wind_update_time = 0;
+local wind_angle = 0;
+
+local function update_wind_target(is_wind_update, is_gust)
+    if is_gust then
+        gust_end_time = 0;
+    end
+
+    local angle = (is_wind_update and rad(rand(0, 360))) or wind_angle;
+
+    local base_strength = get_float(cv_wind_strength);
+    local variance = base_strength * get_float(cv_wind_strength_variance);
+    local strength = rand(base_strength - variance, base_strength + variance);
+
+    local time = cur_time();
+    if ((not is_wind_update and is_gust) or is_wind_update) and rand(0, 1) < get_float(cv_wind_gust_chance) then
+        strength = strength + strength * rand(get_float(cv_wind_gust_min_strength), get_float(cv_wind_gust_max_strength));
+        local duration = rand(get_float(cv_wind_gust_min_duration), get_float(cv_wind_gust_max_duration));
+        gust_end_time = time + duration;
+        
+        if time > (next_wind_update_time - duration) then
+            next_wind_update_time = time + duration;
+        end
+    elseif is_wind_update then
+        local freq = rand(get_float(cv_wind_change_min_duration), get_float(cv_wind_change_max_duration));
+        next_wind_update_time = time + freq;
+    end
+    
+    wind_target_vector.x = sin(angle) * strength;
+    wind_target_vector.y = cos(angle) * strength;
+
+    wind_angle = angle;
+end
+
 local function move_projectiles(ply, mv, cmd)
     local projectiles = projectile_store[ply];
     if not projectiles then return; end
@@ -341,6 +405,14 @@ local function move_projectiles(ply, mv, cmd)
 end
 
 if SERVER then
+    util.AddNetworkString("projectiles_wind");
+
+    local net_start = net.Start;
+    local write_entity = net.WriteEntity;
+    local write_float = net.WriteFloat;
+    local broadcast = net.Broadcast;
+    local send = net.Send;
+
     hook.Add("SetupMove", "projectiles_tick", move_projectiles)
     hook.Add("Tick", "projectiles_tick", function()
         for shooter, _ in next, projectile_store do
@@ -348,12 +420,35 @@ if SERVER then
                 move_projectiles(shooter, nil, nil);
             end
         end
+
+        if get_bool(cv_wind_enabled) then
+            local time = cur_time();
+            local wind_update = time > next_wind_update_time;
+            local gust = gust_end_time > 0 and time > gust_end_time;
+            if wind_update or gust then
+                update_wind_target(wind_update, gust);
+
+                net_start("projectiles_wind");
+                write_float(wind_target_vector.x);
+                write_float(wind_target_vector.y);
+                broadcast();
+            end
+    
+            wind_vector = lerp_vector(get_float(cv_wind_change_speed) * tick_interval, wind_vector, wind_target_vector);
+        else
+            if wind_target_vector.x ~= 0.0 or wind_target_vector.y ~= 0.0 then
+                net_start("projectiles_wind");
+                write_float(0.0);
+                write_float(0.0);
+                broadcast();
+
+                wind_target_vector.x = 0.0;
+                wind_target_vector.y = 0.0;
+            end
+        end
     end);
 
     util.AddNetworkString("projectiles_cleanup");
-    local net_start = net.Start;
-    local write_entity = net.WriteEntity;
-    local broadcast = net.Broadcast;
 
     hook.Add("EntityRemoved", "projectiles_cleanup", function(ent)
         projectile_store[ent] = nil;
@@ -363,13 +458,26 @@ if SERVER then
         --broadcast();
     end);
     
-else    
+    hook.Add("PlayerInitialSpawn", "projectiles_wind", function(ply)
+        local local_wind_vector = wind_target_vector;
+        timer.Simple(1, function()
+            if local_wind_vector.x ~= wind_target_vector.x or local_wind_vector.y ~= wind_target_vector.y then
+                net_start("projectiles_wind");
+                write_float(wind_target_vector.x);
+                write_float(wind_target_vector.y);
+                send(ply);
+            end
+        end);
+    end);
+else
     hook.Add("CreateMove", "projectiles_tick", function(cmd)
         if get_command_number(cmd) ~= 0 then
             for shooter, _ in next, projectile_store do
                 if not is_valid(shooter) then continue; end
                 move_projectiles(shooter, nil, nil);
             end
+
+            wind_vector = lerp_vector(get_float(cv_wind_change_speed) * tick_interval, wind_vector, wind_target_vector);
         end
     end);
 
@@ -378,6 +486,17 @@ else
         local ent = read_entity();
         projectile_store[ent] = nil;
     end);]]
+
+    local read_float = net.ReadFloat;
+
+    net.Receive("projectiles_wind", function()
+        local wind_x = read_float();
+        local wind_y = read_float();
+        wind_target_vector.x = wind_x;
+        wind_target_vector.y = wind_y;
+
+        print("wind_target_vector: " .. wind_target_vector.x .. ", " .. wind_target_vector.y);
+    end);
 
     timer.Create("projectiles_cleanup", 120.0, 0, function()
         for ent, _ in next, projectile_store do
