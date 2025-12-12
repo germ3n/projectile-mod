@@ -434,7 +434,11 @@ if SERVER then
                 broadcast();
             end
     
-            wind_vector = lerp_vector(get_float(cv_wind_change_speed) * tick_interval, wind_vector, wind_target_vector);
+            local fraction = get_float(cv_wind_change_speed) * tick_interval;
+            if fraction > 1.0 then
+                fraction = 1.0;
+            end
+            wind_vector = lerp_vector(fraction, wind_vector, wind_target_vector);
         else
             if wind_target_vector.x ~= 0.0 or wind_target_vector.y ~= 0.0 then
                 net_start("projectiles_wind");
@@ -459,9 +463,8 @@ if SERVER then
     end);
     
     hook.Add("PlayerInitialSpawn", "projectiles_wind", function(ply)
-        local local_wind_vector = wind_target_vector;
         timer.Simple(1, function()
-            if local_wind_vector.x ~= wind_target_vector.x or local_wind_vector.y ~= wind_target_vector.y then
+            if IsValid(ply) then
                 net_start("projectiles_wind");
                 write_float(wind_target_vector.x);
                 write_float(wind_target_vector.y);
@@ -477,7 +480,11 @@ else
                 move_projectiles(shooter, nil, nil);
             end
 
-            wind_vector = lerp_vector(get_float(cv_wind_change_speed) * tick_interval, wind_vector, wind_target_vector);
+            local fraction = get_float(cv_wind_change_speed) * tick_interval;
+            if fraction > 1.0 then
+                fraction = 1.0;
+            end
+            wind_vector = lerp_vector(fraction, wind_vector, wind_target_vector);
         end
     end);
 
