@@ -26,7 +26,8 @@ pro_gravity_multiplier = CreateConVar("pro_gravity_multiplier", "1", bit.bor(FCV
 pro_gravity_water_multiplier = CreateConVar("pro_gravity_water_multiplier", "100", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Gravity water multiplier");
 pro_wind_enabled = CreateConVar("pro_wind_enabled", "0", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Enable wind");
 pro_wind_strength = CreateConVar("pro_wind_strength", "2.5", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Wind strength");
-pro_wind_strength_variance = CreateConVar("pro_wind_strength_variance", "0.2", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Wind strength variance");
+pro_wind_strength_min_variance = CreateConVar("pro_wind_strength_min_variance", "0.8", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Wind strength min variance");
+pro_wind_strength_max_variance = CreateConVar("pro_wind_strength_max_variance", "1.2", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Wind strength max variance");
 pro_wind_gust_chance = CreateConVar("pro_wind_gust_chance", "0.2", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Min wind gust chance");
 pro_wind_gust_min_strength = CreateConVar("pro_wind_gust_min_strength", "0.1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Min wind gust strength");
 pro_wind_gust_max_strength = CreateConVar("pro_wind_gust_max_strength", "0.3", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Wind gust strength");
@@ -66,7 +67,8 @@ PROJECTILE_CVAR_NAMES = {
 	"pro_render_enabled",
 	"pro_wind_enabled",
 	"pro_wind_strength",
-	"pro_wind_strength_variance",
+	"pro_wind_strength_min_variance",
+	"pro_wind_strength_max_variance",
 	"pro_wind_gust_chance",
 	"pro_wind_gust_min_strength",
 	"pro_wind_gust_max_strength",

@@ -30,15 +30,22 @@ local string_split = string.Split;
 local tonumber = tonumber;
 local tostring = tostring;
 local NULL = NULL;
+local get_world = game.GetWorld;
+local engine_tick_count = engine.TickCount;
 
 local entity_meta = FindMetaTable("Entity");
 local is_valid = entity_meta.IsValid;
 local take_damage_info = entity_meta.TakeDamageInfo;
 local fire_bullets = entity_meta.FireBullets;
 local get_class = entity_meta.GetClass;
+local set_nw2_float = entity_meta.SetNW2Float;
+local get_nw2_float = entity_meta.GetNW2Float;
+local set_nw2_int = entity_meta.SetNW2Int;
+local get_nw2_int = entity_meta.GetNW2Int;
 
 local player_meta = FindMetaTable("Player");
 local toggle_lag_compensation = player_meta.LagCompensation;
+local is_listen_server_host = player_meta.IsListenServerHost;
 
 local damage_info_meta = FindMetaTable("CTakeDamageInfo");
 local set_damage = damage_info_meta.SetDamage;
@@ -91,7 +98,9 @@ local cv_gravity_water_multiplier = get_convar("pro_gravity_water_multiplier");
 local cv_drop_multiplier = get_convar("pro_drop_multiplier");
 local cv_wind_enabled = get_convar("pro_wind_enabled");
 local cv_wind_strength = get_convar("pro_wind_strength");
-local cv_wind_strength_variance = get_convar("pro_wind_strength_variance");
+local cv_wind_strength_min_variance = get_convar("pro_wind_strength_min_variance");
+local cv_wind_strength_max_variance = get_convar("pro_wind_strength_max_variance");
+
 local cv_wind_gust_chance = get_convar("pro_wind_gust_chance");
 local cv_wind_gust_min_strength = get_convar("pro_wind_gust_min_strength");
 local cv_wind_gust_max_strength = get_convar("pro_wind_gust_max_strength");
@@ -348,6 +357,28 @@ local rand = math.Rand;
 local gust_end_time = 0;
 local next_wind_update_time = 0;
 local wind_angle = 0;
+local wind_start_tick = 0;
+
+-- move away from lerping using curtime and use tick count instead
+local clamp = math.Clamp;
+local lerp = Lerp;
+local function get_wind_at_tick(tick)
+    local world = get_world();
+    local start_tick = get_nw2_int(world, "pro_wind_start_tick", 0);
+    local end_tick = get_nw2_int(world, "pro_wind_end_tick", 0);
+
+    local progress = (tick - start_tick) / (end_tick - start_tick + (start_tick == end_tick and 1 or 0));
+    progress = clamp(progress, 0, 1);
+
+    local start_wind_x = get_nw2_float(world, "pro_wind_start_vector_x", 0.0);
+    local start_wind_y = get_nw2_float(world, "pro_wind_start_vector_y", 0.0);
+    local target_wind_x = get_nw2_float(world, "pro_wind_target_vector_x", 0.0);
+    local target_wind_y = get_nw2_float(world, "pro_wind_target_vector_y", 0.0);
+
+    local wind_x = lerp(progress, start_wind_x, target_wind_x);
+    local wind_y = lerp(progress, start_wind_y, target_wind_y);
+    return vector(wind_x, wind_y, 0.0);
+end
 
 local function update_wind_target(is_wind_update, is_gust)
     if is_gust then
@@ -357,10 +388,10 @@ local function update_wind_target(is_wind_update, is_gust)
     local angle = (is_wind_update and rad(rand(0, 360))) or wind_angle;
 
     local base_strength = get_float(cv_wind_strength);
-    local variance = base_strength * get_float(cv_wind_strength_variance);
-    local strength = rand(base_strength - variance, base_strength + variance);
+    local strength = base_strength * rand(get_float(cv_wind_strength_min_variance), get_float(cv_wind_strength_max_variance));
 
-    local time = cur_time();
+    local tick_count = engine_tick_count();
+    local time = tick_count * tick_interval;
     if ((not is_wind_update and is_gust) or is_wind_update) and rand(0, 1) < get_float(cv_wind_gust_chance) then
         strength = strength + strength * rand(get_float(cv_wind_gust_min_strength), get_float(cv_wind_gust_max_strength));
         local duration = rand(get_float(cv_wind_gust_min_duration), get_float(cv_wind_gust_max_duration));
@@ -373,9 +404,21 @@ local function update_wind_target(is_wind_update, is_gust)
         local freq = rand(get_float(cv_wind_change_min_duration), get_float(cv_wind_change_max_duration));
         next_wind_update_time = time + freq;
     end
+
+    local start_wind = get_wind_at_tick(tick_count);
     
     wind_target_vector.x = sin(angle) * strength;
     wind_target_vector.y = cos(angle) * strength;
+
+    local world = get_world();
+    set_nw2_float(world, "pro_wind_start_vector_x", start_wind.x);
+    set_nw2_float(world, "pro_wind_start_vector_y", start_wind.y);
+    set_nw2_float(world, "pro_wind_target_vector_x", wind_target_vector.x);
+    set_nw2_float(world, "pro_wind_target_vector_y", wind_target_vector.y);
+    wind_start_tick = engine_tick_count();
+    set_nw2_int(world, "pro_wind_start_tick", wind_start_tick);
+    local wind_end_tick = floor(next_wind_update_time / tick_interval);
+    set_nw2_int(world, "pro_wind_end_tick", wind_end_tick);
 
     wind_angle = angle;
 end
@@ -406,7 +449,7 @@ local function move_projectiles(ply, mv, cmd)
 end
 
 if SERVER then
-    util.AddNetworkString("projectiles_wind");
+    --util.AddNetworkString("projectiles_wind");
 
     local net_start = net.Start;
     local write_entity = net.WriteEntity;
@@ -423,32 +466,37 @@ if SERVER then
         end
 
         if get_bool(cv_wind_enabled) then
-            local time = cur_time();
+            local time = engine_tick_count() * tick_interval;
             local wind_update = time > next_wind_update_time;
             local gust = gust_end_time > 0 and time > gust_end_time;
             if wind_update or gust then
                 update_wind_target(wind_update, gust);
 
-                net_start("projectiles_wind");
+                --[[net_start("projectiles_wind");
                 write_float(wind_target_vector.x);
                 write_float(wind_target_vector.y);
-                broadcast();
+                broadcast();]]
             end
     
-            local fraction = get_float(cv_wind_change_speed) * tick_interval;
-            if fraction > 1.0 then
-                fraction = 1.0;
-            end
-            wind_vector = lerp_vector(fraction, wind_vector, wind_target_vector);
+            wind_vector = get_wind_at_tick(engine_tick_count());
         else
             if wind_target_vector.x ~= 0.0 or wind_target_vector.y ~= 0.0 then
-                net_start("projectiles_wind");
+                --[[net_start("projectiles_wind");
                 write_float(0.0);
                 write_float(0.0);
-                broadcast();
+                broadcast();]]
 
                 wind_target_vector.x = 0.0;
                 wind_target_vector.y = 0.0;
+
+                local tick_count = engine_tick_count();
+                local world = get_world();
+                set_nw2_float(world, "pro_wind_target_vector_x", 0.0);
+                set_nw2_float(world, "pro_wind_target_vector_y", 0.0);
+                set_nw2_float(world, "pro_wind_start_vector_x", 0.0);
+                set_nw2_float(world, "pro_wind_start_vector_y", 0.0);
+                set_nw2_int(world, "pro_wind_end_tick", tick_count);
+                set_nw2_int(world, "pro_wind_start_tick", tick_count);
             end
         end
     end);
@@ -463,7 +511,7 @@ if SERVER then
         --broadcast();
     end);
     
-    hook.Add("PlayerInitialSpawn", "projectiles_wind", function(ply)
+    --[[hook.Add("PlayerInitialSpawn", "projectiles_wind", function(ply)
         timer.Simple(1, function()
             if IsValid(ply) then
                 net_start("projectiles_wind");
@@ -472,20 +520,28 @@ if SERVER then
                 send(ply);
             end
         end);
-    end);
+    end);]]
 else
+    local is_first_time_predicted = IsFirstTimePredicted;
+    local local_player = LocalPlayer;
+    local is_singleplayer = game.SinglePlayer();
     hook.Add("CreateMove", "projectiles_tick", function(cmd)
-        if get_command_number(cmd) ~= 0 then
+        if get_command_number(cmd) ~= 0 and (is_first_time_predicted() or is_listen_server_host(local_player()) or is_singleplayer) then
             for shooter, _ in next, projectile_store do
                 if not is_valid(shooter) then continue; end
                 move_projectiles(shooter, nil, nil);
             end
 
-            local fraction = get_float(cv_wind_change_speed) * tick_interval;
+            local world = get_world();
+            wind_target_vector.x = get_nw2_float(world, "pro_wind_target_vector_x");
+            wind_target_vector.y = get_nw2_float(world, "pro_wind_target_vector_y");
+            wind_vector = get_wind_at_tick(tick_count(cmd));
+
+            --[[local fraction = get_float(cv_wind_change_speed) * tick_interval;
             if fraction > 1.0 then
                 fraction = 1.0;
             end
-            wind_vector = lerp_vector(fraction, wind_vector, wind_target_vector);
+            wind_vector = lerp_vector(fraction, wind_vector, wind_target_vector);]]
         end
     end);
 
@@ -495,7 +551,7 @@ else
         projectile_store[ent] = nil;
     end);]]
 
-    local read_float = net.ReadFloat;
+    --[[local read_float = net.ReadFloat;
 
     net.Receive("projectiles_wind", function()
         local wind_x = read_float();
@@ -504,7 +560,7 @@ else
         wind_target_vector.y = wind_y;
 
         print("wind_target_vector: " .. wind_target_vector.x .. ", " .. wind_target_vector.y);
-    end);
+    end);]]
 
     timer.Create("projectiles_cleanup", 120.0, 0, function()
         for ent, _ in next, projectile_store do
