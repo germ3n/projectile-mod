@@ -100,6 +100,7 @@ local cv_wind_gust_max_duration = get_convar("pro_wind_gust_max_duration");
 local cv_wind_change_min_duration = get_convar("pro_wind_change_min_duration");
 local cv_wind_change_max_duration = get_convar("pro_wind_change_max_duration");
 local cv_wind_change_speed = get_convar("pro_wind_change_speed");
+local cv_render_wind_hud = get_convar("pro_render_wind_hud");
 local cv_sv_gravity = get_convar("sv_gravity");
 
 local convar_meta = FindMetaTable("ConVar");
@@ -510,6 +511,83 @@ else
             if is_valid(ent) then continue; end
             projectile_store[ent] = nil;
         end
+    end);
+end
+
+if CLIENT then
+    local scr_w = ScrW;
+    local scr_h = ScrH;
+    local local_player = LocalPlayer;
+    local set_texture = surface.SetTexture;
+    local set_draw_color = surface.SetDrawColor;
+    local draw_poly = surface.DrawPoly;
+    local draw_simple_text = draw.SimpleText;
+    local text_align_center = TEXT_ALIGN_CENTER;
+    local text_align_top = TEXT_ALIGN_TOP;
+    local color_white = color_white;
+    local local_player = LocalPlayer;
+    local simple_text = draw.SimpleText;
+    
+    hook.Add("HUDPaint", "projectiles_wind_hud", function()
+        if not get_bool(cv_wind_enabled) or not get_bool(cv_render_wind_hud) then return; end
+    
+        local cx, cy = scr_w() / 2, 150;
+        local arrow_size = 40;
+        local speed = vec_len(wind_vector);
+    
+        local function get_arrow_poly(x, y, ang_rad, size)
+            local pts = {};
+            local offsets = {
+                {x = size, y = 0},
+                {x = -size * 0.6, y = size * 0.5},
+                {x = -size * 0.3, y = 0},
+                {x = -size * 0.6, y = -size * 0.5}
+            };
+    
+            local s, c = sin(ang_rad), cos(ang_rad)
+    
+            for idx = 1, #offsets do
+                local pt = offsets[idx];
+                pts[idx] = {
+                    x = x + (pt.x * c - pt.y * s),
+                    y = y + (pt.x * s + pt.y * c)
+                };
+            end
+            return pts;
+        end
+    
+        set_texture(0);
+    
+        local ply_ang = local_player():EyeAngles().y
+        local correction = 1.5707963267949;--math.pi / 2;
+    
+        -- target wind
+        local target_ang_deg = wind_target_vector:Angle().y - ply_ang;
+        local target_rad = math.rad(-target_ang_deg) - correction;
+        
+        local target_poly = get_arrow_poly(cx, cy, target_rad, arrow_size);
+        set_draw_color(255, 255, 255, 50);
+        draw_poly(target_poly);
+    
+        -- current wind
+        if speed > 0.1 then
+            local cur_ang_deg = wind_vector:Angle().y - ply_ang
+            local cur_rad = rad(-cur_ang_deg) - correction
+    
+            local cur_poly = get_arrow_poly(cx, cy, cur_rad, arrow_size)
+            set_draw_color(0, 255, 255, 255)
+            draw_poly(cur_poly)
+        end
+    
+        simple_text(
+            string_format("Wind: %.1fu/s", speed), 
+            "DermaDefaultBold",
+            cx, 
+            cy + arrow_size + 10, 
+            color_white, 
+            TEXT_ALIGN_CENTER, 
+            TEXT_ALIGN_TOP
+        );
     end);
 end
 

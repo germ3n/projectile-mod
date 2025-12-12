@@ -217,6 +217,7 @@ if CLIENT then
             vars = {
                 { type = "header", label = "Render Settings" },
                 { type = "bool", cvar = "pro_render_enabled", label = "Enable Projectile Rendering", client = true },
+                { type = "bool", cvar = "pro_render_wind_hud", label = "Enable Wind HUD", client = true },
             }
         },
         {

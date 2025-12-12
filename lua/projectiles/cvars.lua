@@ -36,6 +36,7 @@ pro_wind_change_min_duration = CreateConVar("pro_wind_change_min_duration", "4.0
 pro_wind_change_max_duration = CreateConVar("pro_wind_change_max_duration", "15.0", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Wind frequency direction");
 pro_wind_change_speed = CreateConVar("pro_wind_change_speed", "0.1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Wind change speed");
 pro_render_enabled = CreateConVar("pro_render_enabled", "1", bit.bor(FCVAR_ARCHIVE), "Enable render");
+pro_render_wind_hud = CreateConVar("pro_render_wind_hud", "1", bit.bor(FCVAR_ARCHIVE), "Enable wind hud");
 
 PROJECTILE_CVAR_NAMES = {
 	"pro_projectiles_enabled",
@@ -74,4 +75,5 @@ PROJECTILE_CVAR_NAMES = {
 	"pro_wind_change_min_duration",
 	"pro_wind_change_max_duration",
 	"pro_wind_change_speed",
+	"pro_render_wind_hud",
 };
