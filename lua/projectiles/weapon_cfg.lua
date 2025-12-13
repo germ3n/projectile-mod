@@ -5,6 +5,11 @@ local tonumber = tonumber;
 local tostring = tostring;
 local NULL = NULL;
 
+local TRACER_TYPE_TO_INDEX = {
+    ["core"] = 1,
+    ["glow"] = 2,
+};
+
 local WEAPON_BLACKLIST = {};
 
 HL2_WEAPON_CLASSES = {
@@ -63,6 +68,11 @@ local WEAPON_MAX_DISTANCE = {
     ["weapon_shotgun"] = 1500.0,
 };
 
+local WEAPON_TRACER_COLORS = {
+    ["default"] = { Color(255, 200, 100, 255), Color(255, 140, 0, 150) },
+    ["weapon_ar2"] = { Color(200, 255, 255, 255), Color(60, 120, 255, 180) }
+};
+
 CONFIG_TYPES = {
     ["speed"] = WEAPON_SPEEDS,
     ["damage"] = WEAPON_DAMAGES,
@@ -73,6 +83,7 @@ CONFIG_TYPES = {
     ["drop"] = WEAPON_DROP,
     ["min_speed"] = WEAPON_MIN_SPEED,
     ["max_distance"] = WEAPON_MAX_DISTANCE,
+    ["tracer_colors"] = WEAPON_TRACER_COLORS,
 };
 
 local CONFIG_TYPES = CONFIG_TYPES;
@@ -163,6 +174,15 @@ function get_weapon_max_distance(weapon, class_name, max_distance)
     return max_distance or WEAPON_MAX_DISTANCE["default"];
 end
 
+function get_weapon_tracer_colors(weapon, class_name)
+    local val = WEAPON_TRACER_COLORS[class_name];
+    if val then
+        if is_function(val) then return val(weapon, class_name) end
+        return val;
+    end
+    return WEAPON_TRACER_COLORS["default"];
+end
+
 if SERVER then
     util.AddNetworkString("projectile_config_sync");
     util.AddNetworkString("projectile_config_update");
@@ -176,18 +196,42 @@ if SERVER then
         else
             local data = sql.Query("SELECT * FROM projectile_weapon_data");
             if data then
-                for idx, row in ipairs(data) do
+                local color_map = {
+                    ["core_red"]   = {1, "r"}, ["core_green"] = {1, "g"}, ["core_blue"]  = {1, "b"}, ["core_alpha"] = {1, "a"},
+                    ["glow_red"]   = {2, "r"}, ["glow_green"] = {2, "g"}, ["glow_blue"]  = {2, "b"}, ["glow_alpha"] = {2, "a"}
+                };
+    
+                for _, row in next, data do
                     local key = row.key;
                     local val = tonumber(row.value);
                     
                     local parts = string.Explode("|", key);
                     if #parts == 2 then
                         local cfg_type = parts[1];
-                        local class_name = parts[2];
+                        local raw_name = parts[2];
                         local target_table = CONFIG_TYPES[cfg_type];
-
+    
                         if target_table then
-                            target_table[class_name] = val;
+                            if cfg_type == "tracer_colors" then
+                                for suffix, map in next, color_map do
+                                    if string.EndsWith(raw_name, suffix) then
+                                        local class_name = string.sub(raw_name, 1, #raw_name - #suffix);
+                                        
+                                        if not target_table[class_name] then
+                                            local def = target_table["default"];
+                                            target_table[class_name] = {
+                                                Color(def[1].r, def[1].g, def[1].b, def[1].a),
+                                                Color(def[2].r, def[2].g, def[2].b, def[2].a)
+                                            };
+                                        end
+    
+                                        target_table[class_name][map[1]][map[2]] = val;
+                                        break;
+                                    end
+                                end
+                            else
+                                target_table[raw_name] = val;
+                            end
                         end
                     end
                 end
@@ -219,6 +263,7 @@ if SERVER then
         ["drop"] = table.Copy(WEAPON_DROP),
         ["min_speed"] = table.Copy(WEAPON_MIN_SPEED),
         ["max_distance"] = table.Copy(WEAPON_MAX_DISTANCE),
+        ["tracer_colors"] = table.Copy(WEAPON_TRACER_COLORS),
     };
 
     local player_meta = FindMetaTable("Player");
@@ -268,7 +313,7 @@ if SERVER then
         table.CopyFromTo(ORIGINAL_TABLES["drop"], WEAPON_DROP);
         table.CopyFromTo(ORIGINAL_TABLES["min_speed"], WEAPON_MIN_SPEED);
         table.CopyFromTo(ORIGINAL_TABLES["max_distance"], WEAPON_MAX_DISTANCE);
-
+        table.CopyFromTo(ORIGINAL_TABLES["tracer_colors"], WEAPON_TRACER_COLORS);
         CONFIG_TYPES["speed"] = WEAPON_SPEEDS;
         CONFIG_TYPES["damage"] = WEAPON_DAMAGES;
         CONFIG_TYPES["penetration_power"] = WEAPON_PENETRATION_POWERS;
@@ -278,7 +323,7 @@ if SERVER then
         CONFIG_TYPES["drop"] = WEAPON_DROP;
         CONFIG_TYPES["min_speed"] = WEAPON_MIN_SPEED;
         CONFIG_TYPES["max_distance"] = WEAPON_MAX_DISTANCE;
-
+        CONFIG_TYPES["tracer_colors"] = WEAPON_TRACER_COLORS;
         net.Start("projectile_config_sync");
         net.WriteTable(WEAPON_SPEEDS);
         net.WriteTable(WEAPON_DAMAGES);
@@ -289,6 +334,7 @@ if SERVER then
         net.WriteTable(WEAPON_DROP);
         net.WriteTable(WEAPON_MIN_SPEED);
         net.WriteTable(WEAPON_MAX_DISTANCE);
+        net.WriteTable(WEAPON_TRACER_COLORS);
         net.Broadcast();
 
         print("reset all weapon configs");
@@ -309,6 +355,7 @@ if SERVER then
             net.WriteTable(WEAPON_DROP);
             net.WriteTable(WEAPON_MIN_SPEED);
             net.WriteTable(WEAPON_MAX_DISTANCE);
+            net.WriteTable(WEAPON_TRACER_COLORS);
             net.Send(ply);
         end)
     end)
@@ -322,11 +369,28 @@ if SERVER then
         end
 
         local cfg_type = net.ReadString();
+        local target_table = CONFIG_TYPES[cfg_type];
+        if target_table then
+            local class_name = net.ReadString();
+            local tracer_colors = { net.ReadColor(), net.ReadColor() };
+            if target_table then
+                print("updated weapon config: " .. cfg_type .. " for " .. class_name .. " -> " .. val);
+                
+                target_table[class_name] = tracer_colors;
+                -- this is so stupid lmao
+                save_config_to_db(cfg_type, class_name .. "core_red", tracer_colors[1].r);
+                save_config_to_db(cfg_type, class_name .. "core_green", tracer_colors[1].g);
+                save_config_to_db(cfg_type, class_name .. "core_blue", tracer_colors[1].b);
+                save_config_to_db(cfg_type, class_name .. "core_alpha", tracer_colors[1].a);
+                save_config_to_db(cfg_type, class_name .. "glow_red", tracer_colors[2].r);
+                save_config_to_db(cfg_type, class_name .. "glow_green", tracer_colors[2].g);
+                save_config_to_db(cfg_type, class_name .. "glow_blue", tracer_colors[2].b);
+                save_config_to_db(cfg_type, class_name .. "glow_alpha", tracer_colors[2].a);
+            end
+        end
+
         local class_name = net.ReadString();
         local val = net.ReadFloat();
-        
-        local target_table = CONFIG_TYPES[cfg_type];
-
         if target_table then
             print("updated weapon config: " .. cfg_type .. " for " .. class_name .. " -> " .. val);
             
@@ -339,7 +403,37 @@ if SERVER then
             net.WriteFloat(val);
             net.Broadcast();
         end
-    end)
+    end);
+
+    concommand.Add("pro_weapon_set_tracer_color", function(ply, cmd, args)
+        if #args < 5 or (ply ~= NULL and (not is_superadmin(ply))) then return; end
+        local class_name = args[1];
+        local tracer_type = args[2];
+        local tracer_color = Color(tonumber(args[3]), tonumber(args[4]), tonumber(args[5]), args[6] and tonumber(args[6]) or 255);
+
+        if not CONFIG_TYPES["tracer_colors"][class_name] then
+            local def = CONFIG_TYPES["tracer_colors"]["default"];
+            CONFIG_TYPES["tracer_colors"][class_name] = {
+                Color(def[1].r, def[1].g, def[1].b, def[1].a),
+                Color(def[2].r, def[2].g, def[2].b, def[2].a)
+            };
+        end
+
+        CONFIG_TYPES["tracer_colors"][class_name][TRACER_TYPE_TO_INDEX[tracer_type]] = tracer_color;
+        save_config_to_db("tracer_colors", class_name .. tracer_type .. "_red", tracer_color.r);
+        save_config_to_db("tracer_colors", class_name .. tracer_type .. "_green", tracer_color.g);
+        save_config_to_db("tracer_colors", class_name .. tracer_type .. "_blue", tracer_color.b);
+        save_config_to_db("tracer_colors", class_name .. tracer_type .. "_alpha", tracer_color.a);
+
+        print("set tracer color: " .. class_name .. " " .. tracer_type .. " to (" .. tracer_color.r .. ", " .. tracer_color.g .. ", " .. tracer_color.b .. ", " .. tracer_color.a .. ")");
+
+        --[[[net.Start("projectile_config_update");
+        net.WriteString("tracer_colors");
+        net.WriteString(class_name);
+        net.WriteColor(tracer_colors[1]);
+        net.WriteColor(tracer_colors[2]);
+        net.Broadcast();]]
+    end, nil, "Set the tracer colors for a weapon");
     
     print("loaded weapon config sql");
 end
@@ -355,7 +449,7 @@ if CLIENT then
         WEAPON_DROP = net.ReadTable();
         WEAPON_MIN_SPEED = net.ReadTable();
         WEAPON_MAX_DISTANCE = net.ReadTable();
-
+        WEAPON_TRACER_COLORS = net.ReadTable();
         CONFIG_TYPES["speed"] = WEAPON_SPEEDS;
         CONFIG_TYPES["damage"] = WEAPON_DAMAGES;
         CONFIG_TYPES["penetration_power"] = WEAPON_PENETRATION_POWERS;
@@ -365,19 +459,27 @@ if CLIENT then
         CONFIG_TYPES["drop"] = WEAPON_DROP;
         CONFIG_TYPES["min_speed"] = WEAPON_MIN_SPEED;
         CONFIG_TYPES["max_distance"] = WEAPON_MAX_DISTANCE;
-
+        CONFIG_TYPES["tracer_colors"] = WEAPON_TRACER_COLORS;
         print("received full weapon config sync");
     end)
 
     net.Receive("projectile_config_update", function()
         local cfg_type = net.ReadString();
         local class_name = net.ReadString();
-        local val = net.ReadFloat();
-
-        local target_table = CONFIG_TYPES[cfg_type];
-        if target_table then
-            target_table[class_name] = val;
-            LocalPlayer():ChatPrint("Updated " .. cfg_type .. " for " .. class_name .. " to " .. val);
+        if cfg_type == "tracer_colors" then
+            local tracer_colors = { net.ReadColor(), net.ReadColor() };
+            local target_table = CONFIG_TYPES[cfg_type];
+            if target_table then
+                target_table[class_name] = tracer_colors;
+                LocalPlayer():ChatPrint("Updated " .. cfg_type .. " for " .. class_name .. " to " .. tracer_colors[1] .. " and " .. tracer_colors[2]);
+            end
+        else
+            local val = net.ReadFloat();
+            local target_table = CONFIG_TYPES[cfg_type];
+            if target_table then
+                target_table[class_name] = val;
+                LocalPlayer():ChatPrint("Updated " .. cfg_type .. " for " .. class_name .. " to " .. val);
+            end
         end
     end)
 end

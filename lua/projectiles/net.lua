@@ -23,6 +23,7 @@ if SERVER then
     local write_vector = net.WriteVector;
     local write_float = net.WriteFloat;
     local write_uint = net.WriteUInt;
+    local write_color = net.WriteColor;
     local send_pvs = net.SendPVS;
 
     local crc = util.CRC;
@@ -30,7 +31,7 @@ if SERVER then
 
     local vector = Vector;
 
-    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, constpen, mass, drop, min_speed, max_distance, reliable)
+    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, constpen, mass, drop, min_speed, max_distance, tracer_colors, reliable)
         weapon.bullet_idx = (weapon.bullet_idx or 0) + 1;
 
         local time = cur_time();
@@ -60,6 +61,9 @@ if SERVER then
         write_float(min_speed);
         write_float(max_distance);
         write_uint(random_seed, 32); -- random seed for ricochet
+        write_color(tracer_colors[1]);
+        write_color(tracer_colors[2]);
+
         --send_pvs(eye_pos(shooter));
         send_pvs(pos);
 
@@ -94,6 +98,7 @@ if SERVER then
                     random_seed = nil,
                     old_pos = vector(),
                     trace_filter = {nil, nil, nil},
+                    tracer_colors = {nil, nil},
                 };
             end
 
@@ -129,7 +134,8 @@ if SERVER then
         projectile.old_pos.x = pos.x;
         projectile.old_pos.y = pos.y;
         projectile.old_pos.z = pos.z;
-
+        projectile.tracer_colors[1] = tracer_colors[1];
+        projectile.tracer_colors[2] = tracer_colors[2];
         projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
     end
 end
@@ -140,6 +146,7 @@ if CLIENT then
     local read_vector = net.ReadVector;
     local read_float = net.ReadFloat;
     local read_uint = net.ReadUInt;
+    local read_color = net.ReadColor;
     local vector = Vector;
 
     net.Receive("projectile", function()
@@ -165,6 +172,8 @@ if CLIENT then
         local min_speed = read_float();
         local max_distance = read_float();
         local random_seed = read_uint(32);
+        local tracer_color_1 = read_color();
+        local tracer_color_2 = read_color();
 
         if not projectile_store[shooter] then 
             projectile_store[shooter] = {
@@ -196,6 +205,7 @@ if CLIENT then
                     random_seed = nil,
                     old_pos = vector(),
                     trace_filter = {nil, nil, nil},
+                    tracer_colors = {nil, nil},
                 };
             end
 
@@ -231,7 +241,8 @@ if CLIENT then
         projectile.old_pos.x = pos_x;
         projectile.old_pos.y = pos_y;
         projectile.old_pos.z = pos_z;
-
+        projectile.tracer_colors[1] = tracer_color_1;
+        projectile.tracer_colors[2] = tracer_color_2;
         projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
     end)
 end

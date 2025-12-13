@@ -17,12 +17,10 @@ local lerp_vector = LerpVector;
 local set_material = render.SetMaterial;
 local draw_sprite = render.DrawSprite;
 local draw_beam = render.DrawBeam;
+local set_blend = render.SetBlend;
 
 local mat_glow = Material("sprites/light_glow02_add");
 local mat_beam = Material("effects/laser1");
-
-local col_core = Color(255, 200, 100, 255);
-local col_glow = Color(255, 140, 0, 150);
 
 local entity_meta = FindMetaTable("Entity");
 local entindex = entity_meta.EntIndex;
@@ -71,17 +69,21 @@ local function render_projectiles()
                 local final_size = base_size * scale_mod;
 
                 set_material(mat_glow);
-                draw_sprite(render_pos, final_size, final_size, col_core);
-                draw_sprite(render_pos, final_size * 1.5, final_size * 1.5, col_glow);
+                set_blend(p_data.tracer_colors[1].a / 255.0);
+                draw_sprite(render_pos, final_size, final_size, p_data.tracer_colors[1]);
+                draw_sprite(render_pos, final_size * 1.5, final_size * 1.5, p_data.tracer_colors[2]);
 
                 local velocity = p_data.dir * p_data.speed;
                 local tail_length = 0.03;
                 local tail_end = render_pos - (velocity * tail_length);
 
                 set_material(mat_beam);
-                draw_beam(render_pos, tail_end, final_size * 0.5, 0, 1, col_glow);
+                set_blend(p_data.tracer_colors[2].a / 255.0);
+                draw_beam(render_pos, tail_end, final_size * 0.5, 0, 1, p_data.tracer_colors[2]);
             --end
         end
+
+        set_blend(1.0);
     end
 end
 

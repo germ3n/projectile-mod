@@ -1,5 +1,4 @@
--- Real Life Blood REDUX 2025
--- todo: optimize this
+-- anything that uses zippy realistic blood
 
 local projectiles = projectiles;
 local fire_bullets_patched = false;
@@ -8,6 +7,8 @@ local rlb_fire_bullets = nil;
 local rlb_entity_take_damage = nil;
 local cv_projectiles_enabled = GetConVar("pro_projectiles_enabled");
 local guard_rlb_fire_bullets = false;
+local BLOOD_COLOR_RED = BLOOD_COLOR_RED;
+local DONT_BLEED = DONT_BLEED;
 
 local convar_meta = FindMetaTable("ConVar");
 local get_bool = convar_meta.GetBool;
@@ -33,9 +34,10 @@ end
 local function patched_rlb_entity_take_damage(ent, ...)
     if not ent.rlb_initialized then
         ent.UsesRealisticBlood = true;
+        if get_blood_color(ent) == BLOOD_COLOR_RED then ent.AnimatedBlood_RedBlood = true; end
         if ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot() then
             ent.RealLifeBloodRedux_OGBloodColor = get_blood_color(ent);
-            set_blood_color(ent, -1);
+            set_blood_color(ent, DONT_BLEED);
         end
         if ent.IsVJBaseSNPC then ent.Bleeds = false end
         ent.rlb_initialized = true;
@@ -52,7 +54,7 @@ local function patch_rlb_entity_take_damage()
     print("patched rlb_entity_take_damage");
 end
 
-timer.Create("2867635154", 1, 0, function()
+timer.Create("projectile_patch_zippy_realistic_blood", 1, 0, function()
     local hooks = hook.GetTable();
     rlb_fire_bullets = hooks["EntityFireBullets"] and hooks["EntityFireBullets"]["EntityFireBullets_RealisticBlood"];
     rlb_entity_take_damage = hooks["EntityTakeDamage"] and hooks["EntityTakeDamage"]["EntityTakeDamage_RealisticBlood"];
@@ -67,6 +69,6 @@ timer.Create("2867635154", 1, 0, function()
 
     if fire_bullets_patched and entity_take_damage_patched then
         print("all Realistic Blood hacks patched");
-        timer.Remove("2867635154");
+        timer.Remove("projectile_patch_zippy_realistic_blood");
     end
 end);

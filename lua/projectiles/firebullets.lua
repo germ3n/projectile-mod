@@ -74,6 +74,7 @@ if SERVER then
     local get_weapon_drop = get_weapon_drop;
     local get_weapon_min_speed = get_weapon_min_speed;
     local get_weapon_max_distance = get_weapon_max_distance;
+    local get_weapon_tracer_colors = get_weapon_tracer_colors;
     
     local player_meta = FindMetaTable("Player");
     local get_lean_amount = player_meta.GetLeanAmount;
@@ -123,6 +124,7 @@ if SERVER then
         local drop = get_weapon_drop(inflictor, inflictor_class);
         local min_speed = get_weapon_min_speed(inflictor, inflictor_class);
         local max_distance = get_weapon_max_distance(inflictor, inflictor_class);
+        local tracer_colors = get_weapon_tracer_colors(inflictor, inflictor_class);
         for idx = 1, data.Num do
             local spread_dir = get_weapon_spread(inflictor, inflictor_class, data.Dir, data.Spread);
             broadcast_projectile(
@@ -139,7 +141,8 @@ if SERVER then
                 mass,
                 drop,
                 min_speed,
-                max_distance
+                max_distance,
+                tracer_colors
             );
         end
 
