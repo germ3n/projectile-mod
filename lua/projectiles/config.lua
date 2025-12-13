@@ -315,7 +315,7 @@ if CLIENT then
                 { type = "float", cvar = "pro_gravity_multiplier", label = "Gravity Multiplier", min = 0.0, max = 5.0, decimals = 2 },
                 { type = "float", cvar = "pro_gravity_water_multiplier", label = "Water Gravity Multiplier", min = 0.0, max = 200.0, decimals = 0 },
                 { type = "header", label = "Wind" },
-                { type = "bool", cvar = "pro_wind_enabled", label = "Enable Wind" },
+                --[[{ type = "bool", cvar = "pro_wind_enabled", label = "Enable Wind" },
                 { type = "float", cvar = "pro_wind_strength", label = "Wind Strength", min = 0.0, max = 20.0, decimals = 1 },
                 { type = "float", cvar = "pro_wind_strength_min_variance", label = "Wind Strength Min Variance", min = 0.0, max = 10.0, decimals = 2 },
                 { type = "float", cvar = "pro_wind_strength_max_variance", label = "Wind Strength Max Variance", min = 0.0, max = 10.0, decimals = 2 },
@@ -326,7 +326,8 @@ if CLIENT then
                 { type = "float", cvar = "pro_wind_gust_max_duration", label = "Wind Gust Max Duration", min = 0.0, max = 120.0, decimals = 1 },
                 { type = "float", cvar = "pro_wind_change_min_duration", label = "Wind Change Min Duration", min = 0.0, max = 120.0, decimals = 1 },
                 { type = "float", cvar = "pro_wind_change_max_duration", label = "Wind Change Max Duration", min = 0.0, max = 120.0, decimals = 1 },
-                { type = "float", cvar = "pro_wind_change_speed", label = "Wind Change Speed", min = 0.0, max = 1.0, decimals = 2 },
+                { type = "float", cvar = "pro_wind_change_speed", label = "Wind Change Speed", min = 0.0, max = 1.0, decimals = 2 },]]
+                { type = "header", label = "Coming soon... Edit via console for now" },
             }
         },
         {
