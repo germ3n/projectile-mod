@@ -248,7 +248,6 @@ if CLIENT then
                     { type = "header", label = "Multipliers" },
                     { type = "float", cvar = "pro_ricochet_speed_multiplier", label = "Speed Multiplier", min = 0.0, max = 1.0, decimals = 2 },
                     { type = "float", cvar = "pro_ricochet_damage_multiplier", label = "Damage Multiplier", min = 0.0, max = 1.0, decimals = 2 },
-                    { type = "float", cvar = "pro_ricochet_distance_multiplier", label = "Distance Multiplier", min = 0.1, max = 5.0, decimals = 1 },
                 };
 
                 if CreateControl then 

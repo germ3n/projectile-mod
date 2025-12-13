@@ -4,6 +4,7 @@ local CLIENT = CLIENT;
 local SERVER = SERVER;
 local next = next;
 local tick_interval = engine.TickInterval();
+local projectiles = projectiles;
 local projectile_store = projectile_store;
 local handle_penetration = handle_penetration;
 local projectile_move_trace = projectile_move_trace;
@@ -100,15 +101,14 @@ local cv_wind_enabled = get_convar("pro_wind_enabled");
 local cv_wind_strength = get_convar("pro_wind_strength");
 local cv_wind_strength_min_variance = get_convar("pro_wind_strength_min_variance");
 local cv_wind_strength_max_variance = get_convar("pro_wind_strength_max_variance");
-
+local cv_wind_min_update_interval = get_convar("pro_wind_min_update_interval");
+local cv_wind_max_update_interval = get_convar("pro_wind_max_update_interval");
 local cv_wind_gust_chance = get_convar("pro_wind_gust_chance");
 local cv_wind_gust_min_strength = get_convar("pro_wind_gust_min_strength");
 local cv_wind_gust_max_strength = get_convar("pro_wind_gust_max_strength");
 local cv_wind_gust_min_duration = get_convar("pro_wind_gust_min_duration");
 local cv_wind_gust_max_duration = get_convar("pro_wind_gust_max_duration");
-local cv_wind_change_min_duration = get_convar("pro_wind_change_min_duration");
-local cv_wind_change_max_duration = get_convar("pro_wind_change_max_duration");
-local cv_wind_change_speed = get_convar("pro_wind_change_speed");
+local cv_wind_jitter_amount = get_convar("pro_wind_jitter_amount");
 local cv_render_wind_hud = get_convar("pro_render_wind_hud");
 local cv_sv_gravity = get_convar("sv_gravity");
 
@@ -358,10 +358,12 @@ local gust_end_time = 0;
 local next_wind_update_time = 0;
 local wind_angle = 0;
 local wind_start_tick = 0;
+local pending_gust = false;
 
--- move away from lerping using curtime and use tick count instead
 local clamp = math.Clamp;
 local lerp = Lerp;
+local min = math.min;
+
 local function get_wind_at_tick(tick)
     local world = get_world();
     local start_tick = get_nw2_int(world, "pro_wind_start_tick", 0);
@@ -370,40 +372,68 @@ local function get_wind_at_tick(tick)
     local progress = (tick - start_tick) / (end_tick - start_tick + (start_tick == end_tick and 1 or 0));
     progress = clamp(progress, 0, 1);
 
+    local curve = min(progress * 3.5, 1);
+    curve = curve * curve * (3 - 2 * curve);
+
     local start_wind_x = get_nw2_float(world, "pro_wind_start_vector_x", 0.0);
     local start_wind_y = get_nw2_float(world, "pro_wind_start_vector_y", 0.0);
     local target_wind_x = get_nw2_float(world, "pro_wind_target_vector_x", 0.0);
     local target_wind_y = get_nw2_float(world, "pro_wind_target_vector_y", 0.0);
 
-    local wind_x = lerp(progress, start_wind_x, target_wind_x);
-    local wind_y = lerp(progress, start_wind_y, target_wind_y);
+    local wind_x = lerp(curve, start_wind_x, target_wind_x);
+    local wind_y = lerp(curve, start_wind_y, target_wind_y);
+
+    local time = engine_tick_count() * tick_interval;
+    local jitter_amt = get_float(cv_wind_jitter_amount);
+    
+    wind_x = wind_x + (sin(time * 0.5) * jitter_amt);
+    wind_y = wind_y + (cos(time * 0.4) * jitter_amt);
+
     return vector(wind_x, wind_y, 0.0);
 end
 
-local function update_wind_target(is_wind_update, is_gust)
-    if is_gust then
-        gust_end_time = 0;
-    end
-
-    local angle = (is_wind_update and rad(rand(0, 360))) or wind_angle;
-
+local function update_wind_target(is_wind_update, has_gust_finished)
     local base_strength = get_float(cv_wind_strength);
-    local strength = base_strength * rand(get_float(cv_wind_strength_min_variance), get_float(cv_wind_strength_max_variance));
-
     local tick_count = engine_tick_count();
     local time = tick_count * tick_interval;
-    if ((not is_wind_update and is_gust) or is_wind_update) and rand(0, 1) < get_float(cv_wind_gust_chance) then
-        strength = strength + strength * rand(get_float(cv_wind_gust_min_strength), get_float(cv_wind_gust_max_strength));
-        local duration = rand(get_float(cv_wind_gust_min_duration), get_float(cv_wind_gust_max_duration));
+    local duration = 0;
+    local angle = rad(rand(0, 360));
+    local strength = 0;
+
+    if pending_gust then
+        pending_gust = false;
+
+        local gust_strength_multiplier = rand(get_float(cv_wind_gust_min_strength), get_float(cv_wind_gust_max_strength));
+        strength = base_strength + base_strength * gust_strength_multiplier;
+
+        duration = rand(get_float(cv_wind_gust_min_duration), get_float(cv_wind_gust_max_duration));
         gust_end_time = time + duration;
-        
-        if time > (next_wind_update_time - duration) then
-            next_wind_update_time = time + duration;
+
+        angle = rad(rand(0, 360));
+        wind_target_vector.x = sin(angle) * strength;
+        wind_target_vector.y = cos(angle) * strength;
+        wind_angle = angle;
+    else
+        gust_end_time = 0;
+
+        strength = base_strength * rand(get_float(cv_wind_strength_min_variance), get_float(cv_wind_strength_max_variance));
+
+        duration = rand(get_float(cv_wind_min_update_interval), get_float(cv_wind_max_update_interval));
+
+        if rand(0, 1) < get_float(cv_wind_gust_chance) then
+            time_until_gust = rand(1, duration * 0.8);
+
+            duration = time_until_gust;
+            pending_gust = true;
         end
-    elseif is_wind_update then
-        local freq = rand(get_float(cv_wind_change_min_duration), get_float(cv_wind_change_max_duration));
-        next_wind_update_time = time + freq;
+
+        angle = rad(rand(0, 360));
+        wind_target_vector.x = sin(angle) * strength;
+        wind_target_vector.y = cos(angle) * strength;
+        wind_angle = angle;
     end
+
+    next_wind_update_time = time + duration;
 
     local start_wind = get_wind_at_tick(tick_count);
     
@@ -449,14 +479,6 @@ local function move_projectiles(ply, mv, cmd)
 end
 
 if SERVER then
-    --util.AddNetworkString("projectiles_wind");
-
-    local net_start = net.Start;
-    local write_entity = net.WriteEntity;
-    local write_float = net.WriteFloat;
-    local broadcast = net.Broadcast;
-    local send = net.Send;
-
     hook.Add("SetupMove", "projectiles_tick", move_projectiles)
     hook.Add("Tick", "projectiles_tick", function()
         for shooter, _ in next, projectile_store do
@@ -466,26 +488,17 @@ if SERVER then
         end
 
         if get_bool(cv_wind_enabled) then
-            local time = engine_tick_count() * tick_interval;
+            local tick_count = engine_tick_count();
+            local time = tick_count * tick_interval;
             local wind_update = time > next_wind_update_time;
             local gust = gust_end_time > 0 and time > gust_end_time;
             if wind_update or gust then
                 update_wind_target(wind_update, gust);
-
-                --[[net_start("projectiles_wind");
-                write_float(wind_target_vector.x);
-                write_float(wind_target_vector.y);
-                broadcast();]]
             end
     
-            wind_vector = get_wind_at_tick(engine_tick_count());
+            wind_vector = get_wind_at_tick(tick_count);
         else
             if wind_target_vector.x ~= 0.0 or wind_target_vector.y ~= 0.0 then
-                --[[net_start("projectiles_wind");
-                write_float(0.0);
-                write_float(0.0);
-                broadcast();]]
-
                 wind_target_vector.x = 0.0;
                 wind_target_vector.y = 0.0;
 
@@ -501,26 +514,9 @@ if SERVER then
         end
     end);
 
-    util.AddNetworkString("projectiles_cleanup");
-
     hook.Add("EntityRemoved", "projectiles_cleanup", function(ent)
         projectile_store[ent] = nil;
-
-        --net_start("projectiles_cleanup");
-        --write_entity(ent);
-        --broadcast();
     end);
-    
-    --[[hook.Add("PlayerInitialSpawn", "projectiles_wind", function(ply)
-        timer.Simple(1, function()
-            if IsValid(ply) then
-                net_start("projectiles_wind");
-                write_float(wind_target_vector.x);
-                write_float(wind_target_vector.y);
-                send(ply);
-            end
-        end);
-    end);]]
 else
     local is_first_time_predicted = IsFirstTimePredicted;
     local local_player = LocalPlayer;
@@ -536,31 +532,8 @@ else
             wind_target_vector.x = get_nw2_float(world, "pro_wind_target_vector_x");
             wind_target_vector.y = get_nw2_float(world, "pro_wind_target_vector_y");
             wind_vector = get_wind_at_tick(tick_count(cmd));
-
-            --[[local fraction = get_float(cv_wind_change_speed) * tick_interval;
-            if fraction > 1.0 then
-                fraction = 1.0;
-            end
-            wind_vector = lerp_vector(fraction, wind_vector, wind_target_vector);]]
         end
     end);
-
-    --[[local read_entity = net.ReadEntity;
-    net.Receive("projectiles_cleanup", function()
-        local ent = read_entity();
-        projectile_store[ent] = nil;
-    end);]]
-
-    --[[local read_float = net.ReadFloat;
-
-    net.Receive("projectiles_wind", function()
-        local wind_x = read_float();
-        local wind_y = read_float();
-        wind_target_vector.x = wind_x;
-        wind_target_vector.y = wind_y;
-
-        print("wind_target_vector: " .. wind_target_vector.x .. ", " .. wind_target_vector.y);
-    end);]]
 
     timer.Create("projectiles_cleanup", 120.0, 0, function()
         for ent, _ in next, projectile_store do
@@ -581,7 +554,6 @@ if CLIENT then
     local text_align_center = TEXT_ALIGN_CENTER;
     local text_align_top = TEXT_ALIGN_TOP;
     local color_white = color_white;
-    local local_player = LocalPlayer;
     local simple_text = draw.SimpleText;
     
     hook.Add("HUDPaint", "projectiles_wind_hud", function()
@@ -619,7 +591,7 @@ if CLIENT then
     
         -- target wind
         local target_ang_deg = wind_target_vector:Angle().y - ply_ang;
-        local target_rad = math.rad(-target_ang_deg) - correction;
+        local target_rad = rad(-target_ang_deg) - correction;
         
         local target_poly = get_arrow_poly(cx, cy, target_rad, arrow_size);
         set_draw_color(255, 255, 255, 50);

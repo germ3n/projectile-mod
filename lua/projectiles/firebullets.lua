@@ -94,7 +94,6 @@ if SERVER then
     hook.Add("EntityFireBullets", "projectiles", function(shooter, data)
         if projectiles.disable_fire_bullets or not get_bool(cv_projectiles_enabled) then return; end
         if not shooter or shooter == NULL then return; end
-
         --print(shooter, data.Inflictor, data.Damage);
 
         local inflictor;

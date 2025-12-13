@@ -14,5 +14,6 @@ include("weapon_cfg.lua");
 include("firebullets.lua");
 include("props.lua");
 include("config.lua");
+include("hacks/init.lua");
 
 print("loaded projectiles system");

@@ -30,7 +30,6 @@ local cv_ricochet_chance = get_convar("pro_ricochet_chance");
 local cv_ricochet_spread = get_convar("pro_ricochet_spread");
 local cv_ricochet_speed_multiplier = get_convar("pro_ricochet_speed_multiplier");
 local cv_ricochet_damage_multiplier = get_convar("pro_ricochet_damage_multiplier");
-local cv_ricochet_distance_multiplier = get_convar("pro_ricochet_distance_multiplier");
 local cv_penetration_power_cost_multiplier = get_convar("pro_penetration_power_cost_multiplier");
 local cv_penetration_dmg_tax_per_unit = get_convar("pro_penetration_dmg_tax_per_unit");
 local cv_penetration_entry_cost_multiplier = get_convar("pro_penetration_entry_cost_multiplier");
