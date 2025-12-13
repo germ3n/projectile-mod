@@ -73,6 +73,11 @@ local WEAPON_TRACER_COLORS = {
     ["weapon_ar2"] = { Color(200, 255, 255, 255), Color(60, 120, 255, 180) }
 };
 
+local WEAPON_SPREAD_BIAS = {
+    ["default"] = 1.0,
+    ["weapon_shotgun"] = -1.0,
+};
+
 CONFIG_TYPES = {
     ["speed"] = WEAPON_SPEEDS,
     ["damage"] = WEAPON_DAMAGES,
@@ -84,6 +89,7 @@ CONFIG_TYPES = {
     ["min_speed"] = WEAPON_MIN_SPEED,
     ["max_distance"] = WEAPON_MAX_DISTANCE,
     ["tracer_colors"] = WEAPON_TRACER_COLORS,
+    ["spread_bias"] = WEAPON_SPREAD_BIAS,
 };
 
 local CONFIG_TYPES = CONFIG_TYPES;
@@ -264,6 +270,7 @@ if SERVER then
         ["min_speed"] = table.Copy(WEAPON_MIN_SPEED),
         ["max_distance"] = table.Copy(WEAPON_MAX_DISTANCE),
         ["tracer_colors"] = table.Copy(WEAPON_TRACER_COLORS),
+        ["spread_bias"] = table.Copy(WEAPON_SPREAD_BIAS),
     };
 
     local player_meta = FindMetaTable("Player");
@@ -314,6 +321,7 @@ if SERVER then
         table.CopyFromTo(ORIGINAL_TABLES["min_speed"], WEAPON_MIN_SPEED);
         table.CopyFromTo(ORIGINAL_TABLES["max_distance"], WEAPON_MAX_DISTANCE);
         table.CopyFromTo(ORIGINAL_TABLES["tracer_colors"], WEAPON_TRACER_COLORS);
+        table.CopyFromTo(ORIGINAL_TABLES["spread_bias"], WEAPON_SPREAD_BIAS);
         CONFIG_TYPES["speed"] = WEAPON_SPEEDS;
         CONFIG_TYPES["damage"] = WEAPON_DAMAGES;
         CONFIG_TYPES["penetration_power"] = WEAPON_PENETRATION_POWERS;
@@ -324,6 +332,7 @@ if SERVER then
         CONFIG_TYPES["min_speed"] = WEAPON_MIN_SPEED;
         CONFIG_TYPES["max_distance"] = WEAPON_MAX_DISTANCE;
         CONFIG_TYPES["tracer_colors"] = WEAPON_TRACER_COLORS;
+        CONFIG_TYPES["spread_bias"] = WEAPON_SPREAD_BIAS;
         net.Start("projectile_config_sync");
         net.WriteTable(WEAPON_SPEEDS);
         net.WriteTable(WEAPON_DAMAGES);
@@ -335,6 +344,7 @@ if SERVER then
         net.WriteTable(WEAPON_MIN_SPEED);
         net.WriteTable(WEAPON_MAX_DISTANCE);
         net.WriteTable(WEAPON_TRACER_COLORS);
+        net.WriteTable(WEAPON_SPREAD_BIAS);
         net.Broadcast();
 
         print("reset all weapon configs");
@@ -356,6 +366,7 @@ if SERVER then
             net.WriteTable(WEAPON_MIN_SPEED);
             net.WriteTable(WEAPON_MAX_DISTANCE);
             net.WriteTable(WEAPON_TRACER_COLORS);
+            net.WriteTable(WEAPON_SPREAD_BIAS);
             net.Send(ply);
         end)
     end)
@@ -453,6 +464,7 @@ if CLIENT then
         WEAPON_MIN_SPEED = net.ReadTable();
         WEAPON_MAX_DISTANCE = net.ReadTable();
         WEAPON_TRACER_COLORS = net.ReadTable();
+        WEAPON_SPREAD_BIAS = net.ReadTable();
         CONFIG_TYPES["speed"] = WEAPON_SPEEDS;
         CONFIG_TYPES["damage"] = WEAPON_DAMAGES;
         CONFIG_TYPES["penetration_power"] = WEAPON_PENETRATION_POWERS;
@@ -463,6 +475,7 @@ if CLIENT then
         CONFIG_TYPES["min_speed"] = WEAPON_MIN_SPEED;
         CONFIG_TYPES["max_distance"] = WEAPON_MAX_DISTANCE;
         CONFIG_TYPES["tracer_colors"] = WEAPON_TRACER_COLORS;
+        CONFIG_TYPES["spread_bias"] = WEAPON_SPREAD_BIAS;
         print("received full weapon config sync");
     end)
 

@@ -13,12 +13,15 @@ local up = angle_meta.Up;
 local vector_meta = FindMetaTable("Vector");
 local angle = vector_meta.Angle;
 
-local function calc_spread(weapon, dir, spread, bias)
-    if spread == zero_vec then
+local CONFIG_TYPES = CONFIG_TYPES;
+
+local function get_weapon_spread(weapon, class_name, dir, spread)
+    if spread.x == 0.0 and spread.y == 0.0 then
         return dir;
     end
 
-    bias = bias or 1.0;
+    local WEAPON_SPREAD_BIAS = CONFIG_TYPES["spread_bias"];
+    local bias = WEAPON_SPREAD_BIAS[class_name] or WEAPON_SPREAD_BIAS["default"];
     local flatness = abs(bias * 0.5);
     local final_spread_x, final_spread_y;
     local angle_dir = angle(dir);
@@ -36,20 +39,6 @@ local function calc_spread(weapon, dir, spread, bias)
 
     local final_dir = dir + (final_spread_x * spread.x * vec_right) + (final_spread_y * spread.y * vec_up);
     return final_dir;
-end
-
-local SPREAD_VALUES = {
-    ["default"] = calc_spread,
-    ["weapon_shotgun"] = function(weapon, dir, spread, bias)
-        return calc_spread(weapon, dir, spread, -1.0);
-    end,
-};
-
-local function get_weapon_spread(weapon, class_name, dir, spread, bias)
-    local spread_func = SPREAD_VALUES[class_name];
-    if spread_func then return spread_func(weapon, dir, spread, bias); end
-
-    return SPREAD_VALUES["default"](weapon, dir, spread, bias);
 end
 
 local convar_meta = FindMetaTable("ConVar");

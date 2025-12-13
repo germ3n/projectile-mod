@@ -130,7 +130,7 @@ if CLIENT then
             slider.OnValueChanged = function(s, value)
                 if math.abs(GetConVar(data.cvar):GetFloat() - value) < 0.001 then return end
                 
-                timer.Create("projectile_update_cvar_timer_" .. data.cvar, 0.2, 1, function()
+                timer.Create("projectile_update_cvar_timer_" .. data.cvar, 0.25, 1, function()
                     net.Start("projectile_update_cvar");
                     net.WriteString(data.cvar);
                     net.WriteString(tostring(value));
@@ -175,7 +175,7 @@ if CLIENT then
             mixer:SetColor(init_col);
 
             mixer.ValueChanged = function(s, col)
-                timer.Create("projectile_update_cvar_timer_" .. data.cvar, 0.2, 1, function()
+                timer.Create("projectile_update_cvar_timer_" .. data.cvar, 0.25, 1, function()
                     local val = string.format("%d %d %d", col.r, col.g, col.b);
                     net.Start("projectile_update_cvar");
                     net.WriteString(data.cvar);
@@ -350,7 +350,7 @@ if CLIENT then
                     slider.TextArea:SetTextColor(THEME.text);
 
                     slider.OnValueChanged = function(s, value)
-                        timer.Create("pro_ric_mat_update_" .. mat_data.name, 0.2, 1, function()
+                        timer.Create("pro_ric_mat_update_" .. mat_data.name, 0.25, 1, function()
                             RunConsoleCommand("pro_ricochet_mat_chance_multipliers_update", mat_data.name, tostring(math.Round(value, 2)));
                         end);
                     end
@@ -578,7 +578,7 @@ if CLIENT then
                 end
                 table.sort(sorted_weapons);
 
-                local function create_slider(parent_panel, label_text, cfg_type, class_name, default_val, max_val, decimals)
+                local function create_slider(parent_panel, label_text, cfg_type, class_name, default_val, min_val, max_val, decimals)
                     local panel = vgui.Create("DPanel", parent_panel);
                     panel:Dock(TOP);
                     panel:SetTall(30);
@@ -593,7 +593,7 @@ if CLIENT then
 
                     local slider = vgui.Create("DNumSlider", panel);
                     slider:Dock(FILL);
-                    slider:SetMin(0);
+                    slider:SetMin(min_val);
                     slider:SetMax(max_val);
                     slider:SetDecimals(decimals);
                     slider.Label:SetVisible(false);
@@ -667,14 +667,15 @@ if CLIENT then
                         
                         content:DockPadding(10, 10, 10, 10);
                         
-                        create_slider(content, "Speed", "speed", class_name, 2000, 10000, 0);
-                        create_slider(content, "Damage", "damage", class_name, 10, 500, 0);
-                        create_slider(content, "Penetration Power", "penetration_power", class_name, 2.5, 50, 2);
-                        create_slider(content, "Max Penetration Count", "penetration_count", class_name, 10, 50, 0);
-                        create_slider(content, "Drag", "drag", class_name, 0, 10, 3);
-                        create_slider(content, "Drop", "drop", class_name, 0, 5, 3);
-                        create_slider(content, "Min Speed (Units/s)", "min_speed", class_name, 0, 500, 0);
-                        create_slider(content, "Max Dist (Units)", "max_distance", class_name, 500, 50000, 0);
+                        create_slider(content, "Speed", "speed", class_name, 2000, 0, 10000, 0);
+                        create_slider(content, "Damage", "damage", class_name, 10, 0, 500, 0);
+                        create_slider(content, "Penetration Power", "penetration_power", class_name, 2.5, 0, 50, 2);
+                        create_slider(content, "Max Penetration Count", "penetration_count", class_name, 10, 0, 50, 0);
+                        create_slider(content, "Drag", "drag", class_name, 0.1, 0, 10, 3);
+                        create_slider(content, "Drop", "drop", class_name, 0.005, 0, 10, 3);
+                        create_slider(content, "Min Speed (Units/s)", "min_speed", class_name, 500, 0, 1000, 0);
+                        create_slider(content, "Max Dist (Units)", "max_distance", class_name, 4096, 0, 50000, 0);
+                        create_slider(content, "Spread Bias", "spread_bias", class_name, 1.0, -1.0, 1.0, 2);
 
                         content:SetTall(290); 
                         category:SetContents(content);
