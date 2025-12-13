@@ -18,6 +18,10 @@ if SERVER then
     local entity_meta = FindMetaTable("Entity");
     local eye_pos = entity_meta.EyePos;
 
+    local convar_meta = FindMetaTable("ConVar");
+    local get_bool = convar_meta.GetBool;
+    local get_int = convar_meta.GetInt;
+
     local net_start = net.Start;
     local write_entity = net.WriteEntity;
     local write_vector = net.WriteVector;
@@ -25,19 +29,23 @@ if SERVER then
     local write_uint = net.WriteUInt;
     local write_color = net.WriteColor;
     local send_pvs = net.SendPVS;
+    local send_pas = net.SendPAS;
+    local broadcast = net.Broadcast;
 
     local crc = util.CRC;
     local tonumber = tonumber;
 
     local vector = Vector;
 
-    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, constpen, mass, drop, min_speed, max_distance, tracer_colors, reliable)
+    local cv_net_send_method = GetConVar("pro_net_send_method");
+
+    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, reliable)
         weapon.bullet_idx = (weapon.bullet_idx or 0) + 1;
 
         local time = cur_time();
         local random_seed = tonumber(crc(tostring(pos) .. tostring(dir))); -- random seed for ricochet
 
-        net_start("projectile", reliable and true or false);
+        net_start("projectile", reliable and false or true);
         write_entity(shooter);
         write_entity(weapon);
         --write_uint(band(weapon.bullet_idx, 255), 8);
@@ -55,7 +63,6 @@ if SERVER then
         write_uint(penetration_count, 8);
         write_float(drag);
         write_float(penetration_power);
-        write_float(constpen);
         write_float(mass);
         write_float(drop);
         write_float(min_speed);
@@ -65,7 +72,14 @@ if SERVER then
         write_color(tracer_colors[2]);
 
         --send_pvs(eye_pos(shooter));
-        send_pvs(pos);
+        local send_method = get_int(cv_net_send_method);
+        if send_method == 0 then
+            send_pvs(pos);
+        elseif send_method == 1 then
+            send_pas(pos);
+        else
+            broadcast();
+        end
 
         if not projectile_store[shooter] then 
             projectile_store[shooter] = {
@@ -88,7 +102,6 @@ if SERVER then
                     drag = nil,
                     penetration_power = nil,
                     penetration_count = nil,
-                    constpen = nil,
                     last_hit_entity = nil,
                     mass = nil,
                     drop = nil,
@@ -122,7 +135,6 @@ if SERVER then
         projectile.drag = drag;
         projectile.penetration_power = penetration_power;
         projectile.penetration_count = penetration_count;
-        projectile.constpen = constpen;
         projectile.last_hit_entity = nil;
         projectile.hit = false;
         projectile.mass = mass;
@@ -166,14 +178,13 @@ if CLIENT then
         local penetration_count = read_uint(8);
         local drag = read_float();
         local penetration_power = read_float();
-        local constpen = read_float();
         local mass = read_float();
         local drop = read_float();
         local min_speed = read_float();
         local max_distance = read_float();
         local random_seed = read_uint(32);
-        local tracer_color_1 = read_color();
-        local tracer_color_2 = read_color();
+        local tracer_color_core = read_color();
+        local tracer_color_glow = read_color();
 
         if not projectile_store[shooter] then 
             projectile_store[shooter] = {
@@ -195,7 +206,6 @@ if CLIENT then
                     drag = nil,
                     penetration_power = nil,
                     penetration_count = nil,
-                    constpen = nil,
                     last_hit_entity = nil,
                     mass = nil,
                     drop = nil,
@@ -229,7 +239,6 @@ if CLIENT then
         projectile.drag = drag;
         projectile.penetration_power = penetration_power;
         projectile.penetration_count = penetration_count;
-        projectile.constpen = constpen;
         projectile.last_hit_entity = nil;
         projectile.hit = false;
         projectile.mass = mass;
@@ -241,8 +250,8 @@ if CLIENT then
         projectile.old_pos.x = pos_x;
         projectile.old_pos.y = pos_y;
         projectile.old_pos.z = pos_z;
-        projectile.tracer_colors[1] = tracer_color_1;
-        projectile.tracer_colors[2] = tracer_color_2;
+        projectile.tracer_colors[1] = tracer_color_core;
+        projectile.tracer_colors[2] = tracer_color_glow;
         projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
     end)
 end

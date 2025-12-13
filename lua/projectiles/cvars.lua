@@ -37,6 +37,8 @@ pro_wind_gust_max_duration = CreateConVar("pro_wind_gust_max_duration", "7.0", b
 pro_wind_jitter_amount = CreateConVar("pro_wind_jitter_amount", "1.0", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Wind jitter amount");
 pro_render_enabled = CreateConVar("pro_render_enabled", "1", bit.bor(FCVAR_ARCHIVE), "Enable render");
 pro_render_wind_hud = CreateConVar("pro_render_wind_hud", "1", bit.bor(FCVAR_ARCHIVE), "Enable wind hud");
+pro_net_reliable = CreateConVar("pro_net_reliable", "0", bit.bor(FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED), "Enable net reliable");
+pro_net_method = CreateConVar("pro_net_send_method", "0", bit.bor(FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED), "Networking send method");
 
 PROJECTILE_CVAR_NAMES = {
 	"pro_projectiles_enabled",
@@ -78,4 +80,6 @@ PROJECTILE_CVAR_NAMES = {
 	"pro_wind_change_max_duration",
 	"pro_wind_change_speed",
 	"pro_render_wind_hud",
+	"pro_net_reliable",
+	"pro_net_send_method",
 };

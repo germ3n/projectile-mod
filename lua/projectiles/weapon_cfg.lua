@@ -369,39 +369,42 @@ if SERVER then
         end
 
         local cfg_type = net.ReadString();
-        local target_table = CONFIG_TYPES[cfg_type];
-        if target_table then
+        if cfg_type == "tracer_colors" then
+            local target_table = CONFIG_TYPES[cfg_type];
+            if target_table then
+                local class_name = net.ReadString();
+                local tracer_colors = { net.ReadColor(), net.ReadColor() };
+                if target_table then
+                    print("updated weapon config: " .. cfg_type .. " for " .. class_name .. " -> " .. val);
+                    
+                    target_table[class_name] = tracer_colors;
+                    -- this is so stupid lmao
+                    save_config_to_db(cfg_type, class_name .. "core_red", tracer_colors[1].r);
+                    save_config_to_db(cfg_type, class_name .. "core_green", tracer_colors[1].g);
+                    save_config_to_db(cfg_type, class_name .. "core_blue", tracer_colors[1].b);
+                    save_config_to_db(cfg_type, class_name .. "core_alpha", tracer_colors[1].a);
+                    save_config_to_db(cfg_type, class_name .. "glow_red", tracer_colors[2].r);
+                    save_config_to_db(cfg_type, class_name .. "glow_green", tracer_colors[2].g);
+                    save_config_to_db(cfg_type, class_name .. "glow_blue", tracer_colors[2].b);
+                    save_config_to_db(cfg_type, class_name .. "glow_alpha", tracer_colors[2].a);
+                end
+            end
+        else
             local class_name = net.ReadString();
-            local tracer_colors = { net.ReadColor(), net.ReadColor() };
+            local val = net.ReadFloat();
+            local target_table = CONFIG_TYPES[cfg_type];
             if target_table then
                 print("updated weapon config: " .. cfg_type .. " for " .. class_name .. " -> " .. val);
                 
-                target_table[class_name] = tracer_colors;
-                -- this is so stupid lmao
-                save_config_to_db(cfg_type, class_name .. "core_red", tracer_colors[1].r);
-                save_config_to_db(cfg_type, class_name .. "core_green", tracer_colors[1].g);
-                save_config_to_db(cfg_type, class_name .. "core_blue", tracer_colors[1].b);
-                save_config_to_db(cfg_type, class_name .. "core_alpha", tracer_colors[1].a);
-                save_config_to_db(cfg_type, class_name .. "glow_red", tracer_colors[2].r);
-                save_config_to_db(cfg_type, class_name .. "glow_green", tracer_colors[2].g);
-                save_config_to_db(cfg_type, class_name .. "glow_blue", tracer_colors[2].b);
-                save_config_to_db(cfg_type, class_name .. "glow_alpha", tracer_colors[2].a);
+                target_table[class_name] = val;
+                save_config_to_db(cfg_type, class_name, val);
+
+                net.Start("projectile_config_update");
+                net.WriteString(cfg_type);
+                net.WriteString(class_name);
+                net.WriteFloat(val);
+                net.Broadcast();
             end
-        end
-
-        local class_name = net.ReadString();
-        local val = net.ReadFloat();
-        if target_table then
-            print("updated weapon config: " .. cfg_type .. " for " .. class_name .. " -> " .. val);
-            
-            target_table[class_name] = val;
-            save_config_to_db(cfg_type, class_name, val);
-
-            net.Start("projectile_config_update");
-            net.WriteString(cfg_type);
-            net.WriteString(class_name);
-            net.WriteFloat(val);
-            net.Broadcast();
         end
     end);
 

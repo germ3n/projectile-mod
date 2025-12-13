@@ -260,7 +260,7 @@ local function move_projectile(shooter, projectile_data)
         local current_hit_damage = projectile_data.damage;
         local current_penetration_power = projectile_data.penetration_power;
 
-        local stop_bullet, exit_pos, exit_trace = handle_penetration(shooter, projectile_data, enter_trace.HitPos, projectile_data.dir, projectile_data.constpen, projectile_data.penetration_power, enter_trace);
+        local stop_bullet, exit_pos, exit_trace = handle_penetration(shooter, projectile_data, enter_trace.HitPos, projectile_data.dir, projectile_data.penetration_power, enter_trace);
 
         -- todo: fix
         if get_bool(cv_debug_pen) and exit_pos then

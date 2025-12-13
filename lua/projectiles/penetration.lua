@@ -248,7 +248,7 @@ if CLIENT then
     end);
 end
 
-function handle_penetration(shooter, projectile_data, src, dir, constpen, penetration_power, enter_trace)
+function handle_penetration(shooter, projectile_data, src, dir, penetration_power, enter_trace)
     if not enter_trace.MatType then 
         return true, nil, nil;
     end

@@ -60,6 +60,7 @@ local cv_projectiles_enabled = GetConVar("pro_projectiles_enabled");
 local cv_penetration_power_scale = GetConVar("pro_penetration_power_scale");
 local cv_weapon_damage_scale = GetConVar("pro_weapon_damage_scale");
 local cv_speed_scale = GetConVar("pro_speed_scale");
+local cv_net_reliable = GetConVar("pro_net_reliable");
 
 if SERVER then
     local broadcast_projectile = broadcast_projectile;
@@ -137,12 +138,12 @@ if SERVER then
                 drag,
                 penetration_power,
                 penetration_count,
-                2.5, -- constpen
                 mass,
                 drop,
                 min_speed,
                 max_distance,
-                tracer_colors
+                tracer_colors,
+                get_bool(cv_net_reliable)
             );
         end
 

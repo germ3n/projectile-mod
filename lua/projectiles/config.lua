@@ -192,6 +192,61 @@ if CLIENT then
             end
 
             return panel;
+        elseif data.type == "dropdown" then
+            local panel = vgui.Create("DPanel", parent);
+            panel:SetTall(40);
+            panel:Dock(TOP);
+            panel:DockMargin(0, 0, 0, 5);
+            panel.Paint = function(s, w, h)
+                draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
+            end
+
+            local label = vgui.Create("DLabel", panel);
+            label:SetText(data.label);
+            label:Dock(LEFT);
+            label:DockMargin(10, 0, 0, 0);
+            label:SetWide(150);
+            label:SetTextColor(THEME.text);
+
+            local combo = vgui.Create("DComboBox", panel);
+            combo:Dock(FILL);
+            combo:DockMargin(10, 8, 10, 8);
+            combo:SetTextColor(THEME.text);
+            
+            combo.Paint = function(s, w, h)
+                draw.RoundedBox(4, 0, 0, w, h, THEME.bg_dark);
+                if s:GetDisabled() then return end
+                if s:IsHovered() then draw.RoundedBox(4, 0, 0, w, h, Color(255,255,255,10)) end
+            end
+
+            for idx, option in ipairs(data.options) do
+                combo:AddChoice(option, idx - 1);
+            end
+
+            combo.OnSelect = function(s, index, value, data_val)
+                local current_convar_val = GetConVar(data.cvar):GetInt();
+                if current_convar_val == data_val then return; end
+
+                if data.client then
+                    RunConsoleCommand(data.cvar, tostring(data_val));
+                else
+                    net.Start("projectile_update_cvar");
+                    net.WriteString(data.cvar);
+                    net.WriteString(tostring(data_val));
+                    net.SendToServer();
+                end
+            end
+
+            panel.UpdateValue = function(s)
+                if combo:IsMenuOpen() then return; end
+                
+                local current_val = GetConVar(data.cvar):GetInt();
+                combo:ChooseOptionID(current_val + 1);
+            end
+            
+            panel:UpdateValue();
+
+            return panel;
         end
     end
 
@@ -632,6 +687,15 @@ if CLIENT then
                     populate_list(s:GetValue());
                 end
             end
+        },
+        {
+            name = "Networking",
+            icon = "icon16/network.png",
+            vars = {
+                { type = "header", label = "Networking" },
+                { type = "bool", cvar = "pro_net_reliable", label = "Reliable projectiles" },
+                { type = "dropdown", cvar = "pro_net_send_method", label = "Projectiles send method", options = { "PVS", "PAS", "Broadcast" } },
+            }
         },
         {
             name = "Debug",
