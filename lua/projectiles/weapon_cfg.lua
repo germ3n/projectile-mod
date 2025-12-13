@@ -1,6 +1,5 @@
 AddCSLuaFile();
 
-local is_function = isfunction;
 local tonumber = tonumber;
 local tostring = tostring;
 local NULL = NULL;
@@ -95,13 +94,8 @@ CONFIG_TYPES = {
 local CONFIG_TYPES = CONFIG_TYPES;
 local HL2_WEAPON_CLASSES = HL2_WEAPON_CLASSES;
 
-function get_weapon_speed(weapon, class_name)
-    local val = WEAPON_SPEEDS[class_name];
-    if val then
-        if is_function(val) then return val(weapon, class_name) end
-        return val;
-    end
-    return WEAPON_SPEEDS["default"];
+function get_weapon_speed(weapon, class_name, speed)
+    return speed or WEAPON_SPEEDS[class_name] or WEAPON_SPEEDS["default"];
 end
 
 function get_weapon_damage(weapon, class_name, damage)
@@ -109,84 +103,39 @@ function get_weapon_damage(weapon, class_name, damage)
         return weapon:GetDamage(0, true);
     end
 
-    local val = WEAPON_DAMAGES[class_name];
-    if val then
-        if is_function(val) then return val(weapon, class_name, damage) end
-        return val;
-    end
-    return damage or WEAPON_DAMAGES["default"];
+    return damage or WEAPON_DAMAGES[class_name] or WEAPON_DAMAGES["default"];
 end
 
 function get_weapon_penetration_power(weapon, class_name, penetration_power)
-    local val = WEAPON_PENETRATION_POWERS[class_name];
-    if val then
-        if is_function(val) then return val(weapon, class_name, penetration_power) end
-        return val;
-    end
-    return penetration_power or WEAPON_PENETRATION_POWERS["default"];
+    return penetration_power or WEAPON_PENETRATION_POWERS[class_name] or WEAPON_PENETRATION_POWERS["default"];
 end
 
 function get_weapon_penetration_count(weapon, class_name, penetration_count)
-    local val = WEAPON_PENETRATION_COUNTS[class_name];
-    if val then
-        if is_function(val) then return val(weapon, class_name, penetration_count) end
-        return val
-    end
-    return penetration_count or WEAPON_PENETRATION_COUNTS["default"];
+    return penetration_count or WEAPON_PENETRATION_COUNTS[class_name] or WEAPON_PENETRATION_COUNTS["default"];
 end
 
 function get_weapon_drag(weapon, class_name, drag)
-    local val = WEAPON_DRAG[class_name];
-    if val then
-        if is_function(val) then return val(weapon, class_name, drag) end
-        return val;
-    end
-    return drag or WEAPON_DRAG["default"];
+    return drag or WEAPON_DRAG[class_name] or WEAPON_DRAG["default"];
 end
 
 function get_weapon_mass(weapon, class_name, mass)
-    local val = WEAPON_MASS[class_name];
-    if val then
-        if is_function(val) then return val(weapon, class_name, mass) end
-        return val;
-    end
-    return mass or WEAPON_MASS["default"];
+    return mass or WEAPON_MASS[class_name] or WEAPON_MASS["default"];
 end
 
 function get_weapon_drop(weapon, class_name, drop)
-    local val = WEAPON_DROP[class_name];
-    if val then
-        if is_function(val) then return val(weapon, class_name, drop) end
-        return val;
-    end
-    return drop or WEAPON_DROP["default"];
+    return drop or WEAPON_DROP[class_name] or WEAPON_DROP["default"];
 end
 
 function get_weapon_min_speed(weapon, class_name, min_speed)
-    local val = WEAPON_MIN_SPEED[class_name];
-    if val then
-        if is_function(val) then return val(weapon, class_name, min_speed) end
-        return val;
-    end
-    return min_speed or WEAPON_MIN_SPEED["default"];
+    return min_speed or WEAPON_MIN_SPEED[class_name] or WEAPON_MIN_SPEED["default"];
 end
 
 function get_weapon_max_distance(weapon, class_name, max_distance)
-    local val = WEAPON_MAX_DISTANCE[class_name];
-    if val then
-        if is_function(val) then return val(weapon, class_name, max_distance) end
-        return val;
-    end
-    return max_distance or WEAPON_MAX_DISTANCE["default"];
+    return max_distance or WEAPON_MAX_DISTANCE[class_name] or WEAPON_MAX_DISTANCE["default"];
 end
 
-function get_weapon_tracer_colors(weapon, class_name)
-    local val = WEAPON_TRACER_COLORS[class_name];
-    if val then
-        if is_function(val) then return val(weapon, class_name) end
-        return val;
-    end
-    return WEAPON_TRACER_COLORS["default"];
+function get_weapon_tracer_colors(weapon, class_name, tracer_colors)
+    return tracer_colors or WEAPON_TRACER_COLORS[class_name] or WEAPON_TRACER_COLORS["default"];
 end
 
 if SERVER then
