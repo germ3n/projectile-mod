@@ -521,8 +521,10 @@ else
     local is_first_time_predicted = IsFirstTimePredicted;
     local local_player = LocalPlayer;
     local is_singleplayer = game.SinglePlayer();
+    local last_tick_count = engine_tick_count();
     hook.Add("CreateMove", "projectiles_tick", function(cmd)
-        if get_command_number(cmd) ~= 0 and (is_first_time_predicted() or is_listen_server_host(local_player()) or is_singleplayer) then
+        local tick = tick_count(cmd);
+        if get_command_number(cmd) ~= 0 and (tick > last_tick_count) then
             for shooter, _ in next, projectile_store do
                 if not is_valid(shooter) then continue; end
                 move_projectiles(shooter, nil, nil);
@@ -531,7 +533,9 @@ else
             local world = get_world();
             wind_target_vector.x = get_nw2_float(world, "pro_wind_target_vector_x");
             wind_target_vector.y = get_nw2_float(world, "pro_wind_target_vector_y");
-            wind_vector = get_wind_at_tick(tick_count(cmd));
+            wind_vector = get_wind_at_tick(tick);
+
+            last_tick_count = tick;
         end
     end);
 
