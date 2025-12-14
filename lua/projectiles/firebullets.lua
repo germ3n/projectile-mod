@@ -82,6 +82,8 @@ if SERVER then
     local is_npc = npc_meta.IsNPC;
     local npc_get_active_weapon = npc_meta.GetActiveWeapon;
 
+    local npc_pistol_effect_fix = npc_pistol_effect_fix;
+
     hook.Add("EntityFireBullets", "projectiles", function(shooter, data)
         if projectiles.disable_fire_bullets or not get_bool(cv_projectiles_enabled) then return; end
         if not shooter or shooter == NULL then return; end
@@ -136,6 +138,8 @@ if SERVER then
             );
         end
 
+        npc_pistol_effect_fix(shooter, data);
+
         return false;
     end);
 end
@@ -143,6 +147,7 @@ end
 if CLIENT then
     hook.Add("EntityFireBullets", "projectiles", function(shooter, data)
         if not get_bool(cv_projectiles_enabled) then return; end
+
         return false;
     end);
 end

@@ -109,7 +109,7 @@ function get_weapon_damage(weapon, class_name, damage)
         return weapon:GetDamage(0, true);
     end
 
-    return damage or WEAPON_DAMAGES["default"];
+    return damage > 0 and damage or WEAPON_DAMAGES["default"];
 end
 
 function get_weapon_penetration_power(weapon, class_name)
