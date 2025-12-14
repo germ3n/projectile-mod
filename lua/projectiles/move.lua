@@ -33,6 +33,7 @@ local tostring = tostring;
 local NULL = NULL;
 local get_world = game.GetWorld;
 local engine_tick_count = engine.TickCount;
+local sqrt = math.sqrt;
 
 local entity_meta = FindMetaTable("Entity");
 local is_valid = entity_meta.IsValid;
@@ -189,6 +190,8 @@ local function debug_penetration(projectile_data, current_hit_damage, current_pe
     debug_text(exit_pos + vector(0, 0, 60), string_format("mat_out: %s", exit_mat), dur, false);
 end
 
+local do_shellshock = do_shellshock;
+
 local _is_valid = IsValid;
 local function move_projectile(shooter, projectile_data)
     if projectile_data.hit or projectile_data.penetration_count <= 0 or projectile_data.damage < 1.0 or projectile_data.distance_traveled >= projectile_data.max_distance then 
@@ -204,7 +207,7 @@ local function move_projectile(shooter, projectile_data)
         projectile_data.speed = projectile_data.speed - projectile_data.speed * drag_factor;
     end
 
-    if projectile_data.speed <= 50.0 then
+    if projectile_data.speed <= projectile_data.min_speed then
         projectile_data.hit = true;
         return true;
     end
@@ -315,6 +318,10 @@ local function move_projectile(shooter, projectile_data)
             projectile_data.hit = true;
             projectile_data.pos = enter_trace.HitPos;
 
+            if SERVER then
+                do_shellshock(shooter, current_pos, enter_trace.HitPos, projectile_data.damage);
+            end
+
             return true; 
         else
             if hit_entity and is_valid(hit_entity) then
@@ -330,6 +337,10 @@ local function move_projectile(shooter, projectile_data)
     else
         projectile_data.pos = new_pos;
         projectile_data.distance_traveled = projectile_data.distance_traveled + vec_len(current_velocity);
+    end
+
+    if SERVER then
+        do_shellshock(shooter, current_pos, projectile_data.pos, projectile_data.damage);
     end
 
     projectile_data.old_pos = current_pos;
@@ -358,12 +369,19 @@ local gust_end_time = 0;
 local next_wind_update_time = 0;
 local wind_angle = 0;
 local wind_start_tick = 0;
-local pending_gust = false;
 
 local clamp = math.Clamp;
 local lerp = Lerp;
 local min = math.min;
 
+local function get_turbulence(val, offset)
+    local n = sin(val + offset); 
+    n = n + sin(val * 2.3 + offset * 1.5) * 0.5;
+    n = n + sin(val * 5.7 + offset * 2.5) * 0.25;
+    return n / 1.75;
+end
+
+-- wind slightly desyncs the projectile on wind target update but the difference even over long ranges is pretty small, at least with projectile speeds >= 2000 (so likely every weapon)
 local function get_wind_at_tick(tick)
     local world = get_world();
     local start_tick = get_nw2_int(world, "pro_wind_start_tick", 0);
@@ -383,11 +401,15 @@ local function get_wind_at_tick(tick)
     local wind_x = lerp(curve, start_wind_x, target_wind_x);
     local wind_y = lerp(curve, start_wind_y, target_wind_y);
 
-    local time = engine_tick_count() * tick_interval;
+    --todo: overhaul this
+    local time = tick * tick_interval;
     local jitter_amt = get_float(cv_wind_jitter_amount);
-    
-    wind_x = wind_x + (sin(time * 0.5) * jitter_amt);
-    wind_y = wind_y + (cos(time * 0.4) * jitter_amt);
+    local jitter_x = get_turbulence(time * 0.5, 0);
+    local jitter_y = get_turbulence(time * 0.5, 50);
+    local wind_speed = sqrt(wind_x * wind_x + wind_y * wind_y);
+
+    wind_x = wind_x + (wind_speed * jitter_x * jitter_amt);
+    wind_y = wind_y + (wind_speed * jitter_y * jitter_amt);
 
     return vector(wind_x, wind_y, 0.0);
 end
@@ -397,40 +419,23 @@ local function update_wind_target(is_wind_update, has_gust_finished)
     local tick_count = engine_tick_count();
     local time = tick_count * tick_interval;
     local duration = 0;
-    local angle = rad(rand(0, 360));
+    local angle = has_gust_finished and wind_angle or rad(rand(0, 360));
     local strength = 0;
 
-    if pending_gust then
-        pending_gust = false;
-
-        local gust_strength_multiplier = rand(get_float(cv_wind_gust_min_strength), get_float(cv_wind_gust_max_strength));
-        strength = base_strength + base_strength * gust_strength_multiplier;
-
-        duration = rand(get_float(cv_wind_gust_min_duration), get_float(cv_wind_gust_max_duration));
-        gust_end_time = time + duration;
-
-        angle = rad(rand(0, 360));
-        wind_target_vector.x = sin(angle) * strength;
-        wind_target_vector.y = cos(angle) * strength;
-        wind_angle = angle;
-    else
+    if has_gust_finished then
         gust_end_time = 0;
+        strength = base_strength;
 
+        print("gust finished");
+    elseif pending_gust then
+        
+    elseif is_wind_update then
         strength = base_strength * rand(get_float(cv_wind_strength_min_variance), get_float(cv_wind_strength_max_variance));
-
         duration = rand(get_float(cv_wind_min_update_interval), get_float(cv_wind_max_update_interval));
 
         if rand(0, 1) < get_float(cv_wind_gust_chance) then
-            time_until_gust = rand(1, duration * 0.8);
-
-            duration = time_until_gust;
-            pending_gust = true;
+            --todo: implement gust
         end
-
-        angle = rad(rand(0, 360));
-        wind_target_vector.x = sin(angle) * strength;
-        wind_target_vector.y = cos(angle) * strength;
-        wind_angle = angle;
     end
 
     next_wind_update_time = time + duration;
@@ -524,7 +529,7 @@ else
     local last_tick_count = engine_tick_count();
     hook.Add("CreateMove", "projectiles_tick", function(cmd)
         local tick = tick_count(cmd);
-        if get_command_number(cmd) ~= 0 and (tick > last_tick_count) then
+        if get_command_number(cmd) ~= 0 and ((tick > last_tick_count) or is_singleplayer) then
             for shooter, _ in next, projectile_store do
                 if not is_valid(shooter) then continue; end
                 move_projectiles(shooter, nil, nil);

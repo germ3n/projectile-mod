@@ -1,5 +1,6 @@
 AddCSLuaFile();
 
+local is_function = isfunction;
 local tonumber = tonumber;
 local tostring = tostring;
 local NULL = NULL;
@@ -51,6 +52,7 @@ local WEAPON_DRAG = {
 };
 
 local WEAPON_MASS = {
+    
     ["default"] = 1.0,
 };
 
@@ -94,48 +96,56 @@ CONFIG_TYPES = {
 local CONFIG_TYPES = CONFIG_TYPES;
 local HL2_WEAPON_CLASSES = HL2_WEAPON_CLASSES;
 
-function get_weapon_speed(weapon, class_name, speed)
-    return speed or WEAPON_SPEEDS[class_name] or WEAPON_SPEEDS["default"];
+function get_weapon_speed(weapon, class_name)
+    return WEAPON_SPEEDS[class_name] or WEAPON_SPEEDS["default"];
 end
 
 function get_weapon_damage(weapon, class_name, damage)
+    if WEAPON_DAMAGES[class_name] then
+        return WEAPON_DAMAGES[class_name];
+    end
+
     if damage == 0 and weapon ~= NULL and weapon.ArcCW then
         return weapon:GetDamage(0, true);
     end
 
-    return damage or WEAPON_DAMAGES[class_name] or WEAPON_DAMAGES["default"];
+    return damage or WEAPON_DAMAGES["default"];
 end
 
-function get_weapon_penetration_power(weapon, class_name, penetration_power)
-    return penetration_power or WEAPON_PENETRATION_POWERS[class_name] or WEAPON_PENETRATION_POWERS["default"];
+function get_weapon_penetration_power(weapon, class_name)
+    return WEAPON_PENETRATION_POWERS[class_name] or WEAPON_PENETRATION_POWERS["default"];
 end
 
-function get_weapon_penetration_count(weapon, class_name, penetration_count)
-    return penetration_count or WEAPON_PENETRATION_COUNTS[class_name] or WEAPON_PENETRATION_COUNTS["default"];
+function get_weapon_penetration_count(weapon, class_name)
+    return WEAPON_PENETRATION_COUNTS[class_name] or WEAPON_PENETRATION_COUNTS["default"];
 end
 
-function get_weapon_drag(weapon, class_name, drag)
-    return drag or WEAPON_DRAG[class_name] or WEAPON_DRAG["default"];
+function get_weapon_drag(weapon, class_name)
+    return WEAPON_DRAG[class_name] or WEAPON_DRAG["default"];
 end
 
-function get_weapon_mass(weapon, class_name, mass)
-    return mass or WEAPON_MASS[class_name] or WEAPON_MASS["default"];
+function get_weapon_mass(weapon, class_name)
+    return WEAPON_MASS[class_name] or WEAPON_MASS["default"];
 end
 
-function get_weapon_drop(weapon, class_name, drop)
-    return drop or WEAPON_DROP[class_name] or WEAPON_DROP["default"];
+function get_weapon_drop(weapon, class_name)
+    return WEAPON_DROP[class_name] or WEAPON_DROP["default"];
 end
 
-function get_weapon_min_speed(weapon, class_name, min_speed)
-    return min_speed or WEAPON_MIN_SPEED[class_name] or WEAPON_MIN_SPEED["default"];
+function get_weapon_min_speed(weapon, class_name)
+    return WEAPON_MIN_SPEED[class_name] or WEAPON_MIN_SPEED["default"];
 end
 
-function get_weapon_max_distance(weapon, class_name, max_distance)
-    return max_distance or WEAPON_MAX_DISTANCE[class_name] or WEAPON_MAX_DISTANCE["default"];
+function get_weapon_max_distance(weapon, class_name)
+    return WEAPON_MAX_DISTANCE[class_name] or WEAPON_MAX_DISTANCE["default"];
 end
 
-function get_weapon_tracer_colors(weapon, class_name, tracer_colors)
-    return tracer_colors or WEAPON_TRACER_COLORS[class_name] or WEAPON_TRACER_COLORS["default"];
+function get_weapon_tracer_colors(weapon, class_name)
+    return WEAPON_TRACER_COLORS[class_name] or WEAPON_TRACER_COLORS["default"];
+end
+
+function get_weapon_spread_bias(weapon, class_name)
+    return WEAPON_SPREAD_BIAS[class_name] or WEAPON_SPREAD_BIAS["default"];
 end
 
 if SERVER then
