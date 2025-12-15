@@ -69,7 +69,6 @@ local function render_projectiles()
                 local final_size = base_size * scale_mod;
 
                 set_material(mat_glow);
-                set_blend(p_data.tracer_colors[1].a / 255.0);
                 draw_sprite(render_pos, final_size, final_size, p_data.tracer_colors[1]);
                 draw_sprite(render_pos, final_size * 1.5, final_size * 1.5, p_data.tracer_colors[2]);
 
@@ -78,12 +77,9 @@ local function render_projectiles()
                 local tail_end = render_pos - (velocity * tail_length);
 
                 set_material(mat_beam);
-                set_blend(p_data.tracer_colors[2].a / 255.0);
                 draw_beam(render_pos, tail_end, final_size * 0.5, 0, 1, p_data.tracer_colors[2]);
             --end
         end
-
-        set_blend(1.0);
     end
 end
 

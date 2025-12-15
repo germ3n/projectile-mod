@@ -164,7 +164,7 @@ if SERVER then
 
     local function save_ricochet_mat_multiplier_to_db(mat_type, chance)
         local query = "REPLACE INTO ricochet_mat_chance_multipliers (key, value) VALUES(" .. mat_type .. ", " .. chance .. ")";
-        print(query);
+        --print(query);
         local res = sql.Query(query);
         
         if res == false then

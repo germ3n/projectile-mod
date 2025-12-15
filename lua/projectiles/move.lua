@@ -120,6 +120,7 @@ local get_int = convar_meta.GetInt;
 local get_string = convar_meta.GetString;
 
 local max = math.max;
+local dyn_splatter = dyn_splatter;
 
 local trace_filter = {nil, nil, nil};
 
@@ -312,6 +313,8 @@ local function move_projectile(shooter, projectile_data)
                     take_damage_info(hit_entity, dmg_info);
                 end
             end
+
+            dyn_splatter(shooter, hit_entity, enter_trace.HitPos, enter_trace.HitNormal, final_damage);
         end
         
         if stop_bullet then

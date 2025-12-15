@@ -17,20 +17,6 @@ local entity_meta = FindMetaTable("Entity");
 local get_blood_color = entity_meta.GetBloodColor;
 local set_blood_color = entity_meta.SetBloodColor;
 
-local function patched_rlb_fire_bullets(...)
-    if guard_rlb_fire_bullets then return; end
-    guard_rlb_fire_bullets = true;
-    rlb_fire_bullets(...);
-    guard_rlb_fire_bullets = false;
-end
-
-local function patch_rlb_fire_bullets()
-    hook.Remove("EntityFireBullets", "EntityFireBullets_RealisticBlood");
-    --hook.Add("EntityFireBullets", "EntityFireBullets_RealisticBlood", patched_rlb_fire_bullets);
-    fire_bullets_patched = true;
-    print("patched rlb_fire_bullets");
-end
-
 local function patched_rlb_entity_take_damage(ent, ...)
     if not ent.rlb_initialized then
         ent.UsesRealisticBlood = true;
@@ -47,28 +33,42 @@ local function patched_rlb_entity_take_damage(ent, ...)
     rlb_entity_take_damage(ent, ...);
 end
 
-local function patch_rlb_entity_take_damage()
-    hook.Remove("EntityTakeDamage", "EntityTakeDamage_RealisticBlood");
-    hook.Add("EntityTakeDamage", "EntityTakeDamage_RealisticBlood", patched_rlb_entity_take_damage);
-    entity_take_damage_patched = true;
-    print("patched rlb_entity_take_damage");
-end
+timer.Create("projectile_patch_zippy_realistic_blood", 3, 0, function()
+    if not rlb_fire_bullets or not rlb_entity_take_damage then
+        local hooks = hook.GetTable();
 
-timer.Create("projectile_patch_zippy_realistic_blood", 1, 0, function()
-    local hooks = hook.GetTable();
-    rlb_fire_bullets = hooks["EntityFireBullets"] and hooks["EntityFireBullets"]["EntityFireBullets_RealisticBlood"];
-    rlb_entity_take_damage = hooks["EntityTakeDamage"] and hooks["EntityTakeDamage"]["EntityTakeDamage_RealisticBlood"];
+        rlb_fire_bullets = rlb_fire_bullets or hooks["EntityFireBullets"] and hooks["EntityFireBullets"]["EntityFireBullets_RealisticBlood"];
+        rlb_entity_take_damage = rlb_entity_take_damage or hooks["EntityTakeDamage"] and hooks["EntityTakeDamage"]["EntityTakeDamage_RealisticBlood"];
 
-    if not fire_bullets_patched and rlb_fire_bullets then
-        patch_rlb_fire_bullets();
+        if not rlb_fire_bullets or not rlb_entity_take_damage then
+            return;
+        end
     end
 
-    if not entity_take_damage_patched and rlb_entity_take_damage then
-        patch_rlb_entity_take_damage();
-    end
+    if get_bool(cv_projectiles_enabled) then
+        if not fire_bullets_patched then
+            hook.Remove("EntityFireBullets", "EntityFireBullets_RealisticBlood");
+            fire_bullets_patched = true;
+            print("patched rlb_fire_bullets");
+        end
 
-    if fire_bullets_patched and entity_take_damage_patched then
-        print("all Realistic Blood hacks patched");
-        timer.Remove("projectile_patch_zippy_realistic_blood");
+        if not entity_take_damage_patched then
+            hook.Remove("EntityTakeDamage", "EntityTakeDamage_RealisticBlood");
+            hook.Add("EntityTakeDamage", "EntityTakeDamage_RealisticBlood", patched_rlb_entity_take_damage);
+            entity_take_damage_patched = true;
+            print("patched rlb_entity_take_damage");
+        end
+    else
+        if fire_bullets_patched then
+            hook.Add("EntityFireBullets", "EntityFireBullets_RealisticBlood", rlb_fire_bullets);
+            fire_bullets_patched = false;
+            print("unpatched rlb_fire_bullets");
+        end
+
+        if entity_take_damage_patched then
+            hook.Add("EntityTakeDamage", "EntityTakeDamage_RealisticBlood", rlb_entity_take_damage);
+            entity_take_damage_patched = false;
+            print("unpatched rlb_entity_take_damage");
+        end
     end
 end);

@@ -9,4 +9,6 @@ end
 if CLIENT then
 end
 
+include("enhanced_blood_splatters.lua");
+
 print("loaded projectiles hacks");
