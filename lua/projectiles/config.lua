@@ -614,7 +614,7 @@ if CLIENT then
                     end
 
                     local function send_update()
-                        net.Start("projectile_config_update");
+                        net.Start("projectile_weapon_config_update");
                         net.WriteString(cfg_type);
                         net.WriteString(class_name);
                         net.WriteFloat(math.Round(slider:GetValue(), decimals));
@@ -640,6 +640,107 @@ if CLIENT then
                 local function populate_list(filter)
                     list_layout:Clear();
 
+                    local function create_slider_with_copy(parent_panel, label_text, cfg_type, class_name, default_val, min_val, max_val, decimals, source_dropdown)
+                        local panel = vgui.Create("DPanel", parent_panel);
+                        panel:Dock(TOP);
+                        panel:SetTall(30);
+                        panel:DockMargin(0, 0, 0, 2);
+                        panel.Paint = function(s, w, h) end
+                        
+                        local label = vgui.Create("DLabel", panel);
+                        label:SetText(label_text);
+                        label:Dock(LEFT);
+                        label:SetWide(120);
+                        label:SetTextColor(THEME.text_dim);
+
+                        local btn_copy = vgui.Create("DButton", panel);
+                        btn_copy:SetText("Copy");
+                        btn_copy:Dock(RIGHT);
+                        btn_copy:SetWide(40);
+                        btn_copy:DockMargin(5, 2, 0, 2);
+                        btn_copy:SetTextColor(THEME.text);
+                        btn_copy.Paint = function(s, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, s:IsHovered() and THEME.accent_hover or THEME.bg_lighter)
+                        end
+                        btn_copy.DoClick = function()
+                            local src_wep = source_dropdown:GetValue();
+                            
+                            if not src_wep or src_wep == "" or src_wep == "Select weapon to copy from..." then
+                                LocalPlayer():ChatPrint("Please select a Source Weapon at the top of this card first.");
+                                return;
+                            end
+
+                            if src_wep == class_name then
+                                LocalPlayer():ChatPrint("Cannot copy from itself.");
+                                return;
+                            end
+
+                            RunConsoleCommand("pro_weapon_config_copy_single", cfg_type, src_wep, class_name);
+                            LocalPlayer():ChatPrint("Copied " .. label_text .. " from " .. src_wep);
+                        end
+                        btn_copy:SetTooltip("Copy " .. label_text .. " from selected source weapon");
+
+                        local btn_reset = vgui.Create("DButton", panel);
+                        btn_reset:SetText("Reset");
+                        btn_reset:Dock(RIGHT);
+                        btn_reset:SetWide(40);
+                        btn_reset:DockMargin(5, 2, 0, 2);
+                        btn_reset:SetTextColor(THEME.text);
+                        btn_reset.Paint = function(s, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, s:IsHovered() and THEME.accent_hover or THEME.bg_lighter)
+                        end
+                        btn_reset.DoClick = function()
+                            RunConsoleCommand("pro_weapon_config_reset_single", cfg_type, class_name);
+                            LocalPlayer():ChatPrint("Reset " .. label_text .. " to default");
+                        end
+                        btn_reset:SetTooltip("Reset " .. label_text .. " to default");
+
+                        local slider = vgui.Create("DNumSlider", panel);
+                        slider:Dock(FILL);
+                        slider:SetMin(min_val);
+                        slider:SetMax(max_val);
+                        slider:SetDecimals(decimals);
+                        slider.Label:SetVisible(false);
+                        slider.TextArea:SetTextColor(THEME.text);
+                        
+                        local current_table = CONFIG_TYPES[cfg_type];
+                        local current_val = current_table and current_table[class_name];
+
+                        if current_val and type(current_val) == "number" then
+                            slider:SetValue(current_val);
+                        else
+                            local def = current_table and current_table["default"];
+                            if def and type(def) == "number" then
+                                slider:SetValue(def);
+                            else
+                                slider:SetValue(default_val);
+                            end
+                        end
+
+                        local function send_update()
+                            net.Start("projectile_weapon_config_update");
+                            net.WriteString(cfg_type);
+                            net.WriteString(class_name);
+                            net.WriteFloat(math.Round(slider:GetValue(), decimals));
+                            net.SendToServer();
+                        end
+
+                        slider.Think = function(s)
+                            local isInteracting = s.Slider:GetDragging() or s.TextArea:IsEditing();
+                            if isInteracting then
+                                s.HasChanged = true;
+                            elseif s.HasChanged then
+                                s.HasChanged = false;
+                                send_update();
+                            end
+                        end
+
+                        slider.TextArea.OnEnter = function()
+                            send_update();
+                            slider.HasChanged = false;
+                        end
+                    end
+
                     for _, class_name in ipairs(sorted_weapons) do
                         if WEAPON_BLACKLIST and WEAPON_BLACKLIST[class_name] then continue; end
                         
@@ -664,20 +765,80 @@ if CLIENT then
                         content.Paint = function(s, w, h)
                             draw.RoundedBoxEx(4, 0, 0, w, h, Color(0,0,0,100), false, false, true, true);
                         end
-                        
                         content:DockPadding(10, 10, 10, 10);
-                        
-                        create_slider(content, "Speed", "speed", class_name, 2000, 0, 10000, 0);
-                        create_slider(content, "Damage", "damage", class_name, 10, 0, 500, 0);
-                        create_slider(content, "Penetration Power", "penetration_power", class_name, 2.5, 0, 50, 2);
-                        create_slider(content, "Max Penetration Count", "penetration_count", class_name, 10, 0, 50, 0);
-                        create_slider(content, "Drag", "drag", class_name, 0.1, 0, 10, 3);
-                        create_slider(content, "Drop", "drop", class_name, 0.005, 0, 10, 3);
-                        create_slider(content, "Min Speed (Units/s)", "min_speed", class_name, 500, 0, 1000, 0);
-                        create_slider(content, "Max Dist (Units)", "max_distance", class_name, 4096, 0, 50000, 0);
-                        create_slider(content, "Spread Bias", "spread_bias", class_name, 1.0, -1.0, 1.0, 2);
 
-                        content:SetTall(290); 
+                        local top_bar = vgui.Create("DPanel", content);
+                        top_bar:Dock(TOP);
+                        top_bar:SetTall(30);
+                        top_bar:DockMargin(0, 0, 0, 10);
+                        top_bar.Paint = function(s,w,h) end
+
+                        local lbl = vgui.Create("DLabel", top_bar);
+                        lbl:SetText("Copy Source:");
+                        lbl:Dock(LEFT);
+                        lbl:SetWide(80);
+                        lbl:SetTextColor(THEME.accent);
+
+                        local combo_src = vgui.Create("DComboBox", top_bar);
+                        combo_src:Dock(FILL);
+                        combo_src:SetText("Select weapon to copy from...");
+                        combo_src:SetTextColor(THEME.text);
+                        combo_src.Paint = function(s, w, h) draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter); end
+                        
+                        for _, other in ipairs(sorted_weapons) do
+                            if other ~= class_name then combo_src:AddChoice(other) end
+                        end
+                        
+                        create_slider_with_copy(content, "Speed", "speed", class_name, CONFIG_TYPES["speed"]["default"], 0, 10000, 0, combo_src);
+                        create_slider_with_copy(content, "Damage", "damage", class_name, CONFIG_TYPES["damage"]["default"], 0, 500, 0, combo_src);
+                        create_slider_with_copy(content, "Penetration Power", "penetration_power", class_name, CONFIG_TYPES["penetration_power"]["default"], 0, 50, 2, combo_src);
+                        create_slider_with_copy(content, "Max Penetration Count", "penetration_count", class_name, CONFIG_TYPES["penetration_count"]["default"], 0, 50, 0, combo_src);
+                        create_slider_with_copy(content, "Drag", "drag", class_name, CONFIG_TYPES["drag"]["default"], 0, 10, 3, combo_src);
+                        create_slider_with_copy(content, "Drop", "drop", class_name, CONFIG_TYPES["drop"]["default"], 0, 10, 3, combo_src);
+                        create_slider_with_copy(content, "Min Speed (Units/s)", "min_speed", class_name, CONFIG_TYPES["min_speed"]["default"], 0, 1000, 0, combo_src);
+                        create_slider_with_copy(content, "Max Dist (Units)", "max_distance", class_name, CONFIG_TYPES["max_distance"]["default"], 0, 50000, 0, combo_src);
+                        create_slider_with_copy(content, "Spread Bias", "spread_bias", class_name, CONFIG_TYPES["spread_bias"]["default"], -1.0, 1.0, 2, combo_src);
+
+                        local div = vgui.Create("DPanel", content);
+                        div:SetTall(2);
+                        div:Dock(TOP);
+                        div:DockMargin(0, 10, 0, 10);
+                        div.Paint = function(s, w, h) draw.RoundedBox(0, 0, 0, w, h, THEME.divider) end
+
+                        local btn_copy_all = vgui.Create("DButton", content);
+                        btn_copy_all:Dock(TOP);
+                        btn_copy_all:SetTall(25);
+                        btn_copy_all:DockMargin(0, 0, 0, 5);
+                        btn_copy_all:SetText("Copy all from Source Weapon");
+                        btn_copy_all:SetTextColor(THEME.text);
+                        btn_copy_all.Paint = function(s, w, h)
+                            local col = s:IsHovered() and Color(200, 140, 60) or Color(180, 120, 40);
+                            draw.RoundedBox(4, 0, 0, w, h, col);
+                        end
+                        btn_copy_all.DoClick = function()
+                            local src_wep = combo_src:GetValue();
+                            
+                            if not src_wep or src_wep == "" or src_wep == "Select weapon to copy from..." then
+                                LocalPlayer():ChatPrint("Select a source weapon in the dropdown above first.");
+                                return;
+                            end
+                            
+                            RunConsoleCommand("pro_weapon_config_copy_all", src_wep, class_name);
+                        end
+
+                        local btn_reset = vgui.Create("DButton", content);
+                        btn_reset:Dock(TOP);
+                        btn_reset:SetTall(25);
+                        btn_reset:SetText("Reset all to default");
+                        btn_reset:SetTextColor(THEME.text);
+                        btn_reset.Paint = function(s, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, s:IsHovered() and Color(180, 60, 60) or Color(150, 40, 40))
+                        end
+                        btn_reset.DoClick = function()
+                            RunConsoleCommand("pro_weapon_config_reset_single_all", class_name);
+                        end
+
+                        content:SetTall(430); 
                         category:SetContents(content);
                     end
                 end
@@ -691,7 +852,7 @@ if CLIENT then
         },
         {
             name = "Networking",
-            icon = "icon16/network.png",
+            icon = "icon16/server.png",
             vars = {
                 { type = "header", label = "Networking" },
                 { type = "bool", cvar = "pro_net_reliable", label = "Reliable projectiles" },

@@ -149,8 +149,8 @@ function get_weapon_spread_bias(weapon, class_name)
 end
 
 if SERVER then
-    util.AddNetworkString("projectile_config_sync");
-    util.AddNetworkString("projectile_config_update");
+    util.AddNetworkString("projectile_weapon_config_sync");
+    util.AddNetworkString("projectile_weapon_config_update");
 
     local function initialize_db()
         if not sql.TableExists("projectile_weapon_data") then
@@ -235,6 +235,7 @@ if SERVER then
     local player_meta = FindMetaTable("Player");
     local is_superadmin = player_meta.IsSuperAdmin;
     local NULL = NULL;
+    local CONFIG_TYPES = CONFIG_TYPES;
 
     local function reset_config_to_db(cfg_type, class_name)
         local key = cfg_type .. "|" .. class_name;
@@ -247,7 +248,7 @@ if SERVER then
         end
 
         if CONFIG_TYPES[cfg_type] then
-            CONFIG_TYPES[cfg_type][class_name] = ORIGINAL_TABLES[cfg_type][class_name];
+            CONFIG_TYPES[cfg_type][class_name] = nil;--ORIGINAL_TABLES[cfg_type][class_name];
         end
     end
 
@@ -257,14 +258,31 @@ if SERVER then
         local class_name = args[2];
         reset_config_to_db(cfg_type, class_name);
 
-        net.Start("projectile_config_update");
+        net.Start("projectile_weapon_config_update");
         net.WriteString(cfg_type);
         net.WriteString(class_name);
-        net.WriteFloat(ORIGINAL_TABLES[cfg_type][class_name] or ORIGINAL_TABLES[cfg_type]["default"]);
+        net.WriteBool(true); -- set to nil
         net.Broadcast();
 
         print("reset weapon config: " .. cfg_type .. " for " .. class_name);
-    end, nil, "Reset a single weapon config");
+    end, nil, "Reset a single weapon config value");
+
+    concommand.Add("pro_weapon_config_reset_single_all", function(ply, cmd, args)
+        if ply ~= NULL and (not is_superadmin(ply)) then return; end
+
+        local class_name = args[1];
+        for cfg_type, cfg_table in next, CONFIG_TYPES do
+            reset_config_to_db(cfg_type, class_name);
+
+            net.Start("projectile_weapon_config_update");
+            net.WriteString(cfg_type);
+            net.WriteString(class_name);
+            net.WriteBool(true); -- set to nil
+            net.Broadcast();
+        end
+
+        print("reset weapon config: " .. class_name .. " to defaults");
+    end, nil, "Reset a weapon to defaults");
 
     concommand.Add("pro_weapon_config_reset_all", function(ply, cmd, args)
         if ply ~= NULL and (not is_superadmin(ply)) then return; end
@@ -292,7 +310,7 @@ if SERVER then
         CONFIG_TYPES["max_distance"] = WEAPON_MAX_DISTANCE;
         CONFIG_TYPES["tracer_colors"] = WEAPON_TRACER_COLORS;
         CONFIG_TYPES["spread_bias"] = WEAPON_SPREAD_BIAS;
-        net.Start("projectile_config_sync");
+        net.Start("projectile_weapon_config_sync");
         net.WriteTable(WEAPON_SPEEDS);
         net.WriteTable(WEAPON_DAMAGES);
         net.WriteTable(WEAPON_PENETRATION_POWERS);
@@ -309,12 +327,75 @@ if SERVER then
         print("reset all weapon configs");
     end, nil, "Reset all weapon configs");
 
+    concommand.Add("pro_weapon_config_copy_single", function(ply, cmd, args)
+        if ply ~= NULL and (not is_superadmin(ply)) then return; end
+        local cfg_type = args[1];
+        if cfg_type == "tracer_colors" then print("not supported yet"); return; end
+
+        local from_class_name = args[2];
+        local to_class_name = args[3];
+        local target_table = CONFIG_TYPES[cfg_type];
+        if target_table then
+            target_table[to_class_name] = target_table[from_class_name];
+            if target_table[to_class_name] then
+                save_config_to_db(cfg_type, to_class_name, target_table[to_class_name]);
+
+                net.Start("projectile_weapon_config_update");
+                net.WriteString(cfg_type);
+                net.WriteString(to_class_name);
+                net.WriteBool(false); -- set to value
+                net.WriteFloat(target_table[to_class_name]);
+                net.Broadcast();
+            else
+                reset_config_to_db(cfg_type, to_class_name);
+
+                net.Start("projectile_weapon_config_update");
+                net.WriteString(cfg_type);
+                net.WriteString(to_class_name);
+                net.WriteBool(true); -- set to nil
+                net.Broadcast();
+            end
+
+            print("copied weapon config: " .. cfg_type .. " from " .. from_class_name .. " to " .. to_class_name);
+        else
+            print("weapon config: " .. cfg_type .. " not found");
+        end
+    end, nil, "Copy a single weapon config value");
+
+    concommand.Add("pro_weapon_config_copy_all", function(ply, cmd, args)
+        if ply ~= NULL and (not is_superadmin(ply)) then return; end
+        local from_class_name = args[1];
+        local to_class_name = args[2];
+
+        for cfg_type, cfg_table in next, CONFIG_TYPES do
+            if cfg_type == "tracer_colors" then print("skipping tracer colors, not supported yet"); continue; end
+
+            reset_config_to_db(cfg_type, to_class_name);
+            cfg_table[to_class_name] = cfg_table[from_class_name];
+
+            net.Start("projectile_weapon_config_update");
+            net.WriteString(cfg_type);
+            net.WriteString(to_class_name);
+            if cfg_table[to_class_name] then
+                net.WriteBool(false); -- set to value
+                net.WriteFloat(cfg_table[to_class_name]);
+
+                save_config_to_db(cfg_type, to_class_name, cfg_table[to_class_name]);
+            else
+                net.WriteBool(true); -- set to nil
+            end
+            net.Broadcast();
+
+            print("copied weapon config: " .. cfg_type .. " from " .. from_class_name .. " to " .. to_class_name);
+        end
+    end, nil, "Copy all weapon configs");
+
     initialize_db();
 
     hook.Add("PlayerInitialSpawn", "projectile_config_full_sync", function(ply)
         timer.Simple(1, function()
             if not IsValid(ply) then return end
-            net.Start("projectile_config_sync");
+            net.Start("projectile_weapon_config_sync");
             net.WriteTable(WEAPON_SPEEDS);
             net.WriteTable(WEAPON_DAMAGES);
             net.WriteTable(WEAPON_PENETRATION_POWERS);
@@ -330,7 +411,7 @@ if SERVER then
         end)
     end)
 
-    net.Receive("projectile_config_update", function(len, ply)
+    net.Receive("projectile_weapon_config_update", function(len, ply)
         if not IsValid(ply) then 
             return;
         elseif not ply:IsSuperAdmin() then 
@@ -369,9 +450,10 @@ if SERVER then
                 target_table[class_name] = val;
                 save_config_to_db(cfg_type, class_name, val);
 
-                net.Start("projectile_config_update");
+                net.Start("projectile_weapon_config_update");
                 net.WriteString(cfg_type);
                 net.WriteString(class_name);
+                net.WriteBool(false); -- set to value
                 net.WriteFloat(val);
                 net.Broadcast();
             end
@@ -400,7 +482,7 @@ if SERVER then
 
         print("set tracer color: " .. class_name .. " " .. tracer_type .. " to (" .. tracer_color.r .. ", " .. tracer_color.g .. ", " .. tracer_color.b .. ", " .. tracer_color.a .. ")");
 
-        --[[[net.Start("projectile_config_update");
+        --[[[net.Start("projectile_weapon_config_update");
         net.WriteString("tracer_colors");
         net.WriteString(class_name);
         net.WriteColor(tracer_colors[1]);
@@ -412,7 +494,7 @@ if SERVER then
 end
 
 if CLIENT then
-    net.Receive("projectile_config_sync", function()
+    net.Receive("projectile_weapon_config_sync", function()
         WEAPON_SPEEDS = net.ReadTable();
         WEAPON_DAMAGES = net.ReadTable();
         WEAPON_PENETRATION_POWERS = net.ReadTable();
@@ -438,9 +520,14 @@ if CLIENT then
         print("received full weapon config sync");
     end)
 
-    net.Receive("projectile_config_update", function()
+    net.Receive("projectile_weapon_config_update", function()
         local cfg_type = net.ReadString();
         local class_name = net.ReadString();
+        if net.ReadBool() then -- reset to default (nil)
+            CONFIG_TYPES[cfg_type][class_name] = nil;
+            return;
+        end
+
         if cfg_type == "tracer_colors" then
             local tracer_colors = { net.ReadColor(), net.ReadColor() };
             local target_table = CONFIG_TYPES[cfg_type];
