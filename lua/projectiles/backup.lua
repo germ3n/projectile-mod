@@ -5,7 +5,8 @@ if CLIENT then return; end
 PROJECTILES_BACKUP_SURFACEPROPS = 0x1;
 PROJECTILES_BACKUP_WEAPON_CONFIG = 0x2;
 PROJECTILES_BACKUP_CVARS = 0x4;
-PROJECTILES_BACKUP_ALL = bit.bor(PROJECTILES_BACKUP_SURFACEPROPS, PROJECTILES_BACKUP_WEAPON_CONFIG, PROJECTILES_BACKUP_CVARS);
+PROJECTILES_BACKUP_RICOCHET_CHANCES = 0x8;
+PROJECTILES_BACKUP_ALL = bit.bor(PROJECTILES_BACKUP_SURFACEPROPS, PROJECTILES_BACKUP_WEAPON_CONFIG, PROJECTILES_BACKUP_CVARS, PROJECTILES_BACKUP_RICOCHET_CHANCES);
 
 PROJECTILES_BACKUP_TYPES = {
     "json",
@@ -27,6 +28,13 @@ function projectiles_backup_config(type, flags)
         backup.cvars = {};
         for idx, cvar in next, PROJECTILE_CVAR_NAMES do
             backup.cvars[cvar] = GetConVar(cvar):GetString();
+        end
+    end
+
+    if bit.band(flags, PROJECTILES_BACKUP_RICOCHET_CHANCES) ~= 0 then
+        backup["ricochet_mat_chance_multipliers"] = {};
+        for mat_type, chance in next, RICOCHET_MAT_CHANCE_MULTIPLIERS do
+            backup["ricochet_mat_chance_multipliers"][MAT_TYPE_NAMES[mat_type]] = chance;
         end
     end
 
@@ -54,6 +62,17 @@ function projectiles_restore_config(data)
         end
 
         print("restored cvars");
+    end
+
+    if data["ricochet_mat_chance_multipliers"] then
+        --table.Merge(RICOCHET_MAT_CHANCE_MULTIPLIERS, data["ricochet_mat_chance_multipliers"]);
+        --print("restored ricochet mat chance multipliers");
+        for mat_type, chance in next, data["ricochet_mat_chance_multipliers"] do
+            if not _G[mat_type] then continue; end
+            RICOCHET_MAT_CHANCE_MULTIPLIERS[_G[mat_type]] = chance;
+        end
+
+        print("restored ricochet mat chance multipliers");
     end
 
     print("restored projectiles config");

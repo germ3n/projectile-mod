@@ -4,6 +4,7 @@ if SERVER then
     include("realistic_blood.lua");
     include("shellshock.lua");
     include("muzzleflash.lua");
+    include("hurt_armorednpcs.lua");
 end
 
 if CLIENT then

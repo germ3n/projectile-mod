@@ -121,6 +121,7 @@ local get_string = convar_meta.GetString;
 
 local max = math.max;
 local dyn_splatter = dyn_splatter;
+local hurt_armorednpcs = hurt_armorednpcs;
 
 local trace_filter = {nil, nil, nil};
 
@@ -308,9 +309,11 @@ local function move_projectile(shooter, projectile_data)
                     set_attacker(dmg_info, shooter);
                     dmg_set_damage_type(dmg_info, DMG_BULLET);
                     set_damage_position(dmg_info, enter_trace.HitPos);
-                    set_damage_force(dmg_info, projectile_data.dir * final_damage * 50);
+                    set_damage_force(dmg_info, projectile_data.dir * final_damage * 50); -- todo: make this configurable
 
-                    take_damage_info(hit_entity, dmg_info);
+                    if not hurt_armorednpcs(shooter, enter_trace, dmg_info) then
+                        take_damage_info(hit_entity, dmg_info);
+                    end
                 end
             end
 
