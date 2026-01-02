@@ -36,16 +36,16 @@ timer.Create("projectiles_hack_hurt_armorednpcs", 3, 0, function()
         return;
     end
 
-    if not get_bool(cv_projectiles_enabled) then
-        if not bullets_hurt_armorednpcs_patched then
-            hook.Remove("EntityFireBullets", "BulletsHurtArmoredNPCs");
-            bullets_hurt_armorednpcs_patched = true;
+    if not get_bool(cv_projectiles_enabled) then -- unpatch
+        if bullets_hurt_armorednpcs_patched then
+            hook.Add("EntityFireBullets", "BulletsHurtArmoredNPCs", bullets_hurt_armorednpcs);
+            bullets_hurt_armorednpcs_patched = false;
 
             print("unpatched bullets_hurt_armorednpcs");
         end
     else
         if not bullets_hurt_armorednpcs_patched then
-            hook.Add("EntityFireBullets", "BulletsHurtArmoredNPCs", bullets_hurt_armorednpcs);
+            hook.Remove("EntityFireBullets", "BulletsHurtArmoredNPCs");
             bullets_hurt_armorednpcs_patched = true;
 
             print("patched bullets_hurt_armorednpcs");
