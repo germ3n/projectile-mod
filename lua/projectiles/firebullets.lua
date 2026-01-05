@@ -51,6 +51,13 @@ local cv_weapon_damage_scale = GetConVar("pro_weapon_damage_scale");
 local cv_speed_scale = GetConVar("pro_speed_scale");
 local cv_net_reliable = GetConVar("pro_net_reliable");
 
+local TURRET_AND_MOUNTED_WEAPONS_WHITELIST = {
+    ["npc_turret_floor"] = true,
+    ["npc_turret_ceiling"] = true,
+    ["npc_turret_ground"] = true,
+    ["prop_vehicle_airboat"] = true,
+};
+
 if SERVER then
     local broadcast_projectile = broadcast_projectile;
     local calculate_lean_pos = calculate_lean_pos;
@@ -92,13 +99,28 @@ if SERVER then
         local inflictor;
         local lean_amount = get_lean_amount and shooter:IsPlayer() and get_lean_amount(shooter) or 0.0;
         if (not data.Inflictor or data.Inflictor == NULL) and shooter ~= NULL then
+            local shooter_class = get_class(shooter);
             if shooter:IsPlayer() then--if is_player(shooter) then
                 inflictor = player_get_active_weapon(shooter);
             elseif shooter:IsNPC() then--elseif is_npc(shooter) then
-                inflictor = npc_get_active_weapon(shooter);
+                if not TURRET_AND_MOUNTED_WEAPONS_WHITELIST[shooter_class] then
+                    inflictor = npc_get_active_weapon(shooter);
+                else
+                    inflictor = shooter;
+                end
+            elseif shooter_class == "func_tank" and data.Attacker ~= NULL then -- emplacement turret fix
+                inflictor = shooter;
+                shooter = data.Attacker;
             end
         else
             inflictor = data.Inflictor;
+        end
+
+        if shooter:IsWeapon() then -- fix for https://steamcommunity.com/sharedfiles/filedetails/?id=3490724227
+            local owner = shooter:GetOwner();
+            if owner ~= NULL then
+                shooter = owner;
+            end
         end
 
         if not inflictor or inflictor == NULL then

@@ -18,6 +18,11 @@ HL2_WEAPON_CLASSES = {
     "weapon_shotgun",
     "weapon_smg1",
     "weapon_ar2",
+    "npc_turret_floor",
+    "npc_turret_ceiling",
+    "npc_turret_ground",
+    "prop_vehicle_airboat",
+    "func_tank",
 };
 
 local WEAPON_SPEEDS = {
@@ -26,6 +31,11 @@ local WEAPON_SPEEDS = {
     ["weapon_shotgun"] = 2000,
     ["weapon_smg1"] = 2000,
     ["weapon_ar2"] = 2000,
+    ["npc_turret_floor"] = 2000,
+    ["npc_turret_ceiling"] = 2000,
+    ["npc_turret_ground"] = 2000,
+    ["prop_vehicle_airboat"] = 2000,
+    ["func_tank"] = 2000,
     ["default"] = 2000,
 };
 
@@ -35,6 +45,11 @@ local WEAPON_DAMAGES = {
     ["weapon_shotgun"] = 8,
     ["weapon_smg1"] = 20,
     ["weapon_ar2"] = 30,
+    ["npc_turret_floor"] = 3,
+    ["npc_turret_ceiling"] = 3,
+    ["npc_turret_ground"] = 3,
+    ["prop_vehicle_airboat"] = 15,
+    ["func_tank"] = 15,
     ["default"] = 10,
 };
 
@@ -52,7 +67,6 @@ local WEAPON_DRAG = {
 };
 
 local WEAPON_MASS = {
-    
     ["default"] = 1.0,
 };
 
@@ -71,7 +85,12 @@ local WEAPON_MAX_DISTANCE = {
 
 local WEAPON_TRACER_COLORS = {
     ["default"] = { Color(255, 200, 100, 255), Color(255, 140, 0, 150) },
-    ["weapon_ar2"] = { Color(200, 255, 255, 255), Color(60, 120, 255, 180) }
+    ["weapon_ar2"] = { Color(200, 255, 255, 255), Color(60, 120, 255, 180) },
+    ["npc_turret_floor"] = { Color(255, 255, 255, 255), Color(60, 120, 255, 185) },
+    ["npc_turret_ceiling"] = { Color(255, 255, 255, 255), Color(60, 120, 255, 185) },
+    ["npc_turret_ground"] = { Color(255, 255, 255, 255), Color(60, 120, 255, 185) },
+    ["prop_vehicle_airboat"] = { Color(255, 255, 255, 255), Color(60, 120, 255, 185) },
+    ["func_tank"] = { Color(255, 255, 255, 255), Color(60, 120, 255, 185) },
 };
 
 local WEAPON_SPREAD_BIAS = {

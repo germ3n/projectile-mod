@@ -30,8 +30,12 @@ local get_float = convar_meta.GetFloat;
 local SHOCK_DISTANCE = 30;
 local MAX_SHOCK = 10;
 
+local cv_projectiles_enabled = GetConVar("pro_projectiles_enabled");
 local cv_shell_fadespeed = nil;-- = GetConVar("shell_fadespeed");
 local cv_shell_enabled = nil;-- = GetConVar("shell_enabled");
+
+local shellshock_backup = nil;
+local shellshock_patched = false;
 
 function do_shellshock(shooter, start_pos, end_pos, damage)
     if not cv_shell_enabled or not get_bool(cv_shell_enabled) then return; end
@@ -59,15 +63,30 @@ function do_shellshock(shooter, start_pos, end_pos, damage)
     end
 end
 
-timer.Create("projectiles_shellshock_grab_cvars", 0.25, 0, function()
+timer.Create("projectiles_hack_shellshock", 3, 0, function()
     if not cv_shell_fadespeed then cv_shell_fadespeed = GetConVar("shell_fadespeed"); end
     if not cv_shell_enabled then cv_shell_enabled = GetConVar("shell_enabled"); end
 
-    if cv_shell_fadespeed and cv_shell_enabled then
-        print("shellshock cvars grabbed");
-        timer.Remove("projectiles_shellshock_grab_cvars");
+    if not shellshock_backup and hook.GetTable()["EntityFireBullets"] then
+        shellshock_backup = hook.GetTable()["EntityFireBullets"]["ShellshockGettingBullets"];
+    end
 
-        hook.Remove("EntityFireBullets", "ShellshockGettingBullets");
+    if not shellshock_backup then
+        return;
+    end
+
+    if get_bool(cv_projectiles_enabled) then
+        if not shellshock_patched then
+            hook.Remove("EntityFireBullets", "ShellshockGettingBullets");
+            shellshock_patched = true;
+            print("patched shellshock");
+        end
+    else
+        if shellshock_patched then
+            hook.Add("EntityFireBullets", "ShellshockGettingBullets", shellshock_backup);
+            shellshock_patched = false;
+            print("unpatched shellshock");
+        end
     end
 end);
 
