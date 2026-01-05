@@ -28,6 +28,7 @@ if SERVER then
     local write_float = net.WriteFloat;
     local write_uint = net.WriteUInt;
     local write_color = net.WriteColor;
+    local write_bool = net.WriteBool;
     local send_pvs = net.SendPVS;
     local send_pas = net.SendPAS;
     local broadcast = net.Broadcast;
@@ -39,7 +40,7 @@ if SERVER then
 
     local cv_net_send_method = GetConVar("pro_net_send_method");
 
-    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, reliable)
+    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, is_gmod_turret, reliable)
         weapon.bullet_idx = (weapon.bullet_idx or 0) + 1;
 
         local time = cur_time();
@@ -70,6 +71,7 @@ if SERVER then
         write_uint(random_seed, 32); -- random seed for ricochet
         write_color(tracer_colors[1]);
         write_color(tracer_colors[2]);
+        write_bool(is_gmod_turret);
 
         --send_pvs(eye_pos(shooter));
         local send_method = get_int(cv_net_send_method);
@@ -112,6 +114,7 @@ if SERVER then
                     old_pos = vector(),
                     trace_filter = {nil, nil, nil},
                     tracer_colors = {nil, nil},
+                    is_gmod_turret = false,
                 };
             end
 
@@ -148,6 +151,7 @@ if SERVER then
         projectile.old_pos.z = pos.z;
         projectile.tracer_colors[1] = tracer_colors[1];
         projectile.tracer_colors[2] = tracer_colors[2];
+        projectile.is_gmod_turret = is_gmod_turret;
         projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
     end
 end
@@ -159,6 +163,7 @@ if CLIENT then
     local read_float = net.ReadFloat;
     local read_uint = net.ReadUInt;
     local read_color = net.ReadColor;
+    local read_bool = net.ReadBool;
     local vector = Vector;
 
     net.Receive("projectile", function()
@@ -185,6 +190,7 @@ if CLIENT then
         local random_seed = read_uint(32);
         local tracer_color_core = read_color();
         local tracer_color_glow = read_color();
+        local is_gmod_turret = read_bool();
 
         if not projectile_store[shooter] then 
             projectile_store[shooter] = {
@@ -216,6 +222,7 @@ if CLIENT then
                     old_pos = vector(),
                     trace_filter = {nil, nil, nil},
                     tracer_colors = {nil, nil},
+                    is_gmod_turret = false,
                 };
             end
 
@@ -252,6 +259,7 @@ if CLIENT then
         projectile.old_pos.z = pos_z;
         projectile.tracer_colors[1] = tracer_color_core;
         projectile.tracer_colors[2] = tracer_color_glow;
+        projectile.is_gmod_turret = is_gmod_turret;
         projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
     end)
 end

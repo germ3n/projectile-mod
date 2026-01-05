@@ -240,7 +240,7 @@ local function move_projectile(shooter, projectile_data)
     local current_pos = projectile_data.pos;
     local new_pos = projectile_data.pos + current_velocity;
     
-    trace_filter[1] = shooter;
+    trace_filter[1] = not projectile_data.is_gmod_turret and shooter or projectile_data.weapon;
     trace_filter[2] = projectile_data.weapon;
     trace_filter[3] = projectile_data.last_hit_entity;
     if CLIENT then do_water_trace(projectile_data, new_pos, trace_filter); end -- had to move to seperate funcs cuz i hit more than 60 upvalues

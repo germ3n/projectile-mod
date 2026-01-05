@@ -23,6 +23,7 @@ HL2_WEAPON_CLASSES = {
     "npc_turret_ground",
     "prop_vehicle_airboat",
     "func_tank",
+    "gmod_turret",
 };
 
 local WEAPON_SPEEDS = {

@@ -58,6 +58,11 @@ local TURRET_AND_MOUNTED_WEAPONS_WHITELIST = {
     ["prop_vehicle_airboat"] = true,
 };
 
+local OTHER_TURRETS_FIX = {
+    ["func_tank"] = true,
+    ["gmod_turret"] = true,
+};
+
 if SERVER then
     local broadcast_projectile = broadcast_projectile;
     local calculate_lean_pos = calculate_lean_pos;
@@ -97,6 +102,7 @@ if SERVER then
         --print(shooter, data.Inflictor, data.Damage);
 
         local inflictor;
+        local is_gmod_turret = false;
         local lean_amount = get_lean_amount and shooter:IsPlayer() and get_lean_amount(shooter) or 0.0;
         if (not data.Inflictor or data.Inflictor == NULL) and shooter ~= NULL then
             local shooter_class = get_class(shooter);
@@ -108,9 +114,10 @@ if SERVER then
                 else
                     inflictor = shooter;
                 end
-            elseif shooter_class == "func_tank" and data.Attacker ~= NULL then -- emplacement turret fix
+            elseif OTHER_TURRETS_FIX[shooter_class] and data.Attacker ~= NULL then -- emplacement gun/turret fix
                 inflictor = shooter;
                 shooter = data.Attacker;
+                is_gmod_turret = shooter_class == "gmod_turret";
             end
         else
             inflictor = data.Inflictor;
@@ -156,6 +163,7 @@ if SERVER then
                 min_speed,
                 max_distance,
                 tracer_colors,
+                is_gmod_turret,
                 get_bool(cv_net_reliable)
             );
         end
