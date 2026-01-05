@@ -43,6 +43,15 @@ def init_db():
             last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS banned_users (
+            steamid TEXT PRIMARY KEY,
+            reason TEXT NOT NULL,
+            banned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     
     conn.execute('CREATE INDEX IF NOT EXISTS idx_configs_steamid ON configs(submitter_steamid)')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_sessions_steamid ON user_sessions(steamid)')
@@ -76,6 +85,16 @@ def get_steamid_from_token(token):
     conn.commit()
     conn.close()
     return row['steamid'] if row else None
+
+def is_banned(steamid):
+    conn = get_db_connection()
+    row = conn.execute('SELECT * FROM banned_users WHERE steamid = ?', (steamid,)).fetchone()
+    conn.close()
+    return row is not None
+    if row:
+        return True, row['reason'], row['expires_at']
+    else:
+        return False, None, None
 
 @app.route('/auth/landing')
 def auth_landing():
@@ -226,6 +245,10 @@ def save_config():
     if not verified_steamid:
         return jsonify({"error": "Unauthorized"}), 401
 
+    is_banned, reason, expires_at = is_banned(verified_steamid)
+    if is_banned and expires_at and expires_at < datetime.now():
+        return jsonify({"error": "You are banned from the server. Reason: " + reason}), 403
+
     data = request.get_json()
     if not data or 'config_name' not in data or 'config' not in data:
         return jsonify({"error": "Missing required fields"}), 400
@@ -264,6 +287,10 @@ def update_config():
     verified_steamid = get_steamid_from_token(token)
     if not verified_steamid:
         return jsonify({"error": "Unauthorized"}), 401
+
+    is_banned, reason, expires_at = is_banned(verified_steamid)
+    if is_banned and expires_at and expires_at < datetime.now():
+        return jsonify({"error": "You are banned from the server. Reason: " + reason}), 403
 
     data = request.get_json()
     if not data or 'id' not in data or 'config' not in data:
