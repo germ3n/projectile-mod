@@ -648,12 +648,48 @@ if CLIENT then
                         panel:DockMargin(0, 0, 0, 2);
                         panel.Paint = function(s, w, h) end
                         
+                        local current_table = CONFIG_TYPES[cfg_type];
+                        local current_val = current_table and current_table[class_name];
+                        local is_using_default = false;
+                        local default_source = "";
+                        
+                        local actual_value;
+                        if current_val and type(current_val) == "number" then
+                            actual_value = current_val;
+                            is_using_default = false;
+                        else
+                            local def = current_table and current_table["default"];
+                            if def and type(def) == "number" then
+                                actual_value = def;
+                                is_using_default = true;
+                                default_source = "global default";
+                            else
+                                actual_value = default_val;
+                                is_using_default = true;
+                                default_source = "fallback default";
+                            end
+                        end
+                        
                         local label = vgui.Create("DLabel", panel);
                         label:SetText(label_text);
                         label:Dock(LEFT);
                         label:SetWide(120);
                         label:SetTextColor(THEME.text_dim);
-
+                        if is_using_default then
+                            label:SetTooltip(label_text .. " (using " .. default_source .. ": " .. actual_value .. ")");
+                        end
+                    
+                        if is_using_default then
+                            local indicator = vgui.Create("DPanel", panel);
+                            indicator:Dock(LEFT);
+                            indicator:SetWide(4);
+                            indicator:DockMargin(0, 6, 4, 6);
+                            indicator.Paint = function(s, w, h)
+                                draw.RoundedBox(1, 0, 0, w, h, Color(255, 180, 0));
+                            end
+                            indicator:SetTooltip("Using " .. default_source);
+                        end
+                    
                         local btn_copy = vgui.Create("DButton", panel);
                         btn_copy:SetText("Copy");
                         btn_copy:Dock(RIGHT);
@@ -670,17 +706,17 @@ if CLIENT then
                                 LocalPlayer():ChatPrint("Please select a Source Weapon at the top of this card first.");
                                 return;
                             end
-
+                    
                             if src_wep == class_name then
                                 LocalPlayer():ChatPrint("Cannot copy from itself.");
                                 return;
                             end
-
+                    
                             RunConsoleCommand("pro_weapon_config_copy_single", cfg_type, src_wep, class_name);
                             LocalPlayer():ChatPrint("Copied " .. label_text .. " from " .. src_wep);
                         end
                         btn_copy:SetTooltip("Copy " .. label_text .. " from selected source weapon");
-
+                    
                         local btn_reset = vgui.Create("DButton", panel);
                         btn_reset:SetText("Reset");
                         btn_reset:Dock(RIGHT);
@@ -695,7 +731,7 @@ if CLIENT then
                             LocalPlayer():ChatPrint("Reset " .. label_text .. " to default");
                         end
                         btn_reset:SetTooltip("Reset " .. label_text .. " to default");
-
+                    
                         local slider = vgui.Create("DNumSlider", panel);
                         slider:Dock(FILL);
                         slider:SetMin(min_val);
@@ -703,21 +739,12 @@ if CLIENT then
                         slider:SetDecimals(decimals);
                         slider.Label:SetVisible(false);
                         slider.TextArea:SetTextColor(THEME.text);
+                        slider:SetValue(actual_value);
                         
-                        local current_table = CONFIG_TYPES[cfg_type];
-                        local current_val = current_table and current_table[class_name];
-
-                        if current_val and type(current_val) == "number" then
-                            slider:SetValue(current_val);
-                        else
-                            local def = current_table and current_table["default"];
-                            if def and type(def) == "number" then
-                                slider:SetValue(def);
-                            else
-                                slider:SetValue(default_val);
-                            end
+                        if is_using_default then
+                            slider:SetTooltip("Using " .. default_source .. ": " .. actual_value);
                         end
-
+                    
                         local function send_update()
                             net.Start("projectile_weapon_config_update");
                             net.WriteString(cfg_type);
@@ -725,7 +752,7 @@ if CLIENT then
                             net.WriteFloat(math.Round(slider:GetValue(), decimals));
                             net.SendToServer();
                         end
-
+                    
                         slider.Think = function(s)
                             local isInteracting = s.Slider:GetDragging() or s.TextArea:IsEditing();
                             if isInteracting then
@@ -735,7 +762,7 @@ if CLIENT then
                                 send_update();
                             end
                         end
-
+                    
                         slider.TextArea.OnEnter = function()
                             send_update();
                             slider.HasChanged = false;
