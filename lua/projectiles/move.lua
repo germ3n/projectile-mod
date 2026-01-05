@@ -112,6 +112,7 @@ local cv_wind_gust_max_duration = get_convar("pro_wind_gust_max_duration");
 local cv_wind_jitter_amount = get_convar("pro_wind_jitter_amount");
 local cv_render_wind_hud = get_convar("pro_render_wind_hud");
 local cv_sv_gravity = get_convar("sv_gravity");
+local cv_damage_force_multiplier = get_convar("pro_damage_force_multiplier");
 
 local convar_meta = FindMetaTable("ConVar");
 local get_bool = convar_meta.GetBool;
@@ -309,7 +310,7 @@ local function move_projectile(shooter, projectile_data)
                     set_attacker(dmg_info, shooter);
                     dmg_set_damage_type(dmg_info, DMG_BULLET);
                     set_damage_position(dmg_info, enter_trace.HitPos);
-                    set_damage_force(dmg_info, projectile_data.dir * final_damage * 50); -- todo: make this configurable
+                    set_damage_force(dmg_info, projectile_data.dir * final_damage * get_float(cv_damage_force_multiplier));
 
                     if not hurt_armorednpcs(shooter, enter_trace, dmg_info) then
                         take_damage_info(hit_entity, dmg_info);
