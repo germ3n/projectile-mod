@@ -24,11 +24,12 @@ def init_db():
         CREATE TABLE IF NOT EXISTS configs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             submitter_steamid TEXT NOT NULL,
-            config_name TEXT NOT NULL UNIQUE,
+            config_name TEXT NOT NULL,
             config_flags INTEGER NOT NULL DEFAULT 0,
             config_data TEXT NOT NULL,
             config_version TEXT NOT NULL DEFAULT '1.0.0',
-            rating REAL DEFAULT 0.0,
+            thumbs_up INTEGER DEFAULT 0,
+            thumbs_down INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -44,7 +45,6 @@ def init_db():
     ''')
     
     conn.execute('CREATE INDEX IF NOT EXISTS idx_configs_steamid ON configs(submitter_steamid)')
-    conn.execute('CREATE INDEX IF NOT EXISTS idx_configs_name ON configs(config_name)')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_sessions_steamid ON user_sessions(steamid)')
     
     conn.execute('''
@@ -77,10 +77,39 @@ def get_steamid_from_token(token):
     conn.close()
     return row['steamid'] if row else None
 
+@app.route('/auth/landing')
+def auth_landing():
+    """Serves a professional landing page for the Steam Overlay."""
+    return '''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>ProjectileMod Login</title>
+        <style>
+            body { background: #1b2838; color: #c7d5e0; font-family: "Motiva Sans", Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+            .card { background: #2a475e; padding: 40px; border-radius: 4px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #3d6b8d; max-width: 400px; }
+            h2 { color: #fff; margin-top: 0; }
+            p { line-height: 1.6; font-size: 14px; margin-bottom: 25px; }
+            .btn-steam:hover { opacity: 0.8; }
+            .btn-steam img { display: block; margin: 0 auto; border-radius: 4px; }
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <h2>Authentication</h2>
+            <p>To securely share and sync your ProjectileMod configurations, please sign in via Steam.</p>
+            <a href="/auth/login" class="btn-steam">
+                <img src="https://community.cloudflare.steamstatic.com/public/images/signinthroughsteam/sits_01.png" alt="Sign in through Steam">
+            </a>
+        </div>
+    </body>
+    </html>
+    '''
+
 @app.route('/auth/login')
 def login():
     steam_openid_url = 'https://steamcommunity.com/openid/login'
-    # _external=True is necessary for OpenID to provide a full absolute URL
     return_to = url_for('authorize', _external=True)
     
     params = {
@@ -121,11 +150,20 @@ def authorize():
             conn.commit()
             conn.close()
             
-            return jsonify({
-                "status": "success", 
-                "steam_id": steam_id,
-                "token": token
-            })
+            # If opened in Steam Overlay, we show a 'Success' page with the token to copy
+            return f'''
+            <html>
+                <body style="background: #1b2838; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh;">
+                    <h2>Login Successful!</h2>
+                    <p>Copy the code below if prompted in-game, otherwise you can close this window.</p>
+                    <div style="background: #121a24; padding: 15px; border-radius: 4px; border: 1px solid #3d6b8d; font-family: monospace; font-size: 1.2em; color: #66c0f4;">{token}</div>
+                    <script>
+                        // Still try to notify the DHTML bridge if it's active
+                        console.log("TOKEN_FOUND:{token}");
+                    </script>
+                </body>
+            </html>
+            '''
             
     return jsonify({"error": "Identity verification failed"}), 401
 
