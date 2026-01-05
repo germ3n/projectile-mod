@@ -1,11 +1,13 @@
 AddCSLuaFile();
 
+local URL_MARKETPLACE_API = "https://projectilemod.directory/api/v1/";
+
 if SERVER then
     util.AddNetworkString("projectile_update_cvar");
 
     local IsValid = IsValid;
     local RunConsoleCommand = RunConsoleCommand;
-    local PROJECTILE_CVAR_NAMES = PROJECTILE_CVAR_NAMES;
+    local PROJECTILE_CVARS = PROJECTILE_CVARS;
     local NULL = NULL;
     local get_convar = GetConVar;
     local next = next;
@@ -32,8 +34,8 @@ if SERVER then
 
     concommand.Add("pro_config_reset_cvars", function(ply, cmd, args)
         if ply ~= NULL and (not is_superadmin(ply)) then return; end
-        for _, cvar_name in next, PROJECTILE_CVAR_NAMES do
-            RunConsoleCommand(cvar_name, get_default(get_convar(cvar_name)));
+        for cvar_name, cvar in next, PROJECTILE_CVARS do
+            RunConsoleCommand(cvar_name, get_default(cvar));
         end
 
         print("reset all projectile cvars");
@@ -859,6 +861,14 @@ if CLIENT then
                 { type = "dropdown", cvar = "pro_net_send_method", label = "Projectiles send method", options = { "PVS", "PAS", "Broadcast" } },
             }
         },
+        [
+            name = "Marketplace",
+            icon = "icon16/server_compressed.png",
+            lazy_load = true,
+            custom_draw = function(pnl)
+                
+            end,
+        ]
         {
             name = "Debug",
             icon = "icon16/bug.png",

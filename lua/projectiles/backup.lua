@@ -26,8 +26,8 @@ function projectiles_backup_config(type, flags)
 
     if bit.band(flags, PROJECTILES_BACKUP_CVARS) ~= 0 then
         backup.cvars = {};
-        for idx, cvar in next, PROJECTILE_CVAR_NAMES do
-            backup.cvars[cvar] = GetConVar(cvar):GetString();
+        for cvar_name, cvar in next, PROJECTILES_CVARS do
+            backup.cvars[cvar_name] = cvar:GetString();
         end
     end
 
@@ -39,7 +39,7 @@ function projectiles_backup_config(type, flags)
     end
 
     if type == "json" then
-        return util.TableToJSON(backup);
+        return util.TableToJSON(backup, true);
     end
 
     return nil;
@@ -58,6 +58,7 @@ function projectiles_restore_config(data)
     
     if data["cvars"] then
         for cvar, value in next, data["cvars"] do
+            if not PROJECTILES_CVARS[cvar] then continue; end
             RunConsoleCommand(cvar, value);
         end
 
@@ -65,10 +66,8 @@ function projectiles_restore_config(data)
     end
 
     if data["ricochet_mat_chance_multipliers"] then
-        --table.Merge(RICOCHET_MAT_CHANCE_MULTIPLIERS, data["ricochet_mat_chance_multipliers"]);
-        --print("restored ricochet mat chance multipliers");
         for mat_type, chance in next, data["ricochet_mat_chance_multipliers"] do
-            if not _G[mat_type] then continue; end
+            if not MAT_TYPE_NAMES[_G[mat_type]] then continue; end
             RICOCHET_MAT_CHANCE_MULTIPLIERS[_G[mat_type]] = chance;
         end
 
@@ -89,27 +88,23 @@ local is_superadmin = player_meta.IsSuperAdmin;
 
 concommand.Add("pro_config_backup_json", function(ply, cmd, args)
     if ply ~= NULL and (not is_superadmin(ply)) then return; end
+    local file_name = args[1];
     local flags = PROJECTILES_BACKUP_ALL;
     local backup = projectiles_backup_config("json", flags);
-    local chunk_size = 4095;
-    local chunks = math.ceil(string.len(backup) / chunk_size);
-    for i = 1, chunks do
-        local start_pos = (i - 1) * chunk_size + 1;
-        local end_pos = math.min(start_pos + chunk_size, string.len(backup));
-        local chunk = string.sub(backup, start_pos, end_pos);
-        Msg(chunk);
+    if not file_name then
+        local chunk_size = 4095;
+        local chunks = math.ceil(string.len(backup) / chunk_size);
+        for i = 1, chunks do
+            local start_pos = (i - 1) * chunk_size + 1;
+            local end_pos = math.min(start_pos + chunk_size, string.len(backup));
+            local chunk = string.sub(backup, start_pos, end_pos);
+            Msg(chunk);
+        end
+
+        print("\nbackup complete");
+    else
+        file.Write("projectiles/backup/" .. file_name .. ".json", backup);
+        print("backup complete to garrysmod/data/projectiles/backup/" .. file_name .. ".json");
     end
-    
-    --TEST_DATA = backup;
+end, nil, "Backup projectiles config either to console or a file");
 
-    print("\nbackup complete");
-end, nil, "Backup projectiles config");
-
-concommand.Add("pro_config_restore_json", function(ply, cmd, args)
-    if ply ~= NULL and (not is_superadmin(ply)) then return; end
-    --local data = util.JSONToTable(args[1]);
-    --local data = util.JSONToTable(TEST_DATA);
-    --projectiles_restore_config(data);
-
-    print("not yet implemented");
-end, nil, "Restore projectiles config");
