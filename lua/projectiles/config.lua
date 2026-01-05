@@ -1593,7 +1593,7 @@ if CLIENT then
 
     local function OpenConfigMenu()
         local frame = vgui.Create("DFrame");
-        frame:SetSize(650, 650);
+        frame:SetSize(800, 800);
         frame:Center();
         frame:SetTitle(""); 
         frame:MakePopup();
@@ -1685,6 +1685,20 @@ if CLIENT then
     end
 
     concommand.Add("pro_config", OpenConfigMenu);
+
+    hook.Add("PopulateToolMenu", "ProjectilesAddToSpawnMenu", function()
+        spawnmenu.AddToolMenuOption("Utilities", "Projectile Mod", "ProjectileConfig", "Configuration", "", "", function(panel)
+            panel:ClearControls();
+            
+            panel:Help("Projectile Mod Configuration");
+            panel:Help("Configure weapon ballistics, penetration, ricochet, and more.");
+            
+            local btn = panel:Button("Open Config Menu");
+            btn.DoClick = function()
+                RunConsoleCommand("pro_config");
+            end
+        end);
+    end);
 end
 
 print("loaded projectiles config");
