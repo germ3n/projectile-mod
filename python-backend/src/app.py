@@ -3,6 +3,7 @@ import json
 import os
 import secrets
 import requests
+from datetime import datetime
 from flask import Flask, request, jsonify, redirect, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -88,9 +89,12 @@ def get_steamid_from_token(token):
 
 def is_banned(steamid):
     conn = get_db_connection()
-    row = conn.execute('SELECT * FROM banned_users WHERE steamid = ?', (steamid,)).fetchone()
+    row = conn.execute('''
+        SELECT * FROM banned_users 
+        WHERE steamid = ? 
+        AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+    ''', (steamid,)).fetchone()
     conn.close()
-    return row is not None
     if row:
         return True, row['reason'], row['expires_at']
     else:
@@ -245,8 +249,8 @@ def save_config():
     if not verified_steamid:
         return jsonify({"error": "Unauthorized"}), 401
 
-    is_banned, reason, expires_at = is_banned(verified_steamid)
-    if is_banned and expires_at and expires_at < datetime.now():
+    banned, reason, expires_at = is_banned(verified_steamid)
+    if banned:
         return jsonify({"error": "You are banned from the server. Reason: " + reason}), 403
 
     data = request.get_json()
@@ -288,8 +292,8 @@ def update_config():
     if not verified_steamid:
         return jsonify({"error": "Unauthorized"}), 401
 
-    is_banned, reason, expires_at = is_banned(verified_steamid)
-    if is_banned and expires_at and expires_at < datetime.now():
+    banned, reason, expires_at = is_banned(verified_steamid)
+    if banned:
         return jsonify({"error": "You are banned from the server. Reason: " + reason}), 403
 
     data = request.get_json()
@@ -335,6 +339,39 @@ def update_config():
         "old_version": old_version, 
         "new_version": new_version
     })
+
+@app.route('/delete-config', methods=['POST'])
+def delete_config():
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header.replace('Bearer ', '') if 'Bearer ' in auth_header else None
+    
+    verified_steamid = get_steamid_from_token(token)
+    if not verified_steamid:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.get_json()
+    if not data or 'id' not in data:
+        return jsonify({"error": "Missing config ID"}), 400
+
+    config_id = data['id']
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    row = cursor.execute('SELECT submitter_steamid FROM configs WHERE id = ?', (config_id,)).fetchone()
+    
+    if not row:
+        conn.close()
+        return jsonify({"error": "Config not found"}), 404
+
+    if row['submitter_steamid'] != verified_steamid:
+        conn.close()
+        return jsonify({"error": "You do not own this config"}), 403
+
+    cursor.execute('DELETE FROM configs WHERE id = ?', (config_id,))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({"message": "Config deleted successfully"}), 200
 
 @app.route('/users/me', methods=['GET'])
 def get_me():
