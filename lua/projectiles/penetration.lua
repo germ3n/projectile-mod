@@ -33,6 +33,7 @@ local cv_ricochet_damage_multiplier = get_convar("pro_ricochet_damage_multiplier
 local cv_penetration_power_cost_multiplier = get_convar("pro_penetration_power_cost_multiplier");
 local cv_penetration_dmg_tax_per_unit = get_convar("pro_penetration_dmg_tax_per_unit");
 local cv_penetration_entry_cost_multiplier = get_convar("pro_penetration_entry_cost_multiplier");
+local cv_damage_scaling = get_convar("pro_damage_scaling");
 local convar_meta = FindMetaTable("ConVar");
 local get_bool = convar_meta.GetBool;
 local get_float = convar_meta.GetFloat;
@@ -350,6 +351,10 @@ local HITGROUP_MULTIPLIERS = {
 };
 
 function get_damage_multiplier(hitgroup)
+    if not get_bool(cv_damage_scaling) then
+        return 1.0;
+    end
+
     return HITGROUP_MULTIPLIERS[hitgroup] or 1.0;
 end
 

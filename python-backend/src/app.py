@@ -382,7 +382,11 @@ def get_me():
     if not steamid:
         return jsonify({"error": "Unauthorized"}), 401
         
-    return jsonify({"steamid": steamid}), 200
+    banned, reason, expires_at = is_banned(steamid)
+    if banned:
+        return jsonify({"steamid": steamid, "banned": True, "reason": reason, "expires_at": expires_at}), 200
+
+    return jsonify({"steamid": steamid, "banned": False}), 200
 
 if __name__ == '__main__':
     app.run(debug=True, port=8000)

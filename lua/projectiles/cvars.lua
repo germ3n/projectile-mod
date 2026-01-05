@@ -40,4 +40,5 @@ PROJECTILES_CVARS = {
     ["pro_render_wind_hud"] = CreateConVar("pro_render_wind_hud", "1", bit.bor(FCVAR_ARCHIVE), "Enable wind hud", 0, 1),
     ["pro_net_reliable"] = CreateConVar("pro_net_reliable", "0", bit.bor(FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED), "Enable net reliable", 0, 1),
     ["pro_net_send_method"] = CreateConVar("pro_net_send_method", "1", bit.bor(FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED), "Networking send method", 0, 2), -- 0 PVS, 1 PAS, 2 Broadcast
+    ["pro_damage_scaling"] = CreateConVar("pro_damage_scaling", "1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Enable damage scaling", 0, 1),
 };

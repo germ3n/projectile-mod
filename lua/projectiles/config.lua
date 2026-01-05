@@ -260,6 +260,7 @@ if CLIENT then
                 { type = "bool", cvar = "pro_ricochet_enabled", label = "Enable Ricochet" },
                 { type = "bool", cvar = "pro_drag_enabled", label = "Enable Drag" },
                 { type = "bool", cvar = "pro_gravity_enabled", label = "Enable Gravity" },
+                { type = "bool", cvar = "pro_damage_scaling", label = "Enable Damage Scaling" },
                 { type = "bool", cvar = "pro_wind_enabled", label = "Enable Wind (Experimental)" },
                 { type = "float", cvar = "pro_speed_scale", label = "Speed Scale", min = 0.1, max = 5.0, decimals = 2 },
                 { type = "float", cvar = "pro_weapon_damage_scale", label = "Damage Scale", min = 0.1, max = 5.0, decimals = 2 },
@@ -858,6 +859,400 @@ if CLIENT then
                 { type = "bool", cvar = "pro_net_reliable", label = "Reliable projectiles" },
                 { type = "dropdown", cvar = "pro_net_send_method", label = "Projectiles send method", options = { "PVS", "PAS", "Broadcast" } },
             }
+        },
+        {
+            name = "Configs",
+            icon = "icon16/package.png",
+            lazy_load = true,
+            custom_draw = function(parent)
+                local backup_dir = "projectiles/backup";
+                file.CreateDir(backup_dir);
+                
+                local info_bar = vgui.Create("DPanel", parent);
+                info_bar:Dock(TOP);
+                info_bar:SetTall(25);
+                info_bar:DockMargin(0, 0, 0, 5);
+                info_bar.Paint = function(s, w, h)
+                    draw.RoundedBox(0, 0, 0, w, h, THEME.bg_lighter);
+                    draw.RoundedBox(0, 0, h - 1, w, 1, THEME.divider);
+                end
+                
+                local lbl_info = vgui.Create("DLabel", info_bar);
+                lbl_info:SetText("Client backups saved to: garrysmod/data/projectiles/backup/  |  Server backups saved on server in same location");
+                lbl_info:SetPos(10, 5);
+                lbl_info:SetSize(600, 15);
+                lbl_info:SetTextColor(THEME.text_dim);
+                
+                local top_bar = vgui.Create("DPanel", parent);
+                top_bar:Dock(TOP);
+                top_bar:SetTall(150);
+                top_bar:DockMargin(0, 0, 0, 5);
+                top_bar.Paint = function(s, w, h)
+                    draw.RoundedBox(0, 0, 0, w, h, THEME.bg_lighter);
+                    draw.RoundedBox(0, 0, h - 1, w, 1, THEME.divider);
+                end
+            
+                local lbl_create = vgui.Create("DLabel", top_bar);
+                lbl_create:SetText("Create New Backup");
+                lbl_create:SetPos(10, 10);
+                lbl_create:SetSize(200, 20);
+                lbl_create:SetFont("DermaDefaultBold");
+                lbl_create:SetTextColor(THEME.text);
+            
+                local lbl_name = vgui.Create("DLabel", top_bar);
+                lbl_name:SetText("Backup Name:");
+                lbl_name:SetPos(10, 35);
+                lbl_name:SetSize(100, 20);
+                lbl_name:SetTextColor(THEME.text);
+            
+                local entry_name = vgui.Create("DTextEntry", top_bar);
+                entry_name:SetPos(110, 35);
+                entry_name:SetSize(200, 25);
+                entry_name:SetPlaceholderText("Enter backup name...");
+                entry_name.Paint = function(s, w, h)
+                    draw.RoundedBox(4, 0, 0, w, h, THEME.bg_dark);
+                    s:DrawTextEntryText(THEME.text, THEME.accent, THEME.text);
+                    if s:GetValue() == "" then
+                        draw.SimpleText(s:GetPlaceholderText(), "DermaDefault", 5, h / 2, THEME.text_dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER);
+                    end
+                end
+            
+                local lbl_include = vgui.Create("DLabel", top_bar);
+                lbl_include:SetText("Include in backup:");
+                lbl_include:SetPos(10, 70);
+                lbl_include:SetSize(150, 20);
+                lbl_include:SetTextColor(THEME.text);
+            
+                local check_surfaceprops = vgui.Create("DCheckBoxLabel", top_bar);
+                check_surfaceprops:SetPos(10, 90);
+                check_surfaceprops:SetText("Surface Properties");
+                check_surfaceprops:SetTextColor(THEME.text);
+                check_surfaceprops:SetChecked(true);
+                check_surfaceprops:SizeToContents();
+            
+                local check_weapons = vgui.Create("DCheckBoxLabel", top_bar);
+                check_weapons:SetPos(160, 90);
+                check_weapons:SetText("Weapon Config");
+                check_weapons:SetTextColor(THEME.text);
+                check_weapons:SetChecked(true);
+                check_weapons:SizeToContents();
+            
+                local check_cvars = vgui.Create("DCheckBoxLabel", top_bar);
+                check_cvars:SetPos(280, 90);
+                check_cvars:SetText("CVars");
+                check_cvars:SetTextColor(THEME.text);
+                check_cvars:SetChecked(true);
+                check_cvars:SizeToContents();
+            
+                local check_ricochet = vgui.Create("DCheckBoxLabel", top_bar);
+                check_ricochet:SetPos(360, 90);
+                check_ricochet:SetText("Ricochet Chances");
+                check_ricochet:SetTextColor(THEME.text);
+                check_ricochet:SetChecked(true);
+                check_ricochet:SizeToContents();
+            
+                local btn_select_all = vgui.Create("DButton", top_bar);
+                btn_select_all:SetText("Select All");
+                btn_select_all:SetPos(10, 115);
+                btn_select_all:SetSize(80, 25);
+                btn_select_all:SetTextColor(THEME.text);
+                btn_select_all.Paint = function(s, w, h)
+                    draw.RoundedBox(4, 0, 0, w, h, s:IsHovered() and THEME.divider or THEME.bg_dark);
+                end
+                btn_select_all.DoClick = function()
+                    check_surfaceprops:SetChecked(true);
+                    check_weapons:SetChecked(true);
+                    check_cvars:SetChecked(true);
+                    check_ricochet:SetChecked(true);
+                end
+            
+                local btn_select_none = vgui.Create("DButton", top_bar);
+                btn_select_none:SetText("Select None");
+                btn_select_none:SetPos(95, 115);
+                btn_select_none:SetSize(80, 25);
+                btn_select_none:SetTextColor(THEME.text);
+                btn_select_none.Paint = function(s, w, h)
+                    draw.RoundedBox(4, 0, 0, w, h, s:IsHovered() and THEME.divider or THEME.bg_dark);
+                end
+                btn_select_none.DoClick = function()
+                    check_surfaceprops:SetChecked(false);
+                    check_weapons:SetChecked(false);
+                    check_cvars:SetChecked(false);
+                    check_ricochet:SetChecked(false);
+                end
+            
+                local btn_create = vgui.Create("DButton", top_bar);
+                btn_create:SetText("Create Backup");
+                btn_create:SetPos(320, 35);
+                btn_create:SetSize(120, 25);
+                btn_create:SetTextColor(THEME.text);
+                btn_create.Paint = function(s, w, h)
+                    draw.RoundedBox(4, 0, 0, w, h, s:IsHovered() and THEME.accent_hover or THEME.accent);
+                end
+            
+                local scroll = vgui.Create("DScrollPanel", parent);
+                scroll:Dock(FILL);
+                scroll:GetCanvas():DockPadding(10, 10, 10, 10);
+            
+                local function CreateBackupCard(scroll_panel, filename, filepath, file_time, includes_str, backup_data, is_server, RefreshCallback)
+                    local display_name = string.StripExtension(filename);
+                    local date_str = os.date("%Y-%m-%d %H:%M:%S", file_time);
+            
+                    local card = scroll_panel:Add("DPanel");
+                    card:Dock(TOP);
+                    card:SetTall(90);
+                    card:DockMargin(0, 0, 0, 5);
+                    card.Paint = function(s, w, h)
+                        draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
+                        if s:IsHovered() then
+                            draw.RoundedBox(4, 0, 0, w, h, Color(255, 255, 255, 5));
+                        end
+                    end
+            
+                    local location_badge = vgui.Create("DLabel", card);
+                    location_badge:SetText(is_server and "SERVER" or "CLIENT");
+                    location_badge:SetFont("DermaDefaultBold");
+                    location_badge:SetPos(10, 10);
+                    location_badge:SetSize(60, 20);
+                    location_badge:SetTextColor(is_server and Color(255, 200, 100) or Color(100, 200, 255));
+            
+                    local title = vgui.Create("DLabel", card);
+                    title:SetText(display_name);
+                    title:SetFont("DermaDefaultBold");
+                    title:SetPos(75, 10);
+                    title:SetSize(300, 20);
+                    title:SetTextColor(THEME.text);
+            
+                    local info = vgui.Create("DLabel", card);
+                    info:SetText("Created: " .. date_str);
+                    info:SetPos(10, 35);
+                    info:SetSize(400, 15);
+                    info:SetTextColor(THEME.text_dim);
+            
+                    local info2 = vgui.Create("DLabel", card);
+                    info2:SetText("Includes: " .. includes_str);
+                    info2:SetPos(10, 53);
+                    info2:SetSize(500, 15);
+                    info2:SetTextColor(THEME.text_dim);
+            
+                    local btn_restore = vgui.Create("DButton", card);
+                    btn_restore:SetText("RESTORE");
+                    btn_restore:SetSize(80, 30);
+                    btn_restore:SetTextColor(THEME.text);
+                    btn_restore.Paint = function(s, w, h)
+                        local col = s:IsHovered() and Color(46, 139, 87) or Color(60, 179, 113);
+                        draw.RoundedBox(4, 0, 0, w, h, col);
+                    end
+            
+                    local btn_delete = vgui.Create("DButton", card);
+                    btn_delete:SetText("DELETE");
+                    btn_delete:SetSize(80, 30);
+                    btn_delete:SetTextColor(THEME.text);
+                    btn_delete.Paint = function(s, w, h)
+                        local col = s:IsHovered() and Color(180, 60, 60) or Color(150, 40, 40);
+                        draw.RoundedBox(4, 0, 0, w, h, col);
+                    end
+            
+                    card.PerformLayout = function(s, w, h)
+                        btn_delete:SetPos(w - 90, h / 2 - 15);
+                        btn_restore:SetPos(w - 180, h / 2 - 15);
+                    end
+            
+                    btn_restore.DoClick = function()
+                        Derma_Query("Are you sure you want to restore this backup? This will overwrite your current settings.", "Confirm Restore", "Yes", function()
+                            if backup_data then
+                                local compressed_data = util.Compress(util.TableToJSON(backup_data));
+                                local compressed_size = string.len(compressed_data);
+                                local chunk_size = 65000;
+                                local total_chunks = math.ceil(compressed_size / chunk_size);
+                                
+                                net.Start("projectiles_restore_config_start");
+                                net.WriteUInt(total_chunks, 16);
+                                net.WriteUInt(compressed_size, 32);
+                                net.SendToServer();
+                                
+                                local chunk_index = 0;
+                                local function SendNextChunk()
+                                    chunk_index = chunk_index + 1;
+                                    if chunk_index > total_chunks then
+                                        chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 255, 255), "Backup '" .. display_name .. "' sent to server (" .. total_chunks .. " chunks)");
+                                        return;
+                                    end
+                                    
+                                    local start_pos = (chunk_index - 1) * chunk_size + 1;
+                                    local end_pos = math.min(start_pos + chunk_size - 1, compressed_size);
+                                    local chunk = string.sub(compressed_data, start_pos, end_pos);
+                                    
+                                    net.Start("projectiles_restore_config_chunk");
+                                    net.WriteUInt(chunk_index, 16);
+                                    net.WriteUInt(string.len(chunk), 32);
+                                    net.WriteData(chunk, string.len(chunk));
+                                    net.SendToServer();
+                                    
+                                    timer.Simple(0.01, SendNextChunk);
+                                end
+                                
+                                SendNextChunk();
+                            elseif is_server then
+                                RunConsoleCommand("pro_config_restore_json", display_name);
+                            else
+                                chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 100, 100), "Failed to parse backup file!");
+                            end
+                        end, "No");
+                    end
+            
+                    btn_delete.DoClick = function()
+                        if is_server then
+                            chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 100, 100), "Cannot delete server backups from client!");
+                            return;
+                        end
+                        
+                        Derma_Query("Are you sure you want to delete this backup? This cannot be undone.", "Confirm Delete", "Yes", function()
+                            file.Delete(filepath);
+                            chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 255, 255), "Backup '" .. display_name .. "' deleted!");
+                            RefreshCallback();
+                        end, "No");
+                    end
+                end
+            
+                local function RefreshBackupList()
+                    scroll:Clear();
+            
+                    local header_client = vgui.Create("DPanel", scroll);
+                    header_client:Dock(TOP);
+                    header_client:SetTall(30);
+                    header_client:DockMargin(0, 0, 0, 5);
+                    header_client.Paint = function(s, w, h)
+                        draw.RoundedBox(4, 0, 0, w, h, THEME.bg_dark);
+                        draw.SimpleText("CLIENT BACKUPS", "DermaDefaultBold", 10, h/2, Color(100, 200, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER);
+                    end
+            
+                    local files, dirs = file.Find(backup_dir .. "/*.json", "DATA");
+            
+                    if not files or #files == 0 then
+                        local no_backups = vgui.Create("DLabel", scroll);
+                        no_backups:SetText("No client backups found. Create one above!");
+                        no_backups:SetTextColor(THEME.text_dim);
+                        no_backups:Dock(TOP);
+                        no_backups:DockMargin(10, 5, 10, 10);
+                    else
+                        table.sort(files, function(a, b) 
+                            local time_a = file.Time(backup_dir .. "/" .. a, "DATA");
+                            local time_b = file.Time(backup_dir .. "/" .. b, "DATA");
+                            return time_a > time_b;
+                        end);
+            
+                        for idx = 1, #files do
+                            local filename = files[idx];
+                            local filepath = backup_dir .. "/" .. filename;
+                            local file_time = file.Time(filepath, "DATA");
+            
+                            local content = file.Read(filepath, "DATA");
+                            local backup_data = content and util.JSONToTable(content);
+                            local includes = "";
+                            if backup_data then
+                                local parts = {};
+                                if backup_data.surfaceprops then table.insert(parts, "Surface Props"); end
+                                if backup_data.weapon_config then table.insert(parts, "Weapons"); end
+                                if backup_data.cvars then table.insert(parts, "CVars"); end
+                                if backup_data.ricochet_mat_chance_multipliers then table.insert(parts, "Ricochet"); end
+                                includes = #parts > 0 and table.concat(parts, ", ") or "Unknown";
+                            end
+            
+                            CreateBackupCard(scroll, filename, filepath, file_time, includes, backup_data, false, RefreshBackupList);
+                        end
+                    end
+            
+                    local header_server = vgui.Create("DPanel", scroll);
+                    header_server:Dock(TOP);
+                    header_server:SetTall(30);
+                    header_server:DockMargin(0, 15, 0, 5);
+                    header_server.Paint = function(s, w, h)
+                        draw.RoundedBox(4, 0, 0, w, h, THEME.bg_dark);
+                        draw.SimpleText("SERVER BACKUPS", "DermaDefaultBold", 10, h/2, Color(255, 200, 100), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER);
+                    end
+            
+                    local loading_label = vgui.Create("DLabel", scroll);
+                    loading_label:SetText("Loading server backups...");
+                    loading_label:SetTextColor(THEME.text_dim);
+                    loading_label:Dock(TOP);
+                    loading_label:DockMargin(10, 5, 10, 10);
+            
+                    net.Start("projectiles_query_configs");
+                    net.SendToServer();
+                end
+            
+                net.Receive("projectiles_query_configs", function()
+                    local count = net.ReadUInt(16);
+                    if not IsValid(scroll) then return; end
+                        
+                    local children = scroll:GetCanvas():GetChildren();
+                    for i = 1, #children do
+                        if children[i]:GetText() == "Loading server backups..." then
+                            children[i]:Remove();
+                            break;
+                        end
+                    end
+                        
+                    if count == 0 then
+                        local no_backups = vgui.Create("DLabel", scroll);
+                        no_backups:SetText("No server backups found.");
+                        no_backups:SetTextColor(THEME.text_dim);
+                        no_backups:Dock(TOP);
+                        no_backups:DockMargin(10, 5, 10, 10);
+                        return;
+                    end
+                        
+                    for i = 1, count do
+                        local filename = net.ReadString();
+                        local file_time = tonumber(net.ReadString());
+                        local includes_count = net.ReadUInt(8);
+                        local includes = {};
+                        for j = 1, includes_count do
+                            table.insert(includes, net.ReadString());
+                        end
+                        local includes_str = #includes > 0 and table.concat(includes, ", ") or "Unknown";
+                        CreateBackupCard(scroll, filename, nil, file_time, includes_str, nil, true, RefreshBackupList);
+                    end
+                end);
+            
+                btn_create.DoClick = function()
+                    local name = string.Trim(entry_name:GetValue());
+                    
+                    if name == "" then
+                        Derma_Message("Please enter a backup name.", "Missing Name", "OK");
+                        return;
+                    end
+            
+                    name = string.gsub(name, "[^%w%s%-_]", "");
+                    
+                    if name == "" then
+                        Derma_Message("Please enter a valid backup name (alphanumeric characters only).", "Invalid Name", "OK");
+                        return;
+                    end
+            
+                    local flags = 0;
+                    if check_surfaceprops:GetChecked() then flags = bit.bor(flags, 0x1); end
+                    if check_weapons:GetChecked() then flags = bit.bor(flags, 0x2); end
+                    if check_cvars:GetChecked() then flags = bit.bor(flags, 0x4); end
+                    if check_ricochet:GetChecked() then flags = bit.bor(flags, 0x8); end
+            
+                    if flags == 0 then
+                        Derma_Message("Please select at least one component to backup.", "Nothing Selected", "OK");
+                        return;
+                    end
+            
+                    RunConsoleCommand("pro_config_backup_json_flags", name, tostring(flags));
+                    
+                    timer.Simple(0.1, function()
+                        RefreshBackupList();
+                        entry_name:SetValue("");
+                        chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 255, 255), "Backup '" .. name .. "' created!");
+                    end);
+                end
+            
+                RefreshBackupList();
+            end
         },
         {
             name = "Marketplace",
