@@ -265,7 +265,7 @@ if CLIENT then
                 { type = "float", cvar = "pro_speed_scale", label = "Speed Scale", min = 0.1, max = 5.0, decimals = 2 },
                 { type = "float", cvar = "pro_weapon_damage_scale", label = "Damage Scale", min = 0.1, max = 5.0, decimals = 2 },
                 { type = "float", cvar = "pro_penetration_power_scale", label = "Power Scale", min = 0.1, max = 5.0, decimals = 2 },
-                { type = "float", cvar = "pro_damage_force_multiplier", label = "Damage Force Multiplier", min = 0.0, max = 10000.0, decimals = 1 },
+                { type = "float", cvar = "pro_damage_force_multiplier", label = "Damage Force Multiplier", min = 0.0, max = 50.0, decimals = 3 },
             }
         },
         {

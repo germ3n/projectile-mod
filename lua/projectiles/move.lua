@@ -292,7 +292,7 @@ local function move_projectile(shooter, projectile_data)
                     projectiles.disable_fire_bullets = true;
                     fire_bullets_config.Attacker = shooter;
                     fire_bullets_config.Damage = final_damage;
-                    fire_bullets_config.Force = final_damage;
+                    fire_bullets_config.Force = final_damage * get_float(cv_damage_force_multiplier);
                     fire_bullets_config.Distance = 1;
                     fire_bullets_config.Dir = projectile_data.dir;
                     fire_bullets_config.Src = enter_trace.HitPos - (projectile_data.dir * 0.5);
