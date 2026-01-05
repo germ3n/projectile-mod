@@ -107,4 +107,3 @@ concommand.Add("pro_config_backup_json", function(ply, cmd, args)
         print("backup complete to garrysmod/data/projectiles/backup/" .. file_name .. ".json");
     end
 end, nil, "Backup projectiles config either to console or a file");
-

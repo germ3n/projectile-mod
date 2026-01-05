@@ -28,8 +28,8 @@ def init_db():
             config_flags INTEGER NOT NULL DEFAULT 0,
             config_data TEXT NOT NULL,
             config_version TEXT NOT NULL DEFAULT '1.0.0',
-            thumbs_up INTEGER DEFAULT 0,
-            thumbs_down INTEGER DEFAULT 0,
+            thumbs_up INTEGER NOT NULL DEFAULT 0,
+            thumbs_down INTEGER NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -308,6 +308,17 @@ def update_config():
         "old_version": old_version, 
         "new_version": new_version
     })
+
+@app.route('/users/me', methods=['GET'])
+def get_me():
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header.replace('Bearer ', '') if 'Bearer ' in auth_header else None
+    
+    steamid = get_steamid_from_token(token)
+    if not steamid:
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    return jsonify({"steamid": steamid}), 200
 
 if __name__ == '__main__':
     app.run(debug=True, port=8000)

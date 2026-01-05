@@ -1,13 +1,11 @@
 AddCSLuaFile();
 
-local URL_MARKETPLACE_API = "https://projectilemod.directory/api/v1/";
-
 if SERVER then
     util.AddNetworkString("projectile_update_cvar");
 
     local IsValid = IsValid;
     local RunConsoleCommand = RunConsoleCommand;
-    local PROJECTILE_CVARS = PROJECTILE_CVARS;
+    local PROJECTILES_CVARS = PROJECTILES_CVARS;
     local NULL = NULL;
     local get_convar = GetConVar;
     local next = next;
@@ -34,7 +32,7 @@ if SERVER then
 
     concommand.Add("pro_config_reset_cvars", function(ply, cmd, args)
         if ply ~= NULL and (not is_superadmin(ply)) then return; end
-        for cvar_name, cvar in next, PROJECTILE_CVARS do
+        for cvar_name, cvar in next, PROJECTILES_CVARS do
             RunConsoleCommand(cvar_name, get_default(cvar));
         end
 
@@ -861,14 +859,302 @@ if CLIENT then
                 { type = "dropdown", cvar = "pro_net_send_method", label = "Projectiles send method", options = { "PVS", "PAS", "Broadcast" } },
             }
         },
-        [
+        {
             name = "Marketplace",
             icon = "icon16/server_compressed.png",
             lazy_load = true,
-            custom_draw = function(pnl)
+            custom_draw = function(parent)
+                local marketplace_search_url = "https://projectilemod.directory/configs/search";
+                local api_base = "https://projectilemod.directory/";
+                local current_sort = "date";
+                local current_auth_user = nil;
                 
-            end,
-        ]
+                local top_bar = vgui.Create("DPanel", parent);
+                top_bar:Dock(TOP);
+                top_bar:SetTall(45);
+                top_bar:DockMargin(0, 0, 0, 5);
+                top_bar.Paint = function(s, w, h)
+                    draw.RoundedBox(0, 0, 0, w, h, THEME.bg_lighter);
+                    draw.RoundedBox(0, 0, h - 1, w, 1, THEME.divider);
+                end
+            
+                local scroll = vgui.Create("DScrollPanel", parent);
+                scroll:Dock(FILL);
+                scroll:GetCanvas():DockPadding(10, 10, 10, 10);
+
+                local btn_login = nil;
+
+                local function UpdateLoginButton(status, user_data)
+                    if not IsValid(btn_login) then return; end
+
+                    if status == "loading" then
+                        btn_login:SetText("...");
+                        btn_login:SetEnabled(false);
+                        btn_login.user_data = nil;
+                    elseif status == "logged_in" and user_data then
+                        btn_login:SetText(user_data.username or "Unknown");
+                        btn_login:SetEnabled(true);
+                        btn_login.user_data = user_data;
+                        btn_login.is_logged_in = true;
+                        btn_login:SetTooltip("Logged in as " .. (user_data.steamid or "User") .. ". Click to logout.");
+                    else
+                        btn_login:SetText("Login");
+                        btn_login:SetEnabled(true);
+                        btn_login.user_data = nil;
+                        btn_login.is_logged_in = false;
+                        btn_login:SetTooltip("Click to enter API Key");
+                    end
+                end
+
+                local function VerifyAuthKey(key)
+                    if not key or key == "" then 
+                        print("[ProjectileMod] No API Key provided");
+                        UpdateLoginButton("logged_out");
+                        return;
+                    end
+
+                    UpdateLoginButton("loading");
+
+                    http.Fetch(api_base .. "users/me",
+                        function(body, len, headers, code)
+                            if code == 200 then
+                                local data = util.JSONToTable(body);
+                                current_auth_user = data;
+                                UpdateLoginButton("logged_in", data);
+                            else
+                                cookie.Delete("projectile_api_key");
+                                current_auth_user = nil;
+                                UpdateLoginButton("logged_out");
+                                print("[ProjectileMod] Auth Check Failed: " .. body);
+                                print("[ProjectileMod] Code: " .. code);
+                                print("[ProjectileMod] Headers: " .. util.TableToJSON(headers));
+                                print("[ProjectileMod] Body: " .. body);
+                            end
+                        end,
+                        function(err)
+                            print("[ProjectileMod] Auth Check Failed: " .. err);
+                            UpdateLoginButton("logged_out");
+                        end,
+                        { ["Authorization"] = "Bearer " .. key }
+                    );
+                end
+            
+                local function LoadMarketplace(query)
+                    scroll:Clear();
+                    
+                    local fetch_url = string.format("%s?limit=100&sort_by=%s&order=desc", marketplace_search_url, current_sort);
+                    if query and query ~= "" then
+                        fetch_url = fetch_url .. "&name=" .. string.Replace(query, " ", "%20");
+                    end
+                    
+                    local headers = {};
+                    local key = cookie.GetString("projectile_api_key");
+                    if key and key ~= "" then
+                        headers["Authorization"] = "Bearer " .. key;
+                    end
+            
+                    http.Fetch(fetch_url, function(body, len, headers, code)
+                        if not IsValid(scroll) then return end
+                        local data = util.JSONToTable(body);
+                        if not data then return; end
+            
+                        for idx = 1, #data do
+                            local cfg = data[idx];
+                            
+                            local card = scroll:Add("DPanel");
+                            card:Dock(TOP);
+                            card:SetTall(60);
+                            card:DockMargin(0, 0, 0, 5);
+                            card.Paint = function(s, w, h)
+                                draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
+                                if s:IsHovered() then
+                                    draw.RoundedBox(4, 0, 0, w, h, Color(255, 255, 255, 5));
+                                end
+                            end
+            
+                            local title = vgui.Create("DLabel", card);
+                            title:SetText(cfg.name or "Unnamed Config");
+                            title:SetFont("DermaDefaultBold");
+                            title:SetPos(10, 10);
+                            title:SetSize(300, 20);
+                            title:SetTextColor(THEME.text);
+            
+                            local info = vgui.Create("DLabel", card);
+                            local date_str = string.sub(cfg.created_at or "", 1, 10);
+                            info:SetText(string.format("By: %s  |  Rating: %s  |  Date: %s", cfg.steamid, cfg.rating or "0.0", date_str));
+                            info:SetPos(10, 32);
+                            info:SetSize(400, 15);
+                            info:SetTextColor(THEME.text_dim);
+            
+                            local btn_install = vgui.Create("DButton", card);
+                            btn_install:SetText("INSTALL");
+                            btn_install:SetSize(80, 30);
+                            btn_install:SetPos(card:GetWide() - 90, 15);
+                            btn_install:SetTextColor(THEME.text);
+                            btn_install.Paint = function(s, w, h)
+                                local col = s:IsHovered() and THEME.accent_hover or THEME.accent;
+                                draw.RoundedBox(4, 0, 0, w, h, col);
+                            end
+                            
+                            card.PerformLayout = function(s, w, h)
+                                btn_install:SetPos(w - 90, h / 2 - 15);
+                            end
+            
+                            btn_install.DoClick = function()
+                                Derma_Query("Are you sure you want to apply this configuration?", "Confirm Installation", "Yes", function()
+                                    local config = cfg.config and util.JSONToTable(cfg.config) or nil;
+                                    if config then
+                                        projectiles_restore_config(config);
+                                        chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 255, 255), "Config '" .. cfg.name .. "' applied!")
+                                    else
+                                        chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 255, 255), "Config '" .. cfg.name .. "' is invalid! Please contact the developer.")
+                                    end
+                                end, "No")
+                            end
+                        end
+                    end, function(err)
+                        print("[Marketplace] Error: ", err);
+                    end, headers);
+                end
+            
+                local search = vgui.Create("DTextEntry", top_bar);
+                search:SetSize(250, 25);
+                search:SetPos(10, 10);
+                search:SetPlaceholderText("Search marketplace...");
+                search.OnEnter = function(s) LoadMarketplace(s:GetValue()); end
+                search.Paint = function(s, w, h)
+                    draw.RoundedBox(4, 0, 0, w, h, THEME.bg_dark);
+                    s:DrawTextEntryText(THEME.text, THEME.accent, THEME.text);
+                    if s:GetValue() == "" then
+                        draw.SimpleText(s:GetPlaceholderText(), "DermaDefault", 5, h / 2, THEME.text_dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER);
+                    end
+                end
+            
+                local sort_label = vgui.Create("DLabel", top_bar);
+                sort_label:SetText("Sort By:")
+                sort_label:SetPos(280, 10);
+                sort_label:SetSize(50, 25);
+                sort_label:SetTextColor(THEME.text_dim);
+            
+                local sort_combo = vgui.Create("DComboBox", top_bar);
+                sort_combo:SetSize(100, 25);
+                sort_combo:SetPos(335, 10);
+                sort_combo:AddChoice("Newest", "date");
+                sort_combo:AddChoice("Rating", "rating");
+                sort_combo:AddChoice("Name", "name");
+                sort_combo:ChooseOptionID(1);
+                sort_combo:SetTextColor(THEME.text);
+                sort_combo.OnSelect = function(s, idx, val, data)
+                    current_sort = data;
+                    LoadMarketplace(search:GetValue());
+                end
+                sort_combo.Paint = function(s, w, h)
+                    draw.RoundedBox(4, 0, 0, w, h, THEME.bg_dark);
+                end
+            
+                local btn_refresh = vgui.Create("DButton", top_bar);
+                btn_refresh:SetText("Refresh");
+                btn_refresh:SetSize(80, 25);
+                btn_refresh:SetPos(445, 10);
+                btn_refresh:SetTextColor(THEME.text);
+                btn_refresh.DoClick = function() LoadMarketplace(search:GetValue()); end
+                btn_refresh.Paint = function(s, w, h)
+                    draw.RoundedBox(4, 0, 0, w, h, s:IsHovered() and THEME.divider or THEME.bg_dark);
+                end
+
+                btn_login = vgui.Create("DButton", top_bar);
+                btn_login:SetText("Login");
+                btn_login:SetSize(100, 25);
+                btn_login:SetPos(535, 10);
+                btn_login:SetTextColor(THEME.text);
+                btn_login.Paint = function(s, w, h)
+                    local col = THEME.bg_dark;
+                    if s.is_logged_in then
+                        col = s:IsHovered() and Color(46, 139, 87) or Color(60, 179, 113);
+                    else
+                        col = s:IsHovered() and THEME.accent_hover or THEME.accent;
+                    end
+                    draw.RoundedBox(4, 0, 0, w, h, col)
+                end
+                btn_login.DoClick = function(s)
+                    if s.is_logged_in then
+                        Derma_Query("Do you want to logout?", "Logout", "Yes", function()
+                            cookie.Delete("projectile_api_key");
+                            current_auth_user = nil;
+                            UpdateLoginButton("logged_out");
+                        end, "Cancel")
+                    else
+                        local frame = vgui.Create("DFrame");
+                        frame:SetSize(300, 185);
+                        frame:Center();
+                        frame:SetTitle("ProjectileMod Login");
+                        frame:MakePopup();
+                        frame.Paint = function(self, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
+                            draw.RoundedBox(4, 0, 0, w, 24, THEME.bg_dark);
+                        end
+
+                        local lbl_step1 = vgui.Create("DLabel", frame);
+                        lbl_step1:SetText("1. Open browser to get API Key:");
+                        lbl_step1:SetPos(10, 35);
+                        lbl_step1:SetSize(280, 15);
+                        lbl_step1:SetTextColor(THEME.text);
+
+                        local btn_browser = vgui.Create("DButton", frame);
+                        btn_browser:SetText("Open Login Page");
+                        btn_browser:SetPos(10, 55);
+                        btn_browser:SetSize(280, 25);
+                        btn_browser:SetTextColor(THEME.text);
+                        btn_browser.Paint = function(me, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, me:IsHovered() and THEME.accent_hover or THEME.accent);
+                        end
+                        btn_browser.DoClick = function()
+                            gui.OpenURL("https://projectilemod.directory/auth/landing");
+                        end
+
+                        local lbl_step2 = vgui.Create("DLabel", frame);
+                        lbl_step2:SetText("2. Paste your API Key below:");
+                        lbl_step2:SetPos(10, 90);
+                        lbl_step2:SetSize(280, 15);
+                        lbl_step2:SetTextColor(THEME.text);
+
+                        local entry_key = vgui.Create("DTextEntry", frame);
+                        entry_key:SetPos(10, 110);
+                        entry_key:SetSize(280, 25);
+                        entry_key:SetPlaceholderText("Paste key here...");
+
+                        local btn_confirm = vgui.Create("DButton", frame);
+                        btn_confirm:SetText("Confirm & Login");
+                        btn_confirm:SetPos(10, 145);
+                        btn_confirm:SetSize(280, 30);
+                        btn_confirm:SetTextColor(THEME.text);
+                        btn_confirm.Paint = function(me, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, me:IsHovered() and Color(46, 139, 87) or Color(60, 179, 113));
+                        end
+                        btn_confirm.DoClick = function()
+                            local key = string.Trim(entry_key:GetValue());
+                            print("[ProjectileMod] API Key: ", key);
+                            if key ~= "" then
+                                cookie.Set("projectile_api_key", key);
+                                VerifyAuthKey(key);
+                                frame:Close();
+                            else
+                                Derma_Message("Please paste the API Key first.", "Missing Key", "OK");
+                            end
+                        end
+                    end
+                end
+
+                local saved_key = cookie.GetString("projectile_api_key");
+                if saved_key and saved_key ~= "" then
+                    VerifyAuthKey(saved_key);
+                else
+                    UpdateLoginButton("logged_out");
+                end
+            
+                LoadMarketplace();
+            end
+        },
         {
             name = "Debug",
             icon = "icon16/bug.png",
