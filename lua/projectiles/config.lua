@@ -301,7 +301,6 @@ if CLIENT then
                 local scroll = vgui.Create("DScrollPanel", parent);
                 scroll:Dock(FILL);
                 scroll:DockPadding(10, 10, 10, 10);
-
                 local standard_vars = {
                     { type = "header", label = "Logic" },
                     { type = "bool", cvar = "pro_ricochet_enabled", label = "Enable Ricochet" },
@@ -526,44 +525,6 @@ if CLIENT then
                     return;
                 end
 
-                local search_panel = vgui.Create("DPanel", parent)
-                search_panel:Dock(TOP)
-                search_panel:SetTall(40)
-                search_panel:DockMargin(0,0,0,5)
-                search_panel.Paint = function(s, w, h)
-                    draw.RoundedBox(0, 0, 0, w, h, THEME.bg_lighter);
-                    draw.RoundedBox(0, 0, h-1, w, 1, THEME.divider);
-                end
-
-                local search = vgui.Create("DTextEntry", search_panel);
-                search:Dock(FILL);
-                search:DockMargin(10, 8, 10, 8);
-                search:SetPlaceholderText("Search Weapon Class...");
-                search:SetFont("DermaDefault")
-                search.Paint = function(s, w, h)
-                    draw.RoundedBox(4, 0, 0, w, h, Color(20, 20, 20, 200));
-                    s:DrawTextEntryText(THEME.text, THEME.accent, THEME.text);
-
-                    if (s:GetValue() == "" and s:GetPlaceholderText()) then
-                        draw.SimpleText(
-                            s:GetPlaceholderText(), 
-                            s:GetFont(), 
-                            5,
-                            h / 2,
-                            THEME.text_dim,
-                            TEXT_ALIGN_LEFT, 
-                            TEXT_ALIGN_CENTER
-                        );
-                    end
-                end
-                
-                local scroll = vgui.Create("DScrollPanel", parent);
-                scroll:Dock(FILL);
-                
-                local list_layout = vgui.Create("DListLayout", scroll);
-                list_layout:Dock(TOP);
-                list_layout:DockPadding(5, 5, 5, 5);
-
                 local weapon_list = weapons.GetList();
                 local sorted_weapons = {};
                 local seen = {};
@@ -584,70 +545,152 @@ if CLIENT then
                 end
                 table.sort(sorted_weapons);
 
-                local function create_slider(parent_panel, label_text, cfg_type, class_name, default_val, min_val, max_val, decimals)
-                    local panel = vgui.Create("DPanel", parent_panel);
-                    panel:Dock(TOP);
-                    panel:SetTall(30);
-                    panel:DockMargin(0, 0, 0, 2);
-                    panel.Paint = function(s, w, h) end
-                    
-                    local label = vgui.Create("DLabel", panel);
-                    label:SetText(label_text);
-                    label:Dock(LEFT);
-                    label:SetWide(120);
-                    label:SetTextColor(THEME.text_dim);
+                local selected_source = nil;
+                local selected_dest = nil;
 
-                    local slider = vgui.Create("DNumSlider", panel);
-                    slider:Dock(FILL);
-                    slider:SetMin(min_val);
-                    slider:SetMax(max_val);
-                    slider:SetDecimals(decimals);
-                    slider.Label:SetVisible(false);
-                    slider.TextArea:SetTextColor(THEME.text);
-                    
-                    local current_table = CONFIG_TYPES[cfg_type];
-                    local current_val = current_table and current_table[class_name];
+                local search_bar = vgui.Create("DPanel", parent);
+                search_bar:Dock(TOP);
+                search_bar:SetTall(40);
+                search_bar:DockMargin(0, 0, 0, 5);
+                search_bar.Paint = function(s, w, h)
+                    draw.RoundedBox(0, 0, 0, w, h, THEME.bg_lighter);
+                    draw.RoundedBox(0, 0, h-1, w, 1, THEME.divider);
+                end
 
-                    if current_val and type(current_val) == "number" then
-                        slider:SetValue(current_val);
-                    else
-                        local def = current_table and current_table["default"];
-                        if def and type(def) == "number" then
-                            slider:SetValue(def);
-                        else
-                            slider:SetValue(default_val);
-                        end
-                    end
+                local search_left_container = vgui.Create("DPanel", search_bar);
+                search_left_container:Dock(LEFT);
+                search_left_container.Paint = function() end
+                search_left_container.PerformLayout = function(s, w, h)
+                    s:SetWide(search_bar:GetWide() / 2 - 6);
+                end
 
-                    local function send_update()
-                        net.Start("projectile_weapon_config_update");
-                        net.WriteString(cfg_type);
-                        net.WriteString(class_name);
-                        net.WriteFloat(math.Round(slider:GetValue(), decimals));
-                        net.SendToServer();
-                    end
-
-                    slider.Think = function(s)
-                        local isInteracting = s.Slider:GetDragging() or s.TextArea:IsEditing();
-                        if isInteracting then
-                            s.HasChanged = true;
-                        elseif s.HasChanged then
-                            s.HasChanged = false;
-                            send_update();
-                        end
-                    end
-
-                    slider.TextArea.OnEnter = function()
-                        send_update();
-                        slider.HasChanged = false;
+                local search_left = vgui.Create("DTextEntry", search_left_container);
+                search_left:Dock(FILL);
+                search_left:DockMargin(8, 8, 4, 8);
+                search_left:SetPlaceholderText("Search Source Weapon...");
+                search_left.Paint = function(s, w, h)
+                    draw.RoundedBox(4, 0, 0, w, h, Color(20, 20, 20, 200));
+                    s:DrawTextEntryText(THEME.text, THEME.accent, THEME.text);
+                    if s:GetValue() == "" and s:GetPlaceholderText() then
+                        draw.SimpleText(s:GetPlaceholderText(), s:GetFont(), 5, h / 2, THEME.text_dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER);
                     end
                 end
 
-                local function populate_list(filter)
-                    list_layout:Clear();
+                local search_right = vgui.Create("DTextEntry", search_bar);
+                search_right:Dock(FILL);
+                search_right:DockMargin(4, 8, 8, 8);
+                search_right:SetPlaceholderText("Search Destination Weapon...");
+                search_right.Paint = function(s, w, h)
+                    draw.RoundedBox(4, 0, 0, w, h, Color(20, 20, 20, 200));
+                    s:DrawTextEntryText(THEME.text, THEME.accent, THEME.text);
+                    if s:GetValue() == "" and s:GetPlaceholderText() then
+                        draw.SimpleText(s:GetPlaceholderText(), s:GetFont(), 5, h / 2, THEME.text_dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER);
+                    end
+                end
 
-                    local function create_slider_with_copy(parent_panel, label_text, cfg_type, class_name, default_val, min_val, max_val, decimals, source_dropdown)
-                        local panel = vgui.Create("DPanel", parent_panel);
+                local lists_container = vgui.Create("DPanel", parent);
+                lists_container:Dock(TOP);
+                lists_container:SetTall(210);
+                lists_container:DockMargin(0, 0, 0, 5);
+                lists_container.Paint = function(s, w, h) end
+
+                local left_panel = vgui.Create("DPanel", lists_container);
+                left_panel:Dock(LEFT);
+                left_panel:DockMargin(0, 0, 2, 0);
+                left_panel.Paint = function(s, w, h)
+                    draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
+                end
+                left_panel.PerformLayout = function(s, w, h)
+                    s:SetWide(lists_container:GetWide() / 2 - 3);
+                end
+
+                local left_header = vgui.Create("DPanel", left_panel);
+                left_header:Dock(TOP);
+                left_header:SetTall(30);
+                left_header.Paint = function(s, w, h)
+                    draw.RoundedBoxEx(4, 0, 0, w, h, THEME.bg_dark, true, true, false, false);
+                    draw.SimpleText("SOURCE (Copy From)", "DermaDefaultBold", w/2, h/2, THEME.accent, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER);
+                end
+
+                local left_scroll = vgui.Create("DScrollPanel", left_panel);
+                left_scroll:Dock(FILL);
+                left_scroll:DockMargin(5, 5, 5, 5);
+
+                local right_panel = vgui.Create("DPanel", lists_container);
+                right_panel:Dock(FILL);
+                right_panel:DockMargin(2, 0, 0, 0);
+                right_panel.Paint = function(s, w, h)
+                    draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
+                end
+
+                local right_header = vgui.Create("DPanel", right_panel);
+                right_header:Dock(TOP);
+                right_header:SetTall(30);
+                right_header.Paint = function(s, w, h)
+                    draw.RoundedBoxEx(4, 0, 0, w, h, THEME.bg_dark, true, true, false, false);
+                    draw.SimpleText("DESTINATION (Configure)", "DermaDefaultBold", w/2, h/2, THEME.accent, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER);
+                end
+
+                local right_scroll = vgui.Create("DScrollPanel", right_panel);
+                right_scroll:Dock(FILL);
+                right_scroll:DockMargin(5, 5, 5, 5);
+
+                local config_panel = vgui.Create("DPanel", parent);
+                config_panel:Dock(FILL);
+                config_panel:DockMargin(0, 0, 0, 0);
+                config_panel.Paint = function(s, w, h)
+                    draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
+                end
+
+                local config_scroll = vgui.Create("DScrollPanel", config_panel);
+                config_scroll:Dock(FILL);
+                config_scroll:DockMargin(10, 10, 10, 10);
+
+                local function create_weapon_button(parent_scroll, class_name, is_source)
+                    local btn = vgui.Create("DButton", parent_scroll);
+                    btn:Dock(TOP);
+                    btn:SetTall(25);
+                    btn:SetText("");
+                    btn:DockMargin(0, 0, 0, 2);
+                    
+                    btn.Paint = function(s, w, h)
+                        local is_selected = is_source and (selected_source == class_name) or (not is_source and selected_dest == class_name);
+                        local bg_col = Color(35, 35, 35);
+                        
+                        if is_selected then
+                            bg_col = THEME.accent;
+                        elseif s:IsHovered() then
+                            bg_col = Color(50, 50, 50);
+                        end
+                        
+                        draw.RoundedBox(4, 0, 0, w, h, bg_col);
+                        
+                        local text_col = is_selected and Color(255, 255, 255) or THEME.text;
+                        draw.SimpleText(class_name, "DermaDefault", 10, h/2, text_col, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER);
+                        
+                        if is_selected then
+                            draw.SimpleText(is_source and "◀" or "●", "DermaDefaultBold", w - 10, h/2, Color(255,255,255), TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER);
+                        end
+                    end
+                    
+                    return btn;
+                end
+
+                local function rebuild_config_panel(class_name)
+                    config_scroll:Clear();
+                    
+                    if not class_name then
+                        local no_sel = vgui.Create("DLabel", config_scroll);
+                        no_sel:SetText("Select a destination weapon to configure");
+                        no_sel:SetTextColor(THEME.text_dim);
+                        no_sel:Dock(TOP);
+                        no_sel:DockMargin(10, 10, 10, 10);
+                        no_sel:SetFont("DermaDefaultBold");
+                        return;
+                    end
+
+                    local function create_slider_row(label_text, cfg_type, default_val, min_val, max_val, decimals)
+                        local panel = vgui.Create("DPanel", config_scroll);
                         panel:Dock(TOP);
                         panel:SetTall(30);
                         panel:DockMargin(0, 0, 0, 2);
@@ -661,7 +704,6 @@ if CLIENT then
                         local actual_value;
                         if current_val and type(current_val) == "number" then
                             actual_value = current_val;
-                            is_using_default = false;
                         else
                             local def = current_table and current_table["default"];
                             if def and type(def) == "number" then
@@ -678,7 +720,7 @@ if CLIENT then
                         local label = vgui.Create("DLabel", panel);
                         label:SetText(label_text);
                         label:Dock(LEFT);
-                        label:SetWide(120);
+                        label:SetWide(140);
                         label:SetTextColor(THEME.text_dim);
                         if is_using_default then
                             label:SetTooltip(label_text .. " (using " .. default_source .. ": " .. actual_value .. ")");
@@ -698,42 +740,55 @@ if CLIENT then
                         local btn_copy = vgui.Create("DButton", panel);
                         btn_copy:SetText("Copy");
                         btn_copy:Dock(RIGHT);
-                        btn_copy:SetWide(40);
+                        btn_copy:SetWide(45);
                         btn_copy:DockMargin(5, 2, 0, 2);
                         btn_copy:SetTextColor(THEME.text);
                         btn_copy.Paint = function(s, w, h)
-                            draw.RoundedBox(4, 0, 0, w, h, s:IsHovered() and THEME.accent_hover or THEME.bg_lighter)
+                            local enabled = selected_source and selected_source ~= class_name;
+                            local col = Color(60, 60, 60);
+                            if not enabled then
+                                col = Color(40, 40, 40);
+                            elseif s:IsHovered() then
+                                col = Color(80, 80, 80);
+                            end
+                            draw.RoundedBox(4, 0, 0, w, h, col);
                         end
                         btn_copy.DoClick = function()
-                            local src_wep = source_dropdown:GetValue();
-                            
-                            if not src_wep or src_wep == "" or src_wep == "Select weapon to copy from..." then
-                                LocalPlayer():ChatPrint("Please select a Source Weapon at the top of this card first.");
+                            if not selected_source then
+                                LocalPlayer():ChatPrint("Select a source weapon on the left first.");
                                 return;
                             end
-                    
-                            if src_wep == class_name then
+                            if selected_source == class_name then
                                 LocalPlayer():ChatPrint("Cannot copy from itself.");
                                 return;
                             end
-                    
-                            RunConsoleCommand("pro_weapon_config_copy_single", cfg_type, src_wep, class_name);
-                            LocalPlayer():ChatPrint("Copied " .. label_text .. " from " .. src_wep);
+                            RunConsoleCommand("pro_weapon_config_copy_single", cfg_type, selected_source, class_name);
+                            LocalPlayer():ChatPrint("Copied " .. label_text .. " from " .. selected_source);
+                            timer.Simple(0.1, function()
+                                if IsValid(config_scroll) then
+                                    rebuild_config_panel(class_name);
+                                end
+                            end);
                         end
-                        btn_copy:SetTooltip("Copy " .. label_text .. " from selected source weapon");
+                        btn_copy:SetTooltip("Copy " .. label_text .. " from source weapon");
                     
                         local btn_reset = vgui.Create("DButton", panel);
                         btn_reset:SetText("Reset");
                         btn_reset:Dock(RIGHT);
-                        btn_reset:SetWide(40);
+                        btn_reset:SetWide(45);
                         btn_reset:DockMargin(5, 2, 0, 2);
                         btn_reset:SetTextColor(THEME.text);
                         btn_reset.Paint = function(s, w, h)
-                            draw.RoundedBox(4, 0, 0, w, h, s:IsHovered() and THEME.accent_hover or THEME.bg_lighter)
+                            draw.RoundedBox(4, 0, 0, w, h, s:IsHovered() and Color(80, 80, 80) or Color(60, 60, 60))
                         end
                         btn_reset.DoClick = function()
                             RunConsoleCommand("pro_weapon_config_reset_single", cfg_type, class_name);
                             LocalPlayer():ChatPrint("Reset " .. label_text .. " to default");
+                            timer.Simple(0.1, function()
+                                if IsValid(config_scroll) then
+                                    rebuild_config_panel(class_name);
+                                end
+                            end);
                         end
                         btn_reset:SetTooltip("Reset " .. label_text .. " to default");
                     
@@ -756,6 +811,11 @@ if CLIENT then
                             net.WriteString(class_name);
                             net.WriteFloat(math.Round(slider:GetValue(), decimals));
                             net.SendToServer();
+                            timer.Simple(0.1, function()
+                                if IsValid(config_scroll) then
+                                    rebuild_config_panel(class_name);
+                                end
+                            end);
                         end
                     
                         slider.Think = function(s)
@@ -768,143 +828,131 @@ if CLIENT then
                             end
                         end
                     
-                    slider.TextArea.OnEnter = function()
-                        send_update();
-                        slider.HasChanged = false;
+                        slider.TextArea.OnEnter = function()
+                            send_update();
+                            slider.HasChanged = false;
+                        end
                     end
 
-                    panel.UpdateValue = function(s)
-                        local isInteracting = slider.Slider:GetDragging() or slider.TextArea:IsEditing();
-                        if isInteracting then return; end
+                    create_slider_row("Speed", "speed", CONFIG_TYPES["speed"]["default"], 0, 10000, 0);
+                    create_slider_row("Damage", "damage", CONFIG_TYPES["damage"]["default"], 0, 500, 0);
+                    create_slider_row("Penetration Power", "penetration_power", CONFIG_TYPES["penetration_power"]["default"], 0, 50, 2);
+                    create_slider_row("Max Penetration Count", "penetration_count", CONFIG_TYPES["penetration_count"]["default"], 0, 50, 0);
+                    create_slider_row("Drag", "drag", CONFIG_TYPES["drag"]["default"], 0, 10, 3);
+                    create_slider_row("Drop", "drop", CONFIG_TYPES["drop"]["default"], 0, 10, 3);
+                    create_slider_row("Min Speed (Units/s)", "min_speed", CONFIG_TYPES["min_speed"]["default"], 0, 1000, 0);
+                    create_slider_row("Max Dist (Units)", "max_distance", CONFIG_TYPES["max_distance"]["default"], 0, 50000, 0);
+                    create_slider_row("Spread Bias", "spread_bias", CONFIG_TYPES["spread_bias"]["default"], -1.0, 1.0, 2);
+                    create_slider_row("Dropoff Start (Units)", "dropoff_start", CONFIG_TYPES["dropoff_start"]["default"], 0, 50000, 0);
+                    create_slider_row("Dropoff End (Units)", "dropoff_end", CONFIG_TYPES["dropoff_end"]["default"], 0, 50000, 0);
+                    create_slider_row("Dropoff Min Multiplier", "dropoff_min_multiplier", CONFIG_TYPES["dropoff_min_multiplier"]["default"], 0.0, 1.0, 2);
 
-                        local current_table = CONFIG_TYPES[cfg_type];
-                        local current_val = current_table and current_table[class_name];
-                        
-                        local new_value;
-                        if current_val and type(current_val) == "number" then
-                            new_value = current_val;
-                        else
-                            local def = current_table and current_table["default"];
-                            if def and type(def) == "number" then
-                                new_value = def;
-                            else
-                                new_value = default_val;
-                            end
+                    local div = vgui.Create("DPanel", config_scroll);
+                    div:SetTall(2);
+                    div:Dock(TOP);
+                    div:DockMargin(0, 10, 0, 10);
+                    div.Paint = function(s, w, h) draw.RoundedBox(0, 0, 0, w, h, THEME.divider) end
+
+                    local buttons_panel = vgui.Create("DPanel", config_scroll);
+                    buttons_panel:Dock(TOP);
+                    buttons_panel:SetTall(30);
+                    buttons_panel:DockMargin(0, 0, 0, 0);
+                    buttons_panel.Paint = function() end
+
+                    local btn_copy_all = vgui.Create("DButton", buttons_panel);
+                    btn_copy_all:Dock(LEFT);
+                    btn_copy_all.PerformLayout = function(s, w, h)
+                        s:SetWide(buttons_panel:GetWide() / 2 - 3);
+                    end
+                    btn_copy_all:SetText("Copy All From Source Weapon");
+                    btn_copy_all:SetTextColor(THEME.text);
+                    btn_copy_all:DockMargin(0, 0, 2, 0);
+                    btn_copy_all.Paint = function(s, w, h)
+                        local enabled = selected_source and selected_source ~= class_name;
+                        local col = Color(180, 120, 40);
+                        if not enabled then
+                            col = Color(60, 50, 30);
+                        elseif s:IsHovered() then
+                            col = Color(200, 140, 60);
                         end
-                        
-                        slider:SetValue(new_value);
+                        draw.RoundedBox(4, 0, 0, w, h, col);
+                    end
+                    btn_copy_all.DoClick = function()
+                        if not selected_source then
+                            LocalPlayer():ChatPrint("Select a source weapon on the left first.");
+                            return;
+                        end
+                        if selected_source == class_name then
+                            LocalPlayer():ChatPrint("Cannot copy from itself.");
+                            return;
+                        end
+                        RunConsoleCommand("pro_weapon_config_copy_all", selected_source, class_name);
+                        LocalPlayer():ChatPrint("Copied all values from " .. selected_source);
+                        timer.Simple(0.1, function()
+                            if IsValid(config_scroll) then
+                                rebuild_config_panel(class_name);
+                            end
+                        end);
+                    end
+
+                    local btn_reset_all = vgui.Create("DButton", buttons_panel);
+                    btn_reset_all:Dock(FILL);
+                    btn_reset_all:SetText("Reset All To Default");
+                    btn_reset_all:SetTextColor(THEME.text);
+                    btn_reset_all:DockMargin(2, 0, 0, 0);
+                    btn_reset_all.Paint = function(s, w, h)
+                        draw.RoundedBox(4, 0, 0, w, h, s:IsHovered() and Color(180, 60, 60) or Color(150, 40, 40))
+                    end
+                    btn_reset_all.DoClick = function()
+                        RunConsoleCommand("pro_weapon_config_reset_single_all", class_name);
+                        LocalPlayer():ChatPrint("Reset all values to default");
+                        timer.Simple(0.1, function()
+                            if IsValid(config_scroll) then
+                                rebuild_config_panel(class_name);
+                            end
+                        end);
                     end
                 end
 
-                for _, class_name in ipairs(sorted_weapons) do
+                local function populate_left(filter)
+                    left_scroll:Clear();
+                    for _, class_name in ipairs(sorted_weapons) do
                         if WEAPON_BLACKLIST and WEAPON_BLACKLIST[class_name] then continue; end
+                        if filter and filter ~= "" and not string.find(string.lower(class_name), string.lower(filter), 1, true) then continue; end
                         
-                        if filter and filter ~= "" and not string.find(string.lower(class_name), string.lower(filter), 1, true) then
-                            continue;
+                        local btn = create_weapon_button(left_scroll, class_name, true);
+                        btn.DoClick = function()
+                            selected_source = class_name;
+                            populate_left(search_left:GetValue());
                         end
-
-                        local category = list_layout:Add("DCollapsibleCategory");
-                        category:SetLabel(class_name);
-                        category:SetExpanded(false);
-                        category:Dock(TOP);
-                        category:DockMargin(0, 0, 0, 5);
-                        
-                        category.Paint = function(s, w, h)
-                            draw.RoundedBox(4, 0, 0, w, 20, THEME.bg_lighter);
-                        end
-                        category.Header:SetTextColor(THEME.text);
-                        category.Header:SetFont("DermaDefaultBold");
-
-                        local content = vgui.Create("DPanel");
-                        content:SetBackgroundColor(THEME.bg_dark); 
-                        content.Paint = function(s, w, h)
-                            draw.RoundedBoxEx(4, 0, 0, w, h, Color(0,0,0,100), false, false, true, true);
-                        end
-                        content:DockPadding(10, 10, 10, 10);
-
-                        local top_bar = vgui.Create("DPanel", content);
-                        top_bar:Dock(TOP);
-                        top_bar:SetTall(30);
-                        top_bar:DockMargin(0, 0, 0, 10);
-                        top_bar.Paint = function(s,w,h) end
-
-                        local lbl = vgui.Create("DLabel", top_bar);
-                        lbl:SetText("Copy Source:");
-                        lbl:Dock(LEFT);
-                        lbl:SetWide(80);
-                        lbl:SetTextColor(THEME.accent);
-
-                        local combo_src = vgui.Create("DComboBox", top_bar);
-                        combo_src:Dock(FILL);
-                        combo_src:SetText("Select weapon to copy from...");
-                        combo_src:SetTextColor(THEME.text);
-                        combo_src.Paint = function(s, w, h) draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter); end
-                        
-                        for _, other in ipairs(sorted_weapons) do
-                            if other ~= class_name then combo_src:AddChoice(other) end
-                        end
-                        
-                        create_slider_with_copy(content, "Speed", "speed", class_name, CONFIG_TYPES["speed"]["default"], 0, 10000, 0, combo_src);
-                        create_slider_with_copy(content, "Damage", "damage", class_name, CONFIG_TYPES["damage"]["default"], 0, 500, 0, combo_src);
-                        create_slider_with_copy(content, "Penetration Power", "penetration_power", class_name, CONFIG_TYPES["penetration_power"]["default"], 0, 50, 2, combo_src);
-                        create_slider_with_copy(content, "Max Penetration Count", "penetration_count", class_name, CONFIG_TYPES["penetration_count"]["default"], 0, 50, 0, combo_src);
-                        create_slider_with_copy(content, "Drag", "drag", class_name, CONFIG_TYPES["drag"]["default"], 0, 10, 3, combo_src);
-                        create_slider_with_copy(content, "Drop", "drop", class_name, CONFIG_TYPES["drop"]["default"], 0, 10, 3, combo_src);
-                        create_slider_with_copy(content, "Min Speed (Units/s)", "min_speed", class_name, CONFIG_TYPES["min_speed"]["default"], 0, 1000, 0, combo_src);
-                        create_slider_with_copy(content, "Max Dist (Units)", "max_distance", class_name, CONFIG_TYPES["max_distance"]["default"], 0, 50000, 0, combo_src);
-                        create_slider_with_copy(content, "Spread Bias", "spread_bias", class_name, CONFIG_TYPES["spread_bias"]["default"], -1.0, 1.0, 2, combo_src);
-                        create_slider_with_copy(content, "Dropoff Start (Units)", "dropoff_start", class_name, CONFIG_TYPES["dropoff_start"]["default"], 0, 50000, 0, combo_src);
-                        create_slider_with_copy(content, "Dropoff End (Units)", "dropoff_end", class_name, CONFIG_TYPES["dropoff_end"]["default"], 0, 50000, 0, combo_src);
-                        create_slider_with_copy(content, "Dropoff Min Multiplier", "dropoff_min_multiplier", class_name, CONFIG_TYPES["dropoff_min_multiplier"]["default"], 0.0, 1.0, 2, combo_src);
-
-                        local div = vgui.Create("DPanel", content);
-                        div:SetTall(2);
-                        div:Dock(TOP);
-                        div:DockMargin(0, 10, 0, 10);
-                        div.Paint = function(s, w, h) draw.RoundedBox(0, 0, 0, w, h, THEME.divider) end
-
-                        local btn_copy_all = vgui.Create("DButton", content);
-                        btn_copy_all:Dock(TOP);
-                        btn_copy_all:SetTall(25);
-                        btn_copy_all:DockMargin(0, 0, 0, 5);
-                        btn_copy_all:SetText("Copy all from Source Weapon");
-                        btn_copy_all:SetTextColor(THEME.text);
-                        btn_copy_all.Paint = function(s, w, h)
-                            local col = s:IsHovered() and Color(200, 140, 60) or Color(180, 120, 40);
-                            draw.RoundedBox(4, 0, 0, w, h, col);
-                        end
-                        btn_copy_all.DoClick = function()
-                            local src_wep = combo_src:GetValue();
-                            
-                            if not src_wep or src_wep == "" or src_wep == "Select weapon to copy from..." then
-                                LocalPlayer():ChatPrint("Select a source weapon in the dropdown above first.");
-                                return;
-                            end
-                            
-                            RunConsoleCommand("pro_weapon_config_copy_all", src_wep, class_name);
-                        end
-
-                        local btn_reset = vgui.Create("DButton", content);
-                        btn_reset:Dock(TOP);
-                        btn_reset:SetTall(25);
-                        btn_reset:SetText("Reset all to default");
-                        btn_reset:SetTextColor(THEME.text);
-                        btn_reset.Paint = function(s, w, h)
-                            draw.RoundedBox(4, 0, 0, w, h, s:IsHovered() and Color(180, 60, 60) or Color(150, 40, 40))
-                        end
-                        btn_reset.DoClick = function()
-                            RunConsoleCommand("pro_weapon_config_reset_single_all", class_name);
-                        end
-
-                        content:SetTall(520); 
-                        category:SetContents(content);
                     end
                 end
 
-                populate_list();
+                local function populate_right(filter)
+                    right_scroll:Clear();
+                    for _, class_name in ipairs(sorted_weapons) do
+                        if WEAPON_BLACKLIST and WEAPON_BLACKLIST[class_name] then continue; end
+                        if filter and filter ~= "" and not string.find(string.lower(class_name), string.lower(filter), 1, true) then continue; end
+                        
+                        local btn = create_weapon_button(right_scroll, class_name, false);
+                        btn.DoClick = function()
+                            selected_dest = class_name;
+                            populate_right(search_right:GetValue());
+                            rebuild_config_panel(class_name);
+                        end
+                    end
+                end
 
-                search.OnChange = function(s)
-                    populate_list(s:GetValue());
+                populate_left();
+                populate_right();
+                rebuild_config_panel(nil);
+
+                search_left.OnChange = function(s)
+                    populate_left(s:GetValue());
+                end
+
+                search_right.OnChange = function(s)
+                    populate_right(s:GetValue());
                 end
             end
         },
