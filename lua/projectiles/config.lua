@@ -834,17 +834,17 @@ if CLIENT then
                         end
                     end
 
-                    create_slider_row("Speed", "speed", CONFIG_TYPES["speed"]["default"], 0, 10000, 0);
-                    create_slider_row("Damage", "damage", CONFIG_TYPES["damage"]["default"], 0, 500, 0);
+                    create_slider_row("Speed", "speed", CONFIG_TYPES["speed"]["default"], 0, 50000, 0);
+                    create_slider_row("Damage", "damage", CONFIG_TYPES["damage"]["default"], 0, 1000, 0);
                     create_slider_row("Penetration Power", "penetration_power", CONFIG_TYPES["penetration_power"]["default"], 0, 50, 2);
                     create_slider_row("Max Penetration Count", "penetration_count", CONFIG_TYPES["penetration_count"]["default"], 0, 50, 0);
                     create_slider_row("Drag", "drag", CONFIG_TYPES["drag"]["default"], 0, 10, 3);
                     create_slider_row("Drop", "drop", CONFIG_TYPES["drop"]["default"], 0, 10, 3);
-                    create_slider_row("Min Speed (Units/s)", "min_speed", CONFIG_TYPES["min_speed"]["default"], 0, 1000, 0);
-                    create_slider_row("Max Dist (Units)", "max_distance", CONFIG_TYPES["max_distance"]["default"], 0, 50000, 0);
+                    create_slider_row("Min Speed (Units/s)", "min_speed", CONFIG_TYPES["min_speed"]["default"], 0, 50000, 0);
+                    create_slider_row("Max Dist (Units)", "max_distance", CONFIG_TYPES["max_distance"]["default"], 0, 200000, 0);
                     create_slider_row("Spread Bias", "spread_bias", CONFIG_TYPES["spread_bias"]["default"], -1.0, 1.0, 2);
-                    create_slider_row("Dropoff Start (Units)", "dropoff_start", CONFIG_TYPES["dropoff_start"]["default"], 0, 50000, 0);
-                    create_slider_row("Dropoff End (Units)", "dropoff_end", CONFIG_TYPES["dropoff_end"]["default"], 0, 50000, 0);
+                    create_slider_row("Dropoff Start (Units)", "dropoff_start", CONFIG_TYPES["dropoff_start"]["default"], 0, 200000, 0);
+                    create_slider_row("Dropoff End (Units)", "dropoff_end", CONFIG_TYPES["dropoff_end"]["default"], 0, 200000, 0);
                     create_slider_row("Dropoff Min Multiplier", "dropoff_min_multiplier", CONFIG_TYPES["dropoff_min_multiplier"]["default"], 0.0, 1.0, 2);
 
                     local div = vgui.Create("DPanel", config_scroll);
