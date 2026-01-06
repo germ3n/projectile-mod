@@ -1320,10 +1320,11 @@ if CLIENT then
                 local api_base = "https://projectilemod.directory/";
                 local current_sort = "date";
                 local current_auth_user = nil;
+                local current_view = "browse";
                 
                 local top_bar = vgui.Create("DPanel", parent);
                 top_bar:Dock(TOP);
-                top_bar:SetTall(45);
+                top_bar:SetTall(80);
                 top_bar:DockMargin(0, 0, 0, 5);
                 top_bar.Paint = function(s, w, h)
                     draw.RoundedBox(0, 0, 0, w, h, THEME.bg_lighter);
@@ -1335,6 +1336,19 @@ if CLIENT then
                 scroll:GetCanvas():DockPadding(10, 10, 10, 10);
 
                 local btn_login = nil;
+                local btn_browse = nil;
+                local btn_my_configs = nil;
+                local btn_upload = nil;
+                local search = nil;
+                local sort_combo = nil;
+
+                local function GetAuthHeaders()
+                    local key = cookie.GetString("projectile_api_key");
+                    if key and key ~= "" then
+                        return { ["Authorization"] = "Bearer " .. key };
+                    end
+                    return {};
+                end
 
                 local function UpdateLoginButton(status, user_data)
                     if not IsValid(btn_login) then return; end
@@ -1344,23 +1358,36 @@ if CLIENT then
                         btn_login:SetEnabled(false);
                         btn_login.user_data = nil;
                     elseif status == "logged_in" and user_data then
-                        btn_login:SetText(user_data.username or "Unknown");
+                        btn_login:SetText(string.sub(user_data.steamid or "Unknown", 1, 12));
                         btn_login:SetEnabled(true);
                         btn_login.user_data = user_data;
                         btn_login.is_logged_in = true;
                         btn_login:SetTooltip("Logged in as " .. (user_data.steamid or "User") .. ". Click to logout.");
+                        
+                        if IsValid(btn_my_configs) then
+                            btn_my_configs:SetEnabled(true);
+                        end
+                        if IsValid(btn_upload) then
+                            btn_upload:SetEnabled(true);
+                        end
                     else
                         btn_login:SetText("Login");
                         btn_login:SetEnabled(true);
                         btn_login.user_data = nil;
                         btn_login.is_logged_in = false;
                         btn_login:SetTooltip("Click to enter API Key");
+                        
+                        if IsValid(btn_my_configs) then
+                            btn_my_configs:SetEnabled(false);
+                        end
+                        if IsValid(btn_upload) then
+                            btn_upload:SetEnabled(false);
+                        end
                     end
                 end
 
                 local function VerifyAuthKey(key)
                     if not key or key == "" then 
-                        print("[ProjectileMod] No API Key provided");
                         UpdateLoginButton("logged_out");
                         return;
                     end
@@ -1377,45 +1404,140 @@ if CLIENT then
                                 cookie.Delete("projectile_api_key");
                                 current_auth_user = nil;
                                 UpdateLoginButton("logged_out");
-                                print("[ProjectileMod] Auth Check Failed: " .. body);
-                                print("[ProjectileMod] Code: " .. code);
-                                print("[ProjectileMod] Headers: " .. util.TableToJSON(headers));
-                                print("[ProjectileMod] Body: " .. body);
                             end
                         end,
                         function(err)
-                            print("[ProjectileMod] Auth Check Failed: " .. err);
                             UpdateLoginButton("logged_out");
                         end,
                         { ["Authorization"] = "Bearer " .. key }
                     );
                 end
+
+                local function DeleteConfig(config_id, callback)
+                    local headers = GetAuthHeaders();
+                    
+                    HTTP({
+                        url = api_base .. "delete-config",
+                        method = "POST",
+                        headers = headers,
+                        body = util.TableToJSON({ id = config_id }),
+                        type = "application/json",
+                        success = function(code, body, headers)
+                            if code == 200 then
+                                chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 255, 255), "Config deleted successfully!");
+                                if callback then callback(true); end
+                            else
+                                local data = util.JSONToTable(body) or {};
+                                chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 100, 100), "Delete failed: " .. (data.error or "Unknown error"));
+                                if callback then callback(false); end
+                            end
+                        end,
+                        failed = function(err)
+                            chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 100, 100), "Delete request failed!");
+                            if callback then callback(false); end
+                        end
+                    });
+                end
+
+                local function UpdateConfig(config_id, config_data, config_name, callback)
+                    local headers = GetAuthHeaders();
+                    
+                    HTTP({
+                        url = api_base .. "update-config",
+                        method = "POST",
+                        headers = headers,
+                        body = util.TableToJSON({
+                            id = config_id,
+                            config = config_data,
+                            version = "1.0.0"
+                        }),
+                        type = "application/json",
+                        success = function(code, body, headers)
+                            if code == 200 then
+                                chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 255, 255), "Config '" .. config_name .. "' updated successfully!");
+                                if callback then callback(true); end
+                            else
+                                local data = util.JSONToTable(body) or {};
+                                chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 100, 100), "Update failed: " .. (data.error or "Unknown error"));
+                                if callback then callback(false); end
+                            end
+                        end,
+                        failed = function(err)
+                            chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 100, 100), "Update request failed!");
+                            if callback then callback(false); end
+                        end
+                    });
+                end
+
+                local function UploadConfig(config_name, config_data, callback)
+                    local headers = GetAuthHeaders();
+                    
+                    HTTP({
+                        url = api_base .. "upload-config",
+                        method = "POST",
+                        headers = headers,
+                        body = util.TableToJSON({
+                            config_name = config_name,
+                            config = config_data,
+                            flags = 0,
+                            version = "1.0.0"
+                        }),
+                        type = "application/json",
+                        success = function(code, body, headers)
+                            if code == 201 then
+                                local data = util.JSONToTable(body);
+                                chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 255, 255), "Config uploaded successfully! ID: " .. (data.id or "unknown"));
+                                if callback then callback(true); end
+                            else
+                                local data = util.JSONToTable(body) or {};
+                                chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 100, 100), "Upload failed: " .. (data.error or "Unknown error"));
+                                if callback then callback(false); end
+                            end
+                        end,
+                        failed = function(err)
+                            chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 100, 100), "Upload request failed!");
+                            if callback then callback(false); end
+                        end
+                    });
+                end
             
-                local function LoadMarketplace(query)
+                local function LoadMarketplace(query, my_configs_only)
                     scroll:Clear();
                     
                     local fetch_url = string.format("%s?limit=100&sort_by=%s&order=desc", marketplace_search_url, current_sort);
+                    
+                    if my_configs_only and current_auth_user and current_auth_user.steamid then
+                        fetch_url = fetch_url .. "&steamid=" .. current_auth_user.steamid;
+                    end
+                    
                     if query and query ~= "" then
                         fetch_url = fetch_url .. "&name=" .. string.Replace(query, " ", "%20");
                     end
                     
-                    local headers = {};
-                    local key = cookie.GetString("projectile_api_key");
-                    if key and key ~= "" then
-                        headers["Authorization"] = "Bearer " .. key;
-                    end
+                    local headers = GetAuthHeaders();
             
                     http.Fetch(fetch_url, function(body, len, headers, code)
                         if not IsValid(scroll) then return end
                         local data = util.JSONToTable(body);
                         if not data then return; end
             
+                        if #data == 0 then
+                            local empty_lbl = scroll:Add("DLabel");
+                            empty_lbl:Dock(TOP);
+                            empty_lbl:SetText(my_configs_only and "You haven't uploaded any configs yet." or "No configs found.");
+                            empty_lbl:SetTextColor(THEME.text_dim);
+                            empty_lbl:SetContentAlignment(5);
+                            empty_lbl:SetTall(100);
+                            return;
+                        end
+            
                         for idx = 1, #data do
                             local cfg = data[idx];
+                            local is_owner = current_auth_user and current_auth_user.steamid == cfg.steamid;
                             
                             local card = scroll:Add("DPanel");
                             card:Dock(TOP);
-                            card:SetTall(60);
+                            card:SetTall(is_owner and 105 or 85);
                             card:DockMargin(0, 0, 0, 5);
                             card.Paint = function(s, w, h)
                                 draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
@@ -1428,52 +1550,519 @@ if CLIENT then
                             title:SetText(cfg.name or "Unnamed Config");
                             title:SetFont("DermaDefaultBold");
                             title:SetPos(10, 10);
-                            title:SetSize(300, 20);
+                            title:SetSize(400, 20);
                             title:SetTextColor(THEME.text);
             
                             local info = vgui.Create("DLabel", card);
                             local date_str = string.sub(cfg.created_at or "", 1, 10);
-                            info:SetText(string.format("By: %s  |  Rating: %s  |  Date: %s", cfg.steamid, cfg.rating or "0.0", date_str));
+                            local rating_display = string.format("+%d / -%d", cfg.thumbs_up or 0, cfg.thumbs_down or 0);
+                            info:SetText(string.format("By: %s  |  Rating: %s  |  Date: %s", cfg.steamid, rating_display, date_str));
                             info:SetPos(10, 32);
-                            info:SetSize(400, 15);
+                            info:SetSize(500, 15);
                             info:SetTextColor(THEME.text_dim);
+
+                            local includes = vgui.Create("DLabel", card);
+                            local includes_parts = {};
+                            if cfg.config then
+                                if cfg.config.surfaceprops then table.insert(includes_parts, "Surface Props"); end
+                                if cfg.config.weapon_config then table.insert(includes_parts, "Weapons"); end
+                                if cfg.config.cvars then table.insert(includes_parts, "CVars"); end
+                                if cfg.config.ricochet_mat_chance_multipliers then table.insert(includes_parts, "Ricochet"); end
+                            end
+                            local includes_text = #includes_parts > 0 and ("Includes: " .. table.concat(includes_parts, ", ")) or "Empty Config";
+                            includes:SetText(includes_text);
+                            includes:SetPos(10, 47);
+                            includes:SetSize(500, 15);
+                            includes:SetTextColor(Color(100, 200, 255));
+
+                            if is_owner then
+                                local owner_badge = vgui.Create("DLabel", card);
+                                owner_badge:SetText("YOUR CONFIG");
+                                owner_badge:SetPos(10, 65);
+                                owner_badge:SetSize(100, 15);
+                                owner_badge:SetFont("DermaDefaultBold");
+                                owner_badge:SetTextColor(Color(60, 179, 113));
+                            end
             
                             local btn_install = vgui.Create("DButton", card);
                             btn_install:SetText("INSTALL");
                             btn_install:SetSize(80, 30);
-                            btn_install:SetPos(card:GetWide() - 90, 15);
                             btn_install:SetTextColor(THEME.text);
                             btn_install.Paint = function(s, w, h)
                                 local col = s:IsHovered() and THEME.accent_hover or THEME.accent;
                                 draw.RoundedBox(4, 0, 0, w, h, col);
                             end
                             
-                            card.PerformLayout = function(s, w, h)
-                                btn_install:SetPos(w - 90, h / 2 - 15);
-                            end
-            
-                            btn_install.DoClick = function()
-                                Derma_Query("Are you sure you want to apply this configuration?", "Confirm Installation", "Yes", function()
-                                    local config = cfg.config and util.JSONToTable(cfg.config) or nil;
-                                    if config then
-                                        projectiles_restore_config(config);
-                                        chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 255, 255), "Config '" .. cfg.name .. "' applied!")
-                                    else
-                                        chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 255, 255), "Config '" .. cfg.name .. "' is invalid! Please contact the developer.")
+                                btn_install.DoClick = function()
+                                local confirm_frame = vgui.Create("DFrame");
+                                confirm_frame:SetSize(350, 200);
+                                confirm_frame:Center();
+                                confirm_frame:SetTitle("Confirm Installation");
+                                confirm_frame:MakePopup();
+                                confirm_frame.Paint = function(self, w, h)
+                                    draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
+                                    draw.RoundedBox(4, 0, 0, w, 24, THEME.bg_dark);
+                                end
+
+                                local lbl = vgui.Create("DLabel", confirm_frame);
+                                lbl:SetText("Apply configuration: " .. cfg.name);
+                                lbl:SetFont("DermaDefaultBold");
+                                lbl:SetPos(10, 35);
+                                lbl:SetSize(330, 20);
+                                lbl:SetTextColor(THEME.text);
+
+                                local includes_text = "This will apply:\n\n" .. includes_text;
+                                local includes_lbl = vgui.Create("DLabel", confirm_frame);
+                                includes_lbl:SetText(includes_text);
+                                includes_lbl:SetPos(10, 65);
+                                includes_lbl:SetSize(330, 60);
+                                includes_lbl:SetTextColor(Color(100, 200, 255));
+                                includes_lbl:SetWrap(true);
+                                includes_lbl:SetAutoStretchVertical(true);
+
+                                local btn_yes = vgui.Create("DButton", confirm_frame);
+                                btn_yes:SetText("Apply Config");
+                                btn_yes:SetPos(10, 140);
+                                btn_yes:SetSize(160, 40);
+                                btn_yes:SetTextColor(THEME.text);
+                                btn_yes.Paint = function(me, w, h)
+                                    draw.RoundedBox(4, 0, 0, w, h, me:IsHovered() and Color(46, 139, 87) or Color(60, 179, 113));
+                                end
+                                btn_yes.DoClick = function()
+                                    if cfg.config then
+                                        local compressed_data = util.Compress(util.TableToJSON(cfg.config));
+                                        local compressed_size = string.len(compressed_data);
+                                        local chunk_size = 65000;
+                                        local total_chunks = math.ceil(compressed_size / chunk_size);
+                                        
+                                        net.Start("projectiles_restore_config_start");
+                                        net.WriteUInt(total_chunks, 16);
+                                        net.WriteUInt(compressed_size, 32);
+                                        net.SendToServer();
+                                        
+                                        local chunk_index = 0;
+                                        local function SendNextChunk()
+                                            chunk_index = chunk_index + 1;
+                                            if chunk_index > total_chunks then
+                                                chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 255, 255), "Config '" .. cfg.name .. "' sent to server (" .. total_chunks .. " chunks)");
+                                                return;
+                                            end
+                                            
+                                            local start_pos = (chunk_index - 1) * chunk_size + 1;
+                                            local end_pos = math.min(start_pos + chunk_size - 1, compressed_size);
+                                            local chunk = string.sub(compressed_data, start_pos, end_pos);
+                                            
+                                            net.Start("projectiles_restore_config_chunk");
+                                            net.WriteUInt(chunk_index, 16);
+                                            net.WriteUInt(string.len(chunk), 32);
+                                            net.WriteData(chunk, string.len(chunk));
+                                            net.SendToServer();
+                                            
+                                            timer.Simple(0.01, SendNextChunk);
+                                        end
+                                        
+                                        SendNextChunk();
                                     end
-                                end, "No")
+                                    confirm_frame:Close();
+                                end
+
+                                local btn_no = vgui.Create("DButton", confirm_frame);
+                                btn_no:SetText("Cancel");
+                                btn_no:SetPos(180, 140);
+                                btn_no:SetSize(160, 40);
+                                btn_no:SetTextColor(THEME.text);
+                                btn_no.Paint = function(me, w, h)
+                                    draw.RoundedBox(4, 0, 0, w, h, me:IsHovered() and THEME.divider or THEME.bg_dark);
+                                end
+                                btn_no.DoClick = function()
+                                    confirm_frame:Close();
+                                end
+                            end
+
+                            if is_owner then
+                                local btn_update = vgui.Create("DButton", card);
+                                btn_update:SetText("UPDATE");
+                                btn_update:SetSize(80, 30);
+                                btn_update:SetTextColor(THEME.text);
+                                btn_update.Paint = function(s, w, h)
+                                    local col = s:IsHovered() and Color(255, 140, 0) or Color(255, 165, 0);
+                                    draw.RoundedBox(4, 0, 0, w, h, col);
+                                end
+                                
+                                btn_update.DoClick = function()
+                                    local frame = vgui.Create("DFrame");
+                                    frame:SetSize(400, 340);
+                                    frame:Center();
+                                    frame:SetTitle("Update Configuration");
+                                    frame:MakePopup();
+                                    frame.Paint = function(self, w, h)
+                                        draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
+                                        draw.RoundedBox(4, 0, 0, w, 24, THEME.bg_dark);
+                                    end
+
+                                    local lbl = vgui.Create("DLabel", frame);
+                                    lbl:SetText("Updating: " .. cfg.name);
+                                    lbl:SetFont("DermaDefaultBold");
+                                    lbl:SetPos(10, 35);
+                                    lbl:SetSize(380, 20);
+                                    lbl:SetTextColor(THEME.text);
+
+                                    local lbl_include = vgui.Create("DLabel", frame);
+                                    lbl_include:SetText("Select what to include:");
+                                    lbl_include:SetPos(10, 60);
+                                    lbl_include:SetSize(380, 20);
+                                    lbl_include:SetTextColor(THEME.text);
+
+                                    local check_surfaceprops = vgui.Create("DCheckBoxLabel", frame);
+                                    check_surfaceprops:SetPos(10, 85);
+                                    check_surfaceprops:SetText("Surface Properties");
+                                    check_surfaceprops:SetValue(1);
+                                    check_surfaceprops:SetTextColor(THEME.text);
+                                    check_surfaceprops:SizeToContents();
+
+                                    local check_weapons = vgui.Create("DCheckBoxLabel", frame);
+                                    check_weapons:SetPos(10, 110);
+                                    check_weapons:SetText("Weapon Configurations");
+                                    check_weapons:SetValue(1);
+                                    check_weapons:SetTextColor(THEME.text);
+                                    check_weapons:SizeToContents();
+
+                                    local check_cvars = vgui.Create("DCheckBoxLabel", frame);
+                                    check_cvars:SetPos(10, 135);
+                                    check_cvars:SetText("ConVars");
+                                    check_cvars:SetValue(1);
+                                    check_cvars:SetTextColor(THEME.text);
+                                    check_cvars:SizeToContents();
+
+                                    local check_ricochet = vgui.Create("DCheckBoxLabel", frame);
+                                    check_ricochet:SetPos(10, 160);
+                                    check_ricochet:SetText("Ricochet Multipliers");
+                                    check_ricochet:SetValue(1);
+                                    check_ricochet:SetTextColor(THEME.text);
+                                    check_ricochet:SizeToContents();
+
+                                    local divider = vgui.Create("DPanel", frame);
+                                    divider:SetPos(10, 195);
+                                    divider:SetSize(380, 1);
+                                    divider.Paint = function(s, w, h)
+                                        draw.RoundedBox(0, 0, 0, w, h, THEME.divider);
+                                    end
+
+                                    local lbl_or = vgui.Create("DLabel", frame);
+                                    lbl_or:SetText("Or update from a saved backup:");
+                                    lbl_or:SetPos(10, 205);
+                                    lbl_or:SetSize(380, 20);
+                                    lbl_or:SetTextColor(THEME.text_dim);
+
+                                    local backup_combo = vgui.Create("DComboBox", frame);
+                                    backup_combo:SetPos(10, 230);
+                                    backup_combo:SetSize(380, 25);
+                                    backup_combo:AddChoice("-- Use Current Settings --", nil);
+                                    
+                                    local files, dirs = file.Find("projectiles/backup/*.json", "DATA");
+                                    if files and #files > 0 then
+                                        table.sort(files, function(a, b) 
+                                            local time_a = file.Time("projectiles/backup/" .. a, "DATA");
+                                            local time_b = file.Time("projectiles/backup/" .. b, "DATA");
+                                            return time_a > time_b;
+                                        end);
+                                        
+                                        for idx = 1, #files do
+                                            backup_combo:AddChoice(files[idx], files[idx]);
+                                        end
+                                    end
+                                    backup_combo:ChooseOptionID(1);
+
+                                    local lbl_warning = vgui.Create("DLabel", frame);
+                                    lbl_warning:SetText("Note: This will replace the config on the server.");
+                                    lbl_warning:SetPos(10, 265);
+                                    lbl_warning:SetSize(380, 20);
+                                    lbl_warning:SetTextColor(Color(255, 200, 100));
+                                    lbl_warning:SetFont("DermaDefaultBold");
+
+                                    local btn_confirm = vgui.Create("DButton", frame);
+                                    btn_confirm:SetText("Update on Marketplace");
+                                    btn_confirm:SetPos(10, 295);
+                                    btn_confirm:SetSize(380, 35);
+                                    btn_confirm:SetTextColor(THEME.text);
+                                    btn_confirm.Paint = function(me, w, h)
+                                        draw.RoundedBox(4, 0, 0, w, h, me:IsHovered() and Color(255, 140, 0) or Color(255, 165, 0));
+                                    end
+                                    btn_confirm.DoClick = function()
+                                        local config_data;
+                                        local _, selected_file = backup_combo:GetSelected();
+                                        
+                                        if selected_file then
+                                            local content = file.Read("projectiles/backup/" .. selected_file, "DATA");
+                                            config_data = content and util.JSONToTable(content);
+                                            if not config_data then
+                                                Derma_Message("Failed to read backup file.", "Error", "OK");
+                                                return;
+                                            end
+                                        else
+                                            config_data = {};
+                                            if check_surfaceprops:GetChecked() then
+                                                config_data.surfaceprops = projectiles_backup_config("json", PROJECTILES_BACKUP_SURFACEPROPS).surfaceprops;
+                                            end
+                                            if check_weapons:GetChecked() then
+                                                config_data.weapon_config = projectiles_backup_config("json", PROJECTILES_BACKUP_WEAPON_CONFIG).weapon_config;
+                                            end
+                                            if check_cvars:GetChecked() then
+                                                config_data.cvars = projectiles_backup_config("json", PROJECTILES_BACKUP_CVARS).cvars;
+                                            end
+                                            if check_ricochet:GetChecked() then
+                                                config_data.ricochet_mat_chance_multipliers = projectiles_backup_config("json", PROJECTILES_BACKUP_RICOCHET_CHANCES).ricochet_mat_chance_multipliers;
+                                            end
+                                        end
+
+                                        UpdateConfig(cfg.id, config_data, cfg.name, function(success)
+                                            if success then
+                                                LoadMarketplace(search:GetValue(), my_configs_only);
+                                            end
+                                        end);
+                                        frame:Close();
+                                    end
+                                end
+
+                                local btn_delete = vgui.Create("DButton", card);
+                                btn_delete:SetText("DELETE");
+                                btn_delete:SetSize(80, 30);
+                                btn_delete:SetTextColor(THEME.text);
+                                btn_delete.Paint = function(s, w, h)
+                                    local col = s:IsHovered() and Color(139, 0, 0) or Color(178, 34, 34);
+                                    draw.RoundedBox(4, 0, 0, w, h, col);
+                                end
+                                
+                                btn_delete.DoClick = function()
+                                    Derma_Query("Permanently delete '" .. cfg.name .. "'?", "Confirm Deletion", "Yes", function()
+                                        DeleteConfig(cfg.id, function(success)
+                                            if success then
+                                                LoadMarketplace(search:GetValue(), my_configs_only);
+                                            end
+                                        end);
+                                    end, "No")
+                                end
+
+                                card.PerformLayout = function(s, w, h)
+                                    btn_install:SetPos(w - 90, 10);
+                                    btn_update:SetPos(w - 180, 10);
+                                    btn_delete:SetPos(w - 90, 65);
+                                end
+                            else
+                                card.PerformLayout = function(s, w, h)
+                                    btn_install:SetPos(w - 90, h / 2 - 15);
+                                end
                             end
                         end
                     end, function(err)
-                        print("[Marketplace] Error: ", err);
+                        if IsValid(scroll) then
+                            scroll:Clear();
+                            local error_lbl = scroll:Add("DLabel");
+                            error_lbl:Dock(TOP);
+                            error_lbl:SetText("Failed to load configs: " .. err);
+                            error_lbl:SetTextColor(Color(255, 100, 100));
+                            error_lbl:SetContentAlignment(5);
+                            error_lbl:SetTall(100);
+                        end
                     end, headers);
                 end
+
+                btn_browse = vgui.Create("DButton", top_bar);
+                btn_browse:SetText("Browse All");
+                btn_browse:SetSize(100, 25);
+                btn_browse:SetPos(10, 10);
+                btn_browse:SetTextColor(THEME.text);
+                btn_browse.Paint = function(s, w, h)
+                    local col = current_view == "browse" and THEME.accent or THEME.bg_dark;
+                    if s:IsHovered() then
+                        col = current_view == "browse" and THEME.accent_hover or THEME.divider;
+                    end
+                    draw.RoundedBox(4, 0, 0, w, h, col);
+                end
+                btn_browse.DoClick = function()
+                    current_view = "browse";
+                    LoadMarketplace(search:GetValue(), false);
+                end
+
+                btn_my_configs = vgui.Create("DButton", top_bar);
+                btn_my_configs:SetText("My Configs");
+                btn_my_configs:SetSize(100, 25);
+                btn_my_configs:SetPos(120, 10);
+                btn_my_configs:SetTextColor(THEME.text);
+                btn_my_configs:SetEnabled(false);
+                btn_my_configs.Paint = function(s, w, h)
+                    local col = current_view == "my_configs" and THEME.accent or THEME.bg_dark;
+                    if s:IsHovered() and s:IsEnabled() then
+                        col = current_view == "my_configs" and THEME.accent_hover or THEME.divider;
+                    end
+                    if not s:IsEnabled() then
+                        col = Color(30, 30, 30);
+                    end
+                    draw.RoundedBox(4, 0, 0, w, h, col);
+                end
+                btn_my_configs.DoClick = function()
+                    current_view = "my_configs";
+                    LoadMarketplace(search:GetValue(), true);
+                end
+
+                btn_upload = vgui.Create("DButton", top_bar);
+                btn_upload:SetText("Upload Current");
+                btn_upload:SetSize(120, 25);
+                btn_upload:SetPos(230, 10);
+                btn_upload:SetTextColor(THEME.text);
+                btn_upload:SetEnabled(false);
+                btn_upload.Paint = function(s, w, h)
+                    local col = THEME.bg_dark;
+                    if s:IsEnabled() then
+                        col = s:IsHovered() and Color(46, 139, 87) or Color(60, 179, 113);
+                    else
+                        col = Color(30, 30, 30);
+                    end
+                    draw.RoundedBox(4, 0, 0, w, h, col);
+                end
+                btn_upload.DoClick = function()
+                    local frame = vgui.Create("DFrame");
+                    frame:SetSize(400, 340);
+                    frame:Center();
+                    frame:SetTitle("Upload Configuration");
+                    frame:MakePopup();
+                    frame.Paint = function(self, w, h)
+                        draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
+                        draw.RoundedBox(4, 0, 0, w, 24, THEME.bg_dark);
+                    end
+
+                    local lbl = vgui.Create("DLabel", frame);
+                    lbl:SetText("Enter a name for your config:");
+                    lbl:SetPos(10, 35);
+                    lbl:SetSize(380, 20);
+                    lbl:SetTextColor(THEME.text);
+
+                    local entry = vgui.Create("DTextEntry", frame);
+                    entry:SetPos(10, 60);
+                    entry:SetSize(380, 25);
+                    entry:SetPlaceholderText("My Awesome Config");
+
+                    local lbl_include = vgui.Create("DLabel", frame);
+                    lbl_include:SetText("Select what to include:");
+                    lbl_include:SetPos(10, 95);
+                    lbl_include:SetSize(380, 20);
+                    lbl_include:SetTextColor(THEME.text);
+
+                    local check_surfaceprops = vgui.Create("DCheckBoxLabel", frame);
+                    check_surfaceprops:SetPos(10, 120);
+                    check_surfaceprops:SetText("Surface Properties");
+                    check_surfaceprops:SetValue(1);
+                    check_surfaceprops:SetTextColor(THEME.text);
+                    check_surfaceprops:SizeToContents();
+
+                    local check_weapons = vgui.Create("DCheckBoxLabel", frame);
+                    check_weapons:SetPos(10, 145);
+                    check_weapons:SetText("Weapon Configurations");
+                    check_weapons:SetValue(1);
+                    check_weapons:SetTextColor(THEME.text);
+                    check_weapons:SizeToContents();
+
+                    local check_cvars = vgui.Create("DCheckBoxLabel", frame);
+                    check_cvars:SetPos(10, 170);
+                    check_cvars:SetText("ConVars");
+                    check_cvars:SetValue(1);
+                    check_cvars:SetTextColor(THEME.text);
+                    check_cvars:SizeToContents();
+
+                    local check_ricochet = vgui.Create("DCheckBoxLabel", frame);
+                    check_ricochet:SetPos(10, 195);
+                    check_ricochet:SetText("Ricochet Multipliers");
+                    check_ricochet:SetValue(1);
+                    check_ricochet:SetTextColor(THEME.text);
+                    check_ricochet:SizeToContents();
+
+                    local divider = vgui.Create("DPanel", frame);
+                    divider:SetPos(10, 230);
+                    divider:SetSize(380, 1);
+                    divider.Paint = function(s, w, h)
+                        draw.RoundedBox(0, 0, 0, w, h, THEME.divider);
+                    end
+
+                    local lbl_or = vgui.Create("DLabel", frame);
+                    lbl_or:SetText("Or upload from a saved backup:");
+                    lbl_or:SetPos(10, 240);
+                    lbl_or:SetSize(380, 20);
+                    lbl_or:SetTextColor(THEME.text_dim);
+
+                    local backup_combo = vgui.Create("DComboBox", frame);
+                    backup_combo:SetPos(10, 265);
+                    backup_combo:SetSize(380, 25);
+                    backup_combo:AddChoice("-- Use Current Settings --", nil);
+                    
+                    local files, dirs = file.Find("projectiles/backup/*.json", "DATA");
+                    if files and #files > 0 then
+                        table.sort(files, function(a, b) 
+                            local time_a = file.Time("projectiles/backup/" .. a, "DATA");
+                            local time_b = file.Time("projectiles/backup/" .. b, "DATA");
+                            return time_a > time_b;
+                        end);
+                        
+                        for idx = 1, #files do
+                            backup_combo:AddChoice(files[idx], files[idx]);
+                        end
+                    end
+                    backup_combo:ChooseOptionID(1);
+
+                    local btn_confirm = vgui.Create("DButton", frame);
+                    btn_confirm:SetText("Upload to Marketplace");
+                    btn_confirm:SetPos(10, 300);
+                    btn_confirm:SetSize(380, 35);
+                    btn_confirm:SetTextColor(THEME.text);
+                    btn_confirm.Paint = function(me, w, h)
+                        draw.RoundedBox(4, 0, 0, w, h, me:IsHovered() and Color(46, 139, 87) or Color(60, 179, 113));
+                    end
+                    btn_confirm.DoClick = function()
+                        local name = string.Trim(entry:GetValue());
+                        if name == "" then
+                            Derma_Message("Please enter a config name.", "Missing Name", "OK");
+                            return;
+                        end
+
+                        local config_data;
+                        local _, selected_file = backup_combo:GetSelected();
+                        
+                        if selected_file then
+                            local content = file.Read("projectiles/backup/" .. selected_file, "DATA");
+                            config_data = content and util.JSONToTable(content);
+                            if not config_data then
+                                Derma_Message("Failed to read backup file.", "Error", "OK");
+                                return;
+                            end
+                        else
+                            config_data = {};
+                            if check_surfaceprops:GetChecked() then
+                                config_data.surfaceprops = projectiles_backup_config("json", PROJECTILES_BACKUP_SURFACEPROPS).surfaceprops;
+                            end
+                            if check_weapons:GetChecked() then
+                                config_data.weapon_config = projectiles_backup_config("json", PROJECTILES_BACKUP_WEAPON_CONFIG).weapon_config;
+                            end
+                            if check_cvars:GetChecked() then
+                                config_data.cvars = projectiles_backup_config("json", PROJECTILES_BACKUP_CVARS).cvars;
+                            end
+                            if check_ricochet:GetChecked() then
+                                config_data.ricochet_mat_chance_multipliers = projectiles_backup_config("json", PROJECTILES_BACKUP_RICOCHET_CHANCES).ricochet_mat_chance_multipliers;
+                            end
+                        end
+
+                        UploadConfig(name, config_data, function(success)
+                            if success and current_view == "my_configs" then
+                                LoadMarketplace(search:GetValue(), true);
+                            end
+                        end);
+                        frame:Close();
+                    end
+                end
             
-                local search = vgui.Create("DTextEntry", top_bar);
-                search:SetSize(250, 25);
-                search:SetPos(10, 10);
-                search:SetPlaceholderText("Search marketplace...");
-                search.OnEnter = function(s) LoadMarketplace(s:GetValue()); end
+                search = vgui.Create("DTextEntry", top_bar);
+                search:SetSize(200, 25);
+                search:SetPos(10, 45);
+                search:SetPlaceholderText("Search...");
+                search.OnEnter = function(s) LoadMarketplace(s:GetValue(), current_view == "my_configs"); end
                 search.Paint = function(s, w, h)
                     draw.RoundedBox(4, 0, 0, w, h, THEME.bg_dark);
                     s:DrawTextEntryText(THEME.text, THEME.accent, THEME.text);
@@ -1483,33 +2072,29 @@ if CLIENT then
                 end
             
                 local sort_label = vgui.Create("DLabel", top_bar);
-                sort_label:SetText("Sort By:")
-                sort_label:SetPos(280, 10);
-                sort_label:SetSize(50, 25);
+                sort_label:SetText("Sort:");
+                sort_label:SetPos(220, 45);
+                sort_label:SetSize(35, 25);
                 sort_label:SetTextColor(THEME.text_dim);
             
-                local sort_combo = vgui.Create("DComboBox", top_bar);
+                sort_combo = vgui.Create("DComboBox", top_bar);
                 sort_combo:SetSize(100, 25);
-                sort_combo:SetPos(335, 10);
+                sort_combo:SetPos(255, 45);
                 sort_combo:AddChoice("Newest", "date");
                 sort_combo:AddChoice("Rating", "rating");
                 sort_combo:AddChoice("Name", "name");
                 sort_combo:ChooseOptionID(1);
-                sort_combo:SetTextColor(THEME.text);
                 sort_combo.OnSelect = function(s, idx, val, data)
                     current_sort = data;
-                    LoadMarketplace(search:GetValue());
-                end
-                sort_combo.Paint = function(s, w, h)
-                    draw.RoundedBox(4, 0, 0, w, h, THEME.bg_dark);
+                    LoadMarketplace(search:GetValue(), current_view == "my_configs");
                 end
             
                 local btn_refresh = vgui.Create("DButton", top_bar);
                 btn_refresh:SetText("Refresh");
                 btn_refresh:SetSize(80, 25);
-                btn_refresh:SetPos(445, 10);
+                btn_refresh:SetPos(365, 45);
                 btn_refresh:SetTextColor(THEME.text);
-                btn_refresh.DoClick = function() LoadMarketplace(search:GetValue()); end
+                btn_refresh.DoClick = function() LoadMarketplace(search:GetValue(), current_view == "my_configs"); end
                 btn_refresh.Paint = function(s, w, h)
                     draw.RoundedBox(4, 0, 0, w, h, s:IsHovered() and THEME.divider or THEME.bg_dark);
                 end
@@ -1517,7 +2102,7 @@ if CLIENT then
                 btn_login = vgui.Create("DButton", top_bar);
                 btn_login:SetText("Login");
                 btn_login:SetSize(100, 25);
-                btn_login:SetPos(535, 10);
+                btn_login:SetPos(455, 45);
                 btn_login:SetTextColor(THEME.text);
                 btn_login.Paint = function(s, w, h)
                     local col = THEME.bg_dark;
@@ -1530,10 +2115,14 @@ if CLIENT then
                 end
                 btn_login.DoClick = function(s)
                     if s.is_logged_in then
-                        Derma_Query("Do you want to logout?", "Logout", "Yes", function()
+                        Derma_Query("Logout?", "Logout", "Yes", function()
                             cookie.Delete("projectile_api_key");
                             current_auth_user = nil;
                             UpdateLoginButton("logged_out");
+                            if current_view == "my_configs" then
+                                current_view = "browse";
+                                LoadMarketplace(search:GetValue(), false);
+                            end
                         end, "Cancel")
                     else
                         local frame = vgui.Create("DFrame");
@@ -1585,7 +2174,6 @@ if CLIENT then
                         end
                         btn_confirm.DoClick = function()
                             local key = string.Trim(entry_key:GetValue());
-                            print("[ProjectileMod] API Key: ", key);
                             if key ~= "" then
                                 cookie.Set("projectile_api_key", key);
                                 VerifyAuthKey(key);

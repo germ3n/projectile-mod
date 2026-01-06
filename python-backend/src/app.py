@@ -196,13 +196,21 @@ def search_configs():
     sort_by = request.args.get('sort_by', 'date')
     order = request.args.get('order', 'desc').lower()
 
-    sort_map = {'date': 'created_at', 'rating': 'rating', 'name': 'config_name'}
+    steamid_filter = request.args.get('steamid', None)
+    
+    sort_map = {'date': 'created_at', 'rating': '(thumbs_up - thumbs_down)', 'name': 'config_name'}
     column = sort_map.get(sort_by, 'created_at')
     direction = 'ASC' if order == 'asc' else 'DESC'
 
     conn = get_db_connection()
-    query = f'SELECT * FROM configs ORDER BY {column} {direction} LIMIT ?'
-    rows = conn.execute(query, (limit,)).fetchall()
+    
+    if steamid_filter:
+        query = f'SELECT *, (thumbs_up - thumbs_down) as rating FROM configs WHERE submitter_steamid = ? ORDER BY {column} {direction} LIMIT ?'
+        rows = conn.execute(query, (steamid_filter, limit)).fetchall()
+    else:
+        query = f'SELECT *, (thumbs_up - thumbs_down) as rating FROM configs ORDER BY {column} {direction} LIMIT ?'
+        rows = conn.execute(query, (limit,)).fetchall()
+    
     conn.close()
 
     result = []
@@ -214,6 +222,8 @@ def search_configs():
             "flags": row['config_flags'],
             "version": row['config_version'],
             "rating": row['rating'],
+            "thumbs_up": row['thumbs_up'],
+            "thumbs_down": row['thumbs_down'],
             "config": json.loads(row['config_data']),
             "created_at": row['created_at']
         })
@@ -222,7 +232,7 @@ def search_configs():
 @app.route('/fetch-config/<int:config_id>', methods=['GET'])
 def fetch_config(config_id):
     conn = get_db_connection()
-    row = conn.execute('SELECT * FROM configs WHERE id = ?', (config_id,)).fetchone()
+    row = conn.execute('SELECT *, (thumbs_up - thumbs_down) as rating FROM configs WHERE id = ?', (config_id,)).fetchone()
     conn.close()
 
     if not row:
@@ -235,6 +245,8 @@ def fetch_config(config_id):
         "flags": row['config_flags'],
         "version": row['config_version'],
         "rating": row['rating'],
+        "thumbs_up": row['thumbs_up'],
+        "thumbs_down": row['thumbs_down'],
         "config": json.loads(row['config_data']),
         "created_at": row['created_at'],
         "updated_at": row['updated_at']
