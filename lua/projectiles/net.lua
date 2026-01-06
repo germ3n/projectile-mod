@@ -8,6 +8,7 @@ end
 
 local band = bit.band;
 local cur_time = CurTime;
+local tick_interval = engine.TickInterval();
 
 projectile_store = projectile_store or {};
 local projectile_store = projectile_store;
@@ -35,8 +36,11 @@ if SERVER then
 
     local crc = util.CRC;
     local tonumber = tonumber;
+    local floor = math.floor;
 
     local vector = Vector;
+
+    local engine_tick_count = engine.TickCount;
 
     local cv_net_send_method = GetConVar("pro_net_send_method");
 
@@ -44,6 +48,7 @@ if SERVER then
         weapon.bullet_idx = (weapon.bullet_idx or 0) + 1;
 
         local time = cur_time();
+        local tick = floor(0.5 + time / tick_interval);
         local random_seed = tonumber(crc(tostring(pos) .. tostring(dir))); -- random seed for ricochet
 
         net_start("projectile", reliable and false or true);
@@ -75,6 +80,7 @@ if SERVER then
         write_float(dropoff_start);
         write_float(dropoff_end);
         write_float(dropoff_min_multiplier);
+        write_uint(tick, 32);
 
         local send_method = get_int(cv_net_send_method);
         if send_method == 0 then
@@ -119,6 +125,9 @@ if SERVER then
                     tracer_colors = {nil, nil},
                     is_gmod_turret = false,
                     spawn_pos = vector(),
+                    spawn_time = nil,
+                    vel = vector(),
+                    old_vel = vector(),
                     dropoff_start = nil,
                     dropoff_end = nil,
                     dropoff_min_multiplier = nil,
@@ -163,6 +172,13 @@ if SERVER then
         projectile.spawn_pos.x = pos.x;
         projectile.spawn_pos.y = pos.y;
         projectile.spawn_pos.z = pos.z;
+        projectile.spawn_time = time;
+        projectile.vel.x = dir.x * speed;
+        projectile.vel.y = dir.y * speed;
+        projectile.vel.z = dir.z * speed;
+        projectile.old_vel.x = projectile.vel.x;
+        projectile.old_vel.y = projectile.vel.y;
+        projectile.old_vel.z = projectile.vel.z;
         projectile.dropoff_start = dropoff_start;
         projectile.dropoff_end = dropoff_end;
         projectile.dropoff_min_multiplier = dropoff_min_multiplier;
@@ -208,6 +224,7 @@ if CLIENT then
         local dropoff_start = read_float();
         local dropoff_end = read_float();
         local dropoff_min_multiplier = read_float();
+        local tick = read_uint(32);
 
         if not projectile_store[shooter] then 
             projectile_store[shooter] = {
@@ -242,6 +259,9 @@ if CLIENT then
                     tracer_colors = {nil, nil},
                     is_gmod_turret = false,
                     spawn_pos = vector(),
+                    spawn_time = nil,
+                    vel = vector(),
+                    old_vel = vector(),
                     dropoff_start = nil,
                     dropoff_end = nil,
                     dropoff_min_multiplier = nil,
@@ -286,6 +306,13 @@ if CLIENT then
         projectile.spawn_pos.x = pos_x;
         projectile.spawn_pos.y = pos_y;
         projectile.spawn_pos.z = pos_z;
+        projectile.spawn_time = tick * tick_interval;
+        projectile.vel.x = dir_x * speed;
+        projectile.vel.y = dir_y * speed;
+        projectile.vel.z = dir_z * speed;
+        projectile.old_vel.x = projectile.vel.x;
+        projectile.old_vel.y = projectile.vel.y;
+        projectile.old_vel.z = projectile.vel.z;
         projectile.dropoff_start = dropoff_start;
         projectile.dropoff_end = dropoff_end;
         projectile.dropoff_min_multiplier = dropoff_min_multiplier;

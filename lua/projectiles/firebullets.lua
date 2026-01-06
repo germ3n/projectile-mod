@@ -50,6 +50,7 @@ local cv_penetration_power_scale = GetConVar("pro_penetration_power_scale");
 local cv_weapon_damage_scale = GetConVar("pro_weapon_damage_scale");
 local cv_speed_scale = GetConVar("pro_speed_scale");
 local cv_net_reliable = GetConVar("pro_net_reliable");
+local cv_npc_shootpos_forward = GetConVar("pro_npc_shootpos_forward");
 
 local TURRET_AND_MOUNTED_WEAPONS_WHITELIST = {
     ["npc_turret_floor"] = true,
@@ -106,12 +107,15 @@ if SERVER then
 
         local inflictor;
         local is_gmod_turret = false;
-        local lean_amount = get_lean_amount and shooter:IsPlayer() and get_lean_amount(shooter) or 0.0;
+        local is_npc = shooter:IsNPC();
+        local is_player = shooter:IsPlayer();
+        local is_weapon = shooter:IsWeapon();
+        local lean_amount = get_lean_amount and is_player and get_lean_amount(shooter) or 0.0;
         if (not data.Inflictor or data.Inflictor == NULL) and shooter ~= NULL then
             local shooter_class = get_class(shooter);
-            if shooter:IsPlayer() then--if is_player(shooter) then
+            if is_player then--if is_player(shooter) then
                 inflictor = player_get_active_weapon(shooter);
-            elseif shooter:IsNPC() then--elseif is_npc(shooter) then
+            elseif is_npc then--elseif is_npc(shooter) then
                 if not TURRET_AND_MOUNTED_WEAPONS_WHITELIST[shooter_class] then
                     inflictor = npc_get_active_weapon(shooter);
                 else
@@ -126,7 +130,7 @@ if SERVER then
             inflictor = data.Inflictor;
         end
 
-        if shooter:IsWeapon() then -- fix for https://steamcommunity.com/sharedfiles/filedetails/?id=3490724227
+        if is_weapon then -- fix for https://steamcommunity.com/sharedfiles/filedetails/?id=3490724227
             local owner = shooter:GetOwner();
             if owner ~= NULL then
                 shooter = owner;
@@ -141,6 +145,13 @@ if SERVER then
         local speed = get_weapon_speed(inflictor, inflictor_class) * get_float(cv_speed_scale);
         local damage = get_weapon_damage(inflictor, inflictor_class, data.Damage) * get_float(cv_weapon_damage_scale);
         local src = calculate_lean_pos and calculate_lean_pos(data.Src, angle(data.Dir), lean_amount, shooter) or data.Src;
+        
+        if is_npc then
+            local npc_offset = get_float(cv_npc_shootpos_forward);
+            if npc_offset > 0 then
+                src = src + data.Dir * npc_offset;
+            end
+        end
         local penetration_power = get_weapon_penetration_power(inflictor, inflictor_class) * get_float(cv_penetration_power_scale);
         local penetration_count = get_weapon_penetration_count(inflictor, inflictor_class);
         local drag = get_weapon_drag(inflictor, inflictor_class);

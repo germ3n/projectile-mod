@@ -267,6 +267,7 @@ if CLIENT then
                 { type = "float", cvar = "pro_weapon_damage_scale", label = "Damage Scale", min = 0.1, max = 5.0, decimals = 2 },
                 { type = "float", cvar = "pro_penetration_power_scale", label = "Power Scale", min = 0.1, max = 5.0, decimals = 2 },
                 { type = "float", cvar = "pro_damage_force_multiplier", label = "Damage Force Multiplier", min = 0.0, max = 50.0, decimals = 3 },
+                { type = "float", cvar = "pro_npc_shootpos_forward", label = "NPC Shoot Position Forward Offset", min = 0.0, max = 200.0, decimals = 0 },
             }
         },
         {
@@ -275,11 +276,15 @@ if CLIENT then
             vars = {
                 { type = "header", label = "Render Settings" },
                 { type = "bool", cvar = "pro_render_enabled", label = "Enable Projectile Rendering", client = true },
+                { type = "bool", cvar = "pro_distance_scale_enabled", label = "Enable Distance Scaling", client = true },
                 { type = "bool", cvar = "pro_render_wind_hud", label = "Enable Wind HUD", client = true },
-                { type = "float", cvar = "pro_spawn_fade_distance", label = "Spawn Fade Distance", min = 0.0, max = 1000.0, decimals = 0 },
-                { type = "float", cvar = "pro_distance_scale_start", label = "Distance Scale Start", min = 0.0, max = 10000.0, decimals = 0 },
-                { type = "float", cvar = "pro_distance_scale_max", label = "Distance Scale Max", min = 1.0, max = 10.0, decimals = 2 },
-                { type = "float", cvar = "pro_render_min_distance", label = "Minimum Distance", min = 0.0, max = 10000.0, decimals = 0 },
+                { type = "float", cvar = "pro_spawn_fade_distance", label = "Trail Fade Distance", min = 0.0, max = 1000.0, decimals = 0, client = true },
+                { type = "float", cvar = "pro_spawn_fade_time", label = "Trail Fade Time", min = 0.0, max = 2.0, decimals = 2, client = true },
+                { type = "float", cvar = "pro_spawn_offset", label = "Spawn Trail Offset", min = 0.0, max = 200.0, decimals = 0, client = true },
+                { type = "float", cvar = "pro_min_trail_length", label = "Min Trail Length", min = 0.0, max = 100.0, decimals = 0, client = true },
+                { type = "float", cvar = "pro_distance_scale_start", label = "Scale Start Distance", min = 0.0, max = 10000.0, decimals = 0, client = true },
+                { type = "float", cvar = "pro_distance_scale_max", label = "Max Scale Multiplier", min = 1.0, max = 10.0, decimals = 2, client = true },
+                { type = "float", cvar = "pro_render_min_distance", label = "Min Render Distance", min = 0.0, max = 1000.0, decimals = 0, client = true },
             }
         },
         {

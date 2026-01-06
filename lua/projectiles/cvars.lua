@@ -38,10 +38,11 @@ PROJECTILES_CVARS = {
     ["pro_wind_jitter_amount"] = CreateConVar("pro_wind_jitter_amount", "1.0", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Wind jitter amount", 0.0, 100.0),
     ["pro_render_enabled"] = CreateConVar("pro_render_enabled", "1", bit.bor(FCVAR_ARCHIVE), "Enable render", 0, 1),
     ["pro_render_wind_hud"] = CreateConVar("pro_render_wind_hud", "1", bit.bor(FCVAR_ARCHIVE), "Enable wind hud", 0, 1),
-    ["pro_net_reliable"] = CreateConVar("pro_net_reliable", "0", bit.bor(FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED), "Enable net reliable", 0, 1),
-    ["pro_net_send_method"] = CreateConVar("pro_net_send_method", "1", bit.bor(FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED), "Networking send method", 0, 2), -- 0 PVS, 1 PAS, 2 Broadcast
+    ["pro_net_reliable"] = CreateConVar("pro_net_reliable", "0", bit.bor(FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED), "Enable reliable transmission of projectiles", 0, 1),
+    ["pro_net_send_method"] = CreateConVar("pro_net_send_method", "1", bit.bor(FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED), "Networking send method for projectiles", 0, 2), -- 0 PVS, 1 PAS, 2 Broadcast
     ["pro_damage_scaling"] = CreateConVar("pro_damage_scaling", "1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Enable damage scaling", 0, 1),
     ["pro_damage_force_multiplier"] = CreateConVar("pro_damage_force_multiplier", "0.1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Damage force multiplier", 0.0, 50.0),
     ["pro_dropoff_enabled"] = CreateConVar("pro_damage_dropoff_enabled", "1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Enable damage dropoff", 0, 1),
     ["pro_marketplace_base_url"] = CreateConVar("pro_marketplace_base_url", "migration.projectilemod.directory", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Marketplace URL"),
+    ["pro_npc_shootpos_forward"] = CreateConVar("pro_npc_shootpos_forward", "0", bit.bor(FCVAR_ARCHIVE, FCVAR_REPLICATED), "Forward offset for NPC bullet spawn position", 0, 200),
 };

@@ -236,6 +236,12 @@ local function apply_drag(projectile_data)
 
         projectile_data.speed = projectile_data.speed - projectile_data.speed * drag_factor;
     end
+
+    if projectile_data.vel then
+        projectile_data.old_vel.x = projectile_data.vel.x;
+        projectile_data.old_vel.y = projectile_data.vel.y;
+        projectile_data.old_vel.z = projectile_data.vel.z;
+    end
 end
 
 local function move_projectile(shooter, projectile_data)
@@ -275,6 +281,12 @@ local function move_projectile(shooter, projectile_data)
     if get_bool(cv_gravity_enabled) or get_bool(cv_wind_enabled) then
         projectile_data.dir = get_normalized(current_velocity);
         projectile_data.speed = vec_len(current_velocity);
+    end
+    
+    if projectile_data.vel then
+        projectile_data.vel.x = current_velocity.x;
+        projectile_data.vel.y = current_velocity.y;
+        projectile_data.vel.z = current_velocity.z;
     end
     
     vec_mul(current_velocity, tick_interval);
