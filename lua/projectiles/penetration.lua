@@ -44,14 +44,14 @@ local dot = vector_meta.Dot;
 local get_normalized = vector_meta.GetNormalized;
 local len = vector_meta.Length;
 local len_sqr = vector_meta.LengthSqr;
-local mul = vector_meta.Mul;
+local vec_mul = vector_meta.Mul;
 local dist_sqr = vector_meta.DistToSqr;
 local distance = vector_meta.Distance;
 
 local tick_count = engine.TickCount;
 local max = math.max;
 
-local MAX_DISTANCE = 90 * 90;
+local MAX_DISTANCE = 180 * 180;
 
 local cv_debug_dur = get_convar("pro_debug_duration");
 local cv_debug_col = get_convar("pro_debug_color");
@@ -68,57 +68,8 @@ local function debug_ricochet(projectile_data, enter_trace, chance, reflect, spr
     debug_text(enter_trace.HitPos + vector(0, 0, 30), string_format("spread: %.2f %.2f %.2f", spread.x, spread.y, spread.z), dur, false);
 end
 
-RICOCHET_MAT_CHANCE_MULTIPLIERS = {
-    [MAT_ANTLION] = 0.0,
-    [MAT_BLOODYFLESH] = 0.0,
-    [MAT_CONCRETE] = 0.7,
-    [MAT_DIRT] = 0.0,
-    [MAT_EGGSHELL] = 0.6,
-    [MAT_FLESH] = 0.0,
-    [MAT_GRATE] = 0.0,
-    [MAT_ALIENFLESH] = 0.0,
-    [MAT_CLIP] = 0.0,
-    [MAT_SNOW] = 0.0,
-    [MAT_PLASTIC] = 0.0,
-    [MAT_METAL] = 0.9,
-    [MAT_SAND] = 0.0,
-    [MAT_FOLIAGE] = 0.0,
-    [MAT_COMPUTER] = 0.8,
-    [MAT_SLOSH] = 0.0,
-    [MAT_TILE] = 0.6,
-    [MAT_GRASS] = 0.0,
-    [MAT_VENT] = 0.0,
-    [MAT_WOOD] = 0.1,
-    [MAT_DEFAULT] = 0.0,
-    [MAT_GLASS] = 0.0,
-    [MAT_WARPSHIELD] = 0.9,
-};
-
-MAT_TYPE_NAMES = {
-    [MAT_ANTLION] = "MAT_ANTLION",
-    [MAT_BLOODYFLESH] = "MAT_BLOODYFLESH",
-    [MAT_CONCRETE] = "MAT_CONCRETE",
-    [MAT_DIRT] = "MAT_DIRT",
-    [MAT_EGGSHELL] = "MAT_EGGSHELL",
-    [MAT_FLESH] = "MAT_FLESH",
-    [MAT_GRATE] = "MAT_GRATE",
-    [MAT_ALIENFLESH] = "MAT_ALIENFLESH",
-    [MAT_CLIP] = "MAT_CLIP",
-    [MAT_SNOW] = "MAT_SNOW",
-    [MAT_PLASTIC] = "MAT_PLASTIC",
-    [MAT_METAL] = "MAT_METAL",
-    [MAT_SAND] = "MAT_SAND",
-    [MAT_FOLIAGE] = "MAT_FOLIAGE",
-    [MAT_COMPUTER] = "MAT_COMPUTER",
-    [MAT_SLOSH] = "MAT_SLOSH",
-    [MAT_TILE] = "MAT_TILE",
-    [MAT_GRASS] = "MAT_GRASS",
-    [MAT_VENT] = "MAT_VENT",
-    [MAT_WOOD] = "MAT_WOOD",
-    [MAT_DEFAULT] = "MAT_DEFAULT",
-    [MAT_GLASS] = "MAT_GLASS",
-    [MAT_WARPSHIELD] = "MAT_WARPSHIELD",
-};
+--todo: use surface props instead
+RICOCHET_MAT_CHANCE_MULTIPLIERS = SURFACE_PROPS_RICOCHET_CHANCE_MULTIPLIERS;
 
 if SERVER then
     util.AddNetworkString("projectile_ricochet_mat_chance_multipliers_sync");
@@ -131,9 +82,10 @@ if SERVER then
     local write_table = net.WriteTable;
     local write_string = net.WriteString;
     local write_float = net.WriteFloat;
-    local write_uint = net.WriteUInt;
     local broadcast = net.Broadcast;
     local send = net.Send;
+    local read_string = net.ReadString;
+    local read_float = net.ReadFloat;
 
     local IsValid = IsValid;
     local tonumber = tonumber;
@@ -141,18 +93,27 @@ if SERVER then
     local is_superadmin = player_meta.IsSuperAdmin;
 
     local function initialize_db()
+        if sql.TableExists("ricochet_mat_chance_multipliers") then
+            local schema = sql.Query("PRAGMA table_info(ricochet_mat_chance_multipliers)");
+            if schema and schema[1] then
+                local key_type = string.upper(schema[1].type);
+                if key_type == "INTEGER" then
+                    print("detected old ricochet_mat_chance_multipliers table with integer keys, dropping...");
+                    sql.Query("DROP TABLE ricochet_mat_chance_multipliers");
+                end
+            end
+        end
+
         if not sql.TableExists("ricochet_mat_chance_multipliers") then
-            local res = sql.Query("CREATE TABLE ricochet_mat_chance_multipliers (key INTEGER PRIMARY KEY, value FLOAT)");
+            local res = sql.Query("CREATE TABLE ricochet_mat_chance_multipliers (key TEXT PRIMARY KEY, value FLOAT)");
             if res == false then
                 print("sql error creating ricochet_mat_chance_multipliers table: " .. sql.LastError());
             end
         else
             local data = sql.Query("SELECT * FROM ricochet_mat_chance_multipliers");
-            --print(data);
             if data then
-                --PrintTable(data);
                 for idx, row in ipairs(data) do
-                    local key = tonumber(row.key);
+                    local key = row.key;
                     local val = tonumber(row.value);
                     RICOCHET_MAT_CHANCE_MULTIPLIERS[key] = val;
                     print("loaded ricochet mat chance multiplier: " .. key .. " -> " .. val);
@@ -163,21 +124,21 @@ if SERVER then
 
     initialize_db();
 
-    local function save_ricochet_mat_multiplier_to_db(mat_type, chance)
-        local query = "REPLACE INTO ricochet_mat_chance_multipliers (key, value) VALUES(" .. mat_type .. ", " .. chance .. ")";
-        --print(query);
+    local function save_ricochet_mat_multiplier_to_db(surface_prop, chance)
+        local safe_key = sql.SQLStr(surface_prop);
+        local query = "REPLACE INTO ricochet_mat_chance_multipliers (key, value) VALUES(" .. safe_key .. ", " .. chance .. ")";
         local res = sql.Query(query);
         
         if res == false then
-            print("sql error saving ricochet mat chance multiplier: " .. mat_type .. ": " .. chance .. ": " .. sql.LastError());
+            print("sql error saving ricochet mat chance multiplier: " .. surface_prop .. ": " .. chance .. ": " .. sql.LastError());
         end
     end
 
-    local function update_ricochet_mat_chance_multipliers(mat_type, chance)
-        RICOCHET_MAT_CHANCE_MULTIPLIERS[mat_type] = chance;
-        save_ricochet_mat_multiplier_to_db(mat_type, chance);
+    local function update_ricochet_mat_chance_multipliers(surface_prop, chance)
+        RICOCHET_MAT_CHANCE_MULTIPLIERS[surface_prop] = chance;
+        save_ricochet_mat_multiplier_to_db(surface_prop, chance);
         net_start("projectile_ricochet_mat_chance_multipliers_update");
-        write_uint(mat_type, 8);
+        write_string(surface_prop);
         write_float(chance);
         broadcast();
     end
@@ -191,7 +152,7 @@ if SERVER then
         end);
     end);
 
-    concommand.Add("pro_ricochet_mat_chance_multipliers_update", function(player, cmd, args)
+    concommand.Add("pro_ricochet_surfaceprop_update", function(player, cmd, args)
         if not IsValid(player) then 
             return; 
         elseif not is_superadmin(player) then
@@ -199,22 +160,22 @@ if SERVER then
             return;
         end
 
-        local mat_type = tonumber(args[1]) or _G[args[1]];
-        if not mat_type then
-            player:ChatPrint("Invalid mat type: " .. args[1]);
+        local surface_prop = args[1];
+        if not surface_prop then
+            player:ChatPrint("Invalid surface prop: " .. tostring(args[1]));
             return;
         end
 
         local chance = tonumber(args[2]);
         if not chance then
-            player:ChatPrint("Invalid chance: " .. args[2]);
+            player:ChatPrint("Invalid chance: " .. tostring(args[2]));
             return;
         end
 
-        update_ricochet_mat_chance_multipliers(mat_type, tonumber(chance));
-    end, nil, "Update the ricochet mat chance multipliers");
+        update_ricochet_mat_chance_multipliers(surface_prop, chance);
+    end, nil, "Update the ricochet surface prop chance multipliers");
 
-    concommand.Add("pro_ricochet_mat_chance_multipliers_reset", function(player, cmd, args)
+    concommand.Add("pro_ricochet_surfaceprop_reset", function(player, cmd, args)
         if not IsValid(player) then 
             return; 
         elseif not is_superadmin(player) then
@@ -228,7 +189,7 @@ if SERVER then
         broadcast();
 
         print("reset ricochet mat chance multipliers");
-    end, nil, "Reset the ricochet mat chance multipliers");
+    end, nil, "Reset the ricochet surface prop chance multipliers");
 end
 
 local RICOCHET_MAT_CHANCE_MULTIPLIERS = RICOCHET_MAT_CHANCE_MULTIPLIERS;
@@ -241,11 +202,11 @@ if CLIENT then
     end);
     
     net.Receive("projectile_ricochet_mat_chance_multipliers_update", function()
-        local mat_type = net.ReadUInt(8);
+        local surface_prop = net.ReadString();
         local chance = net.ReadFloat();
-        RICOCHET_MAT_CHANCE_MULTIPLIERS[mat_type] = chance;
-        print("updated ricochet mat chance multiplier for " .. mat_type .. " to " .. chance);
-        LocalPlayer():ChatPrint("Updated ricochet mat chance multiplier for " .. mat_type .. " to " .. chance);
+        RICOCHET_MAT_CHANCE_MULTIPLIERS[surface_prop] = chance;
+        print("updated ricochet mat chance multiplier for " .. surface_prop .. " to " .. chance);
+        LocalPlayer():ChatPrint("Updated ricochet mat chance multiplier for " .. surface_prop .. " to " .. chance);
     end);
 end
 
@@ -257,17 +218,19 @@ function handle_penetration(shooter, projectile_data, src, dir, penetration_powe
     if get_bool(cv_ricochet_enabled) then
         random_seed(projectile_data.random_seed + projectile_data.penetration_count);
 
+        local enter_surf_data = get_surface_data(enter_trace.SurfaceProps);
+        local enter_name = enter_surf_data and enter_surf_data.name and lower(enter_surf_data.name) or "unknown";
         local hit_normal = enter_trace.HitNormal;
         local dot_result = dot(dir, hit_normal);
     
         local chance = rand(0, 1);
-        local mat_chance = RICOCHET_MAT_CHANCE_MULTIPLIERS[enter_trace.MatType] or RICOCHET_MAT_CHANCE_MULTIPLIERS[MAT_DEFAULT];
+        local mat_chance = RICOCHET_MAT_CHANCE_MULTIPLIERS[enter_name];
         local angle_scale = 1.0 + dot_result;
         local chance_threshold = get_float(cv_ricochet_chance) * mat_chance * angle_scale;
         if chance < chance_threshold then
             local reflect = dir - (2 * dot_result * hit_normal);
             local spread = vector_rand();
-            mul(spread, get_float(cv_ricochet_spread));
+            vec_mul(spread, get_float(cv_ricochet_spread));
     
             projectile_data.dir = get_normalized(reflect + spread);
             projectile_data.speed = projectile_data.speed * get_float(cv_ricochet_speed_multiplier);
@@ -292,20 +255,20 @@ function handle_penetration(shooter, projectile_data, src, dir, penetration_powe
     local enter_surf_data = get_surface_data(enter_trace.SurfaceProps);
     local exit_surf_data = get_surface_data(exit_trace.SurfaceProps);
 
-    local enter_mat = enter_trace.MatType;
-    local exit_mat = exit_trace.MatType;
+    --local enter_mat = enter_trace.MatType;
+    --local exit_mat = exit_trace.MatType;
 
-    local is_grate_surf = (enter_mat == MAT_GRATE) or (enter_mat == MAT_GLASS);
-    local resistance = 1.0;
-    local entry_cost = 0.0;
+    --local is_grate_surf = (enter_mat == MAT_GRATE) or (enter_mat == MAT_GLASS);
+    local resistance;-- = 1.0;
+    local entry_cost;-- = 0.0;
 
-    if is_grate_surf then
-        resistance = 0.05;
-        entry_cost = 0.05;
+    --if is_grate_surf then
+    --    resistance = 0.05;
+    --    entry_cost = 0.05;
     --elseif enter_mat == MAT_FLESH then 
         --resistance = 0.05;
         --entry_cost = 1.0;
-    else
+    --else
         local exit_name = exit_surf_data and exit_surf_data.name and lower(exit_surf_data.name) or "unknown";
         local enter_name = enter_surf_data and enter_surf_data.name and lower(enter_surf_data.name) or "unknown";
         local exit_pen = 1.0 - (exit_surf_data and SURFACE_PROPS_PENETRATION[exit_name] or 1.0);
@@ -313,7 +276,7 @@ function handle_penetration(shooter, projectile_data, src, dir, penetration_powe
 
         resistance = (enter_pen + exit_pen) * 0.5;
         entry_cost = enter_pen * get_float(cv_penetration_entry_cost_multiplier);
-    end
+    --end
 
     local dist = distance(exit_trace.HitPos, enter_trace.HitPos);
     local power_cost_multiplier = get_float(cv_penetration_power_cost_multiplier);

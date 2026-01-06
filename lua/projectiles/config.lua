@@ -327,9 +327,8 @@ if CLIENT then
                 end
 
                 local sorted_mats = {};
-                for mat_id, val in pairs(RICOCHET_MAT_CHANCE_MULTIPLIERS) do
-                    local name = MAT_TYPE_NAMES[mat_id] or "Unknown";
-                    table.insert(sorted_mats, { id = mat_id, name = name, val = val });
+                for name, val in pairs(RICOCHET_MAT_CHANCE_MULTIPLIERS) do
+                    table.insert(sorted_mats, { name = name, val = val });
                 end
                 table.sort(sorted_mats, function(a, b) return a.name < b.name end);
 
@@ -357,7 +356,7 @@ if CLIENT then
 
                     slider.OnValueChanged = function(s, value)
                         timer.Create("pro_ric_mat_update_" .. mat_data.name, 0.25, 1, function()
-                            RunConsoleCommand("pro_ricochet_mat_chance_multipliers_update", mat_data.name, tostring(math.Round(value, 2)));
+                            RunConsoleCommand("pro_ricochet_surfaceprop_update", mat_data.name, tostring(math.Round(value, 2)));
                         end);
                     end
                 end
@@ -768,13 +767,35 @@ if CLIENT then
                             end
                         end
                     
-                        slider.TextArea.OnEnter = function()
-                            send_update();
-                            slider.HasChanged = false;
-                        end
+                    slider.TextArea.OnEnter = function()
+                        send_update();
+                        slider.HasChanged = false;
                     end
 
-                    for _, class_name in ipairs(sorted_weapons) do
+                    panel.UpdateValue = function(s)
+                        local isInteracting = slider.Slider:GetDragging() or slider.TextArea:IsEditing();
+                        if isInteracting then return; end
+
+                        local current_table = CONFIG_TYPES[cfg_type];
+                        local current_val = current_table and current_table[class_name];
+                        
+                        local new_value;
+                        if current_val and type(current_val) == "number" then
+                            new_value = current_val;
+                        else
+                            local def = current_table and current_table["default"];
+                            if def and type(def) == "number" then
+                                new_value = def;
+                            else
+                                new_value = default_val;
+                            end
+                        end
+                        
+                        slider:SetValue(new_value);
+                    end
+                end
+
+                for _, class_name in ipairs(sorted_weapons) do
                         if WEAPON_BLACKLIST and WEAPON_BLACKLIST[class_name] then continue; end
                         
                         if filter and filter ~= "" and not string.find(string.lower(class_name), string.lower(filter), 1, true) then
