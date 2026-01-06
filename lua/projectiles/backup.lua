@@ -1,10 +1,12 @@
 AddCSLuaFile();
 
-if CLIENT then return; end
+--if CLIENT then return; end
 
-util.AddNetworkString("projectiles_restore_config_start");
-util.AddNetworkString("projectiles_restore_config_chunk");
-util.AddNetworkString("projectiles_query_configs");
+if SERVER then
+    util.AddNetworkString("projectiles_restore_config_start");
+    util.AddNetworkString("projectiles_restore_config_chunk");
+    util.AddNetworkString("projectiles_query_configs");
+end
 
 PROJECTILES_BACKUP_SURFACEPROPS = 0x1;
 PROJECTILES_BACKUP_WEAPON_CONFIG = 0x2;
@@ -45,6 +47,8 @@ function projectiles_backup_config(type, flags)
 
     return nil;
 end
+
+if CLIENT then return; end
 
 function projectiles_restore_config(data)
     if data["surfaceprops"] then
