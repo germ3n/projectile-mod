@@ -26,11 +26,12 @@ fi
 
 echo "Installing system dependencies..."
 apt-get update
-apt-get install -y python3 python3-pip python3-venv ufw nginx
+apt-get install -y python3 python3-pip python3-venv ufw nginx openssl
 
 echo "Enabling ufw..."
 ufw allow 'Nginx Full'
 ufw allow ssh
+ufw default deny
 ufw enable
 ufw reload
 
@@ -54,6 +55,9 @@ echo "Installing Python dependencies..."
 sudo -u "$SERVICE_USER" "$VENV_DIR/bin/pip" install --upgrade pip
 sudo -u "$SERVICE_USER" "$VENV_DIR/bin/pip" install gunicorn flask requests werkzeug flask-limiter
 
+echo "Generating secret key..."
+SECRET_KEY=$(openssl rand -hex 32)
+
 echo "Creating systemd service..."
 cat > "/etc/systemd/system/${SERVICE_NAME}.service" << EOF
 [Unit]
@@ -66,6 +70,7 @@ User=$SERVICE_USER
 Group=$SERVICE_USER
 WorkingDirectory=$WORKING_DIR
 Environment="PATH=$VENV_DIR/bin"
+Environment="SECRET_KEY=$SECRET_KEY"
 ExecStart=$VENV_DIR/bin/gunicorn --bind 0.0.0.0:8000 --workers 4 --timeout 120 --worker-class sync app:app
 Restart=always
 RestartSec=10
