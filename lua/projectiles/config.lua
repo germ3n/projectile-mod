@@ -275,6 +275,10 @@ if CLIENT then
                 { type = "header", label = "Render Settings" },
                 { type = "bool", cvar = "pro_render_enabled", label = "Enable Projectile Rendering", client = true },
                 { type = "bool", cvar = "pro_render_wind_hud", label = "Enable Wind HUD", client = true },
+                { type = "float", cvar = "pro_spawn_fade_distance", label = "Spawn Fade Distance", min = 0.0, max = 1000.0, decimals = 0 },
+                { type = "float", cvar = "pro_distance_scale_start", label = "Distance Scale Start", min = 0.0, max = 10000.0, decimals = 0 },
+                { type = "float", cvar = "pro_distance_scale_max", label = "Distance Scale Max", min = 1.0, max = 10.0, decimals = 2 },
+                { type = "float", cvar = "pro_render_min_distance", label = "Minimum Distance", min = 0.0, max = 10000.0, decimals = 0 },
             }
         },
         {

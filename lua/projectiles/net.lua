@@ -115,6 +115,7 @@ if SERVER then
                     trace_filter = {nil, nil, nil},
                     tracer_colors = {nil, nil},
                     is_gmod_turret = false,
+                    spawn_pos = vector(),
                 };
             end
 
@@ -152,6 +153,9 @@ if SERVER then
         projectile.tracer_colors[1] = tracer_colors[1];
         projectile.tracer_colors[2] = tracer_colors[2];
         projectile.is_gmod_turret = is_gmod_turret;
+        projectile.spawn_pos.x = pos.x;
+        projectile.spawn_pos.y = pos.y;
+        projectile.spawn_pos.z = pos.z;
         projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
     end
 end
@@ -223,6 +227,7 @@ if CLIENT then
                     trace_filter = {nil, nil, nil},
                     tracer_colors = {nil, nil},
                     is_gmod_turret = false,
+                    spawn_pos = vector(),
                 };
             end
 
@@ -260,6 +265,9 @@ if CLIENT then
         projectile.tracer_colors[1] = tracer_color_core;
         projectile.tracer_colors[2] = tracer_color_glow;
         projectile.is_gmod_turret = is_gmod_turret;
+        projectile.spawn_pos.x = pos_x;
+        projectile.spawn_pos.y = pos_y;
+        projectile.spawn_pos.z = pos_z;
         projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
     end)
 end
