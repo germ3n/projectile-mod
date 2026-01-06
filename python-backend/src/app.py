@@ -6,9 +6,17 @@ import requests
 from datetime import datetime
 from flask import Flask, request, jsonify, redirect, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    storage_uri="memory://"
+)
 
 DB_PATH = 'database.db'
 
@@ -191,6 +199,7 @@ def authorize():
     return jsonify({"error": "Identity verification failed"}), 401
 
 @app.route('/configs/search', methods=['GET'])
+@limiter.limit("30 per minute")
 def search_configs():
     limit = request.args.get('limit', 10, type=int)
     sort_by = request.args.get('sort_by', 'date')
@@ -253,6 +262,8 @@ def fetch_config(config_id):
     })
 
 @app.route('/upload-config', methods=['POST'])
+@limiter.limit("5 per hour")
+@limiter.limit("20 per day")
 def save_config():
     auth_header = request.headers.get('Authorization', '')
     token = auth_header.replace('Bearer ', '') if 'Bearer ' in auth_header else None
@@ -296,6 +307,8 @@ def save_config():
     return jsonify({"message": "Config saved successfully", "id": config_id}), 201
 
 @app.route('/update-config', methods=['POST'])
+@limiter.limit("50 per hour")
+@limiter.limit("200 per day")
 def update_config():
     auth_header = request.headers.get('Authorization', '')
     token = auth_header.replace('Bearer ', '') if 'Bearer ' in auth_header else None
@@ -353,6 +366,8 @@ def update_config():
     })
 
 @app.route('/delete-config', methods=['POST'])
+@limiter.limit("50 per hour")
+@limiter.limit("200 per day")
 def delete_config():
     auth_header = request.headers.get('Authorization', '')
     token = auth_header.replace('Bearer ', '') if 'Bearer ' in auth_header else None

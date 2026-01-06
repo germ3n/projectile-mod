@@ -52,7 +52,7 @@ fi
 
 echo "Installing Python dependencies..."
 sudo -u "$SERVICE_USER" "$VENV_DIR/bin/pip" install --upgrade pip
-sudo -u "$SERVICE_USER" "$VENV_DIR/bin/pip" install gunicorn flask requests werkzeug
+sudo -u "$SERVICE_USER" "$VENV_DIR/bin/pip" install gunicorn flask requests werkzeug flask-limiter
 
 echo "Creating systemd service..."
 cat > "/etc/systemd/system/${SERVICE_NAME}.service" << EOF
