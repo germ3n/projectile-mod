@@ -13,6 +13,7 @@ Designed for **Debian 12/13**. Should work on Ubuntu as well.
 - **Public Server**: 2GB+ RAM + 2+ CPUs
 
 > The script automatically calculates optimal worker count based on available resources.
+> Redis is included for rate limiting (~30-50MB RAM overhead).
 
 ## Getting Started
 
@@ -65,7 +66,7 @@ Designed for **Debian 12/13**. Should work on Ubuntu as well.
 - Steam OpenID authentication
 - Automatic username sync from Steam profiles
 - Config upload/download/management
-- Rate limiting
+- Redis-backed rate limiting (works across all workers)
 - User banning system
 - Automatic worker calculation
 - Systemd service integration
@@ -97,6 +98,15 @@ sudo systemctl reload nginx
 
 # Renew SSL certificate (auto-renewed, but manual check)
 sudo certbot renew --dry-run
+
+# Check Redis status
+sudo systemctl status redis-server
+
+# Restart Redis
+sudo systemctl restart redis-server
+
+# Monitor Redis (check rate limit counters)
+redis-cli monitor
 ```
 
 ## File Locations
@@ -111,8 +121,8 @@ sudo certbot renew --dry-run
 
 - Runs as dedicated `projectile-api` system user
 - No shell access for service user
-- Rate limiting enabled
-- UFW firewall configured (HTTP/HTTPS + SSH)
+- Redis-backed rate limiting (shared across all workers)
+- UFW firewall configured (HTTP/HTTPS + SSH, Redis bound to localhost only)
 - TLS 1.2+ with modern cipher suites
 - HSTS enabled (6 months)
 - Environment-based secrets

@@ -19,7 +19,7 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    storage_uri="memory://"
+    storage_uri="redis://localhost:6379"
 )
 
 DB_PATH = 'database.db'

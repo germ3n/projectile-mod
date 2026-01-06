@@ -26,7 +26,7 @@ fi
 
 echo "Installing system dependencies..."
 apt-get update
-apt-get install -y python3 python3-pip python3-venv ufw nginx openssl
+apt-get install -y python3 python3-pip python3-venv ufw nginx openssl redis-server
 
 echo "Enabling ufw..."
 ufw allow 'Nginx Full'
@@ -34,6 +34,10 @@ ufw allow ssh
 ufw default deny
 ufw enable
 ufw reload
+
+echo "Starting Redis..."
+systemctl enable redis-server
+systemctl start redis-server
 
 echo "Creating installation directory..."
 mkdir -p "$INSTALL_DIR"
@@ -53,7 +57,7 @@ fi
 
 echo "Installing Python dependencies..."
 sudo -u "$SERVICE_USER" "$VENV_DIR/bin/pip" install --upgrade pip
-sudo -u "$SERVICE_USER" "$VENV_DIR/bin/pip" install gunicorn flask requests werkzeug flask-limiter
+sudo -u "$SERVICE_USER" "$VENV_DIR/bin/pip" install gunicorn flask requests werkzeug flask-limiter redis
 
 echo ""
 echo "Domain name is required for nginx and SSL setup."
@@ -239,6 +243,7 @@ echo "Configuration:"
 echo "  Application directory: $INSTALL_DIR"
 echo "  Database location: $APP_DIR/database.db"
 echo "  Nginx config: /etc/nginx/conf.d/default.conf"
+echo "  Redis: Running on localhost:6379"
 if [ -n "$STEAM_API_KEY" ]; then
     echo "  Steam API: Configured (username sync enabled)"
 else
