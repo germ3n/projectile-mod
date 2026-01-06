@@ -58,6 +58,32 @@ sudo -u "$SERVICE_USER" "$VENV_DIR/bin/pip" install gunicorn flask requests werk
 echo "Generating secret key..."
 SECRET_KEY=$(openssl rand -hex 32)
 
+calculate_workers() {
+    local cpu_cores=$(nproc)
+    local total_ram_mb=$(free -m | awk '/^Mem:/{print $2}')
+    
+    local worker_formula=$((2 * cpu_cores + 1))
+    
+    local ram_based_workers=$((total_ram_mb / 200))
+    
+    local workers=$worker_formula
+    if [ $ram_based_workers -lt $workers ]; then
+        workers=$ram_based_workers
+    fi
+    
+    if [ $workers -lt 1 ]; then
+        workers=1
+    elif [ $workers -gt 8 ]; then
+        workers=8
+    fi
+    
+    echo $workers
+}
+
+WORKERS=$(calculate_workers)
+echo "Detected CPU cores: $(nproc), RAM: $(free -m | awk '/^Mem:/{print $2}')MB"
+echo "Calculated optimal workers: $WORKERS"
+
 echo "Creating systemd service..."
 cat > "/etc/systemd/system/${SERVICE_NAME}.service" << EOF
 [Unit]
@@ -71,7 +97,7 @@ Group=$SERVICE_USER
 WorkingDirectory=$WORKING_DIR
 Environment="PATH=$VENV_DIR/bin"
 Environment="SECRET_KEY=$SECRET_KEY"
-ExecStart=$VENV_DIR/bin/gunicorn --bind 0.0.0.0:8000 --workers 4 --timeout 120 --worker-class sync app:app
+ExecStart=$VENV_DIR/bin/gunicorn --bind 0.0.0.0:8000 --workers $WORKERS --timeout 120 --worker-class sync app:app
 Restart=always
 RestartSec=10
 
