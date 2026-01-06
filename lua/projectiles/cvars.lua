@@ -42,4 +42,5 @@ PROJECTILES_CVARS = {
     ["pro_net_send_method"] = CreateConVar("pro_net_send_method", "1", bit.bor(FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED), "Networking send method", 0, 2), -- 0 PVS, 1 PAS, 2 Broadcast
     ["pro_damage_scaling"] = CreateConVar("pro_damage_scaling", "1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Enable damage scaling", 0, 1),
     ["pro_damage_force_multiplier"] = CreateConVar("pro_damage_force_multiplier", "0.1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Damage force multiplier", 0.0, 50.0),
+    ["pro_dropoff_enabled"] = CreateConVar("pro_damage_dropoff_enabled", "1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Enable damage dropoff", 0, 1),
 };

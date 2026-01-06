@@ -113,6 +113,7 @@ local cv_wind_jitter_amount = get_convar("pro_wind_jitter_amount");
 local cv_render_wind_hud = get_convar("pro_render_wind_hud");
 local cv_sv_gravity = get_convar("sv_gravity");
 local cv_damage_force_multiplier = get_convar("pro_damage_force_multiplier");
+local cv_damage_dropoff_enabled = get_convar("pro_damage_dropoff_enabled");
 
 local convar_meta = FindMetaTable("ConVar");
 local get_bool = convar_meta.GetBool;
@@ -196,11 +197,37 @@ end
 local do_shellshock = do_shellshock;
 
 local _is_valid = IsValid;
-local function move_projectile(shooter, projectile_data)
-    if projectile_data.hit or projectile_data.penetration_count <= 0 or projectile_data.damage < 1.0 or projectile_data.distance_traveled >= projectile_data.max_distance then 
-        return true;
+local clamp = math.Clamp;
+
+local function calculate_damage_dropoff(projectile_data)
+    if not get_bool(cv_damage_dropoff_enabled) then
+        return false;
     end
 
+    if projectile_data.distance_traveled < projectile_data.dropoff_start then
+        return false;
+    end
+    
+    local multiplier;
+    if projectile_data.distance_traveled >= projectile_data.dropoff_end then
+        multiplier = projectile_data.dropoff_min_multiplier;
+    else
+        local range = projectile_data.dropoff_end - projectile_data.dropoff_start;
+        local progress = (projectile_data.distance_traveled - projectile_data.dropoff_start) / range;
+        progress = clamp(progress, 0.0, 1.0);
+        multiplier = 1.0 - (progress * (1.0 - projectile_data.dropoff_min_multiplier));
+    end
+    
+    local target_damage = projectile_data.damage_initial * multiplier;
+    
+    if target_damage < projectile_data.damage then
+        projectile_data.damage = target_damage;
+    end
+
+    return projectile_data.damage < 1.0;
+end
+
+local function apply_drag(projectile_data)
     if get_bool(cv_drag_enabled) then
         local drag_factor = projectile_data.drag * tick_interval * get_float(cv_drag_multiplier);
         if band(point_contents(projectile_data.pos), CONTENTS_WATER) ~= 0 then
@@ -209,6 +236,19 @@ local function move_projectile(shooter, projectile_data)
 
         projectile_data.speed = projectile_data.speed - projectile_data.speed * drag_factor;
     end
+end
+
+local function move_projectile(shooter, projectile_data)
+    if projectile_data.hit or projectile_data.penetration_count <= 0 or projectile_data.damage < 1.0 or projectile_data.distance_traveled >= projectile_data.max_distance then 
+        return true;
+    end
+
+    if calculate_damage_dropoff(projectile_data) then
+        projectile_data.hit = true;
+        return true;
+    end
+
+    apply_drag(projectile_data);
 
     if projectile_data.speed <= projectile_data.min_speed then
         projectile_data.hit = true;

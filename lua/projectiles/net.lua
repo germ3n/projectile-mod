@@ -40,7 +40,7 @@ if SERVER then
 
     local cv_net_send_method = GetConVar("pro_net_send_method");
 
-    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, is_gmod_turret, reliable)
+    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, is_gmod_turret, dropoff_start, dropoff_end, dropoff_min_multiplier, reliable)
         weapon.bullet_idx = (weapon.bullet_idx or 0) + 1;
 
         local time = cur_time();
@@ -72,8 +72,10 @@ if SERVER then
         write_color(tracer_colors[1]);
         write_color(tracer_colors[2]);
         write_bool(is_gmod_turret);
+        write_float(dropoff_start);
+        write_float(dropoff_end);
+        write_float(dropoff_min_multiplier);
 
-        --send_pvs(eye_pos(shooter));
         local send_method = get_int(cv_net_send_method);
         if send_method == 0 then
             send_pvs(pos);
@@ -101,6 +103,7 @@ if SERVER then
                     dir = vector(),
                     speed = nil,
                     damage = nil,
+                    damage_initial = nil,
                     drag = nil,
                     penetration_power = nil,
                     penetration_count = nil,
@@ -116,6 +119,9 @@ if SERVER then
                     tracer_colors = {nil, nil},
                     is_gmod_turret = false,
                     spawn_pos = vector(),
+                    dropoff_start = nil,
+                    dropoff_end = nil,
+                    dropoff_min_multiplier = nil,
                 };
             end
 
@@ -136,6 +142,7 @@ if SERVER then
         projectile.dir.z = dir.z;
         projectile.speed = speed;
         projectile.damage = damage;
+        projectile.damage_initial = damage;
         projectile.drag = drag;
         projectile.penetration_power = penetration_power;
         projectile.penetration_count = penetration_count;
@@ -156,6 +163,9 @@ if SERVER then
         projectile.spawn_pos.x = pos.x;
         projectile.spawn_pos.y = pos.y;
         projectile.spawn_pos.z = pos.z;
+        projectile.dropoff_start = dropoff_start;
+        projectile.dropoff_end = dropoff_end;
+        projectile.dropoff_min_multiplier = dropoff_min_multiplier;
         projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
     end
 end
@@ -195,6 +205,9 @@ if CLIENT then
         local tracer_color_core = read_color();
         local tracer_color_glow = read_color();
         local is_gmod_turret = read_bool();
+        local dropoff_start = read_float();
+        local dropoff_end = read_float();
+        local dropoff_min_multiplier = read_float();
 
         if not projectile_store[shooter] then 
             projectile_store[shooter] = {
@@ -213,6 +226,7 @@ if CLIENT then
                     dir = vector(),
                     speed = nil,
                     damage = nil,
+                    damage_initial = nil,
                     drag = nil,
                     penetration_power = nil,
                     penetration_count = nil,
@@ -228,6 +242,9 @@ if CLIENT then
                     tracer_colors = {nil, nil},
                     is_gmod_turret = false,
                     spawn_pos = vector(),
+                    dropoff_start = nil,
+                    dropoff_end = nil,
+                    dropoff_min_multiplier = nil,
                 };
             end
 
@@ -248,6 +265,7 @@ if CLIENT then
         projectile.dir.z = dir_z;
         projectile.speed = speed;
         projectile.damage = damage;
+        projectile.damage_initial = damage;
         projectile.drag = drag;
         projectile.penetration_power = penetration_power;
         projectile.penetration_count = penetration_count;
@@ -268,6 +286,9 @@ if CLIENT then
         projectile.spawn_pos.x = pos_x;
         projectile.spawn_pos.y = pos_y;
         projectile.spawn_pos.z = pos_z;
+        projectile.dropoff_start = dropoff_start;
+        projectile.dropoff_end = dropoff_end;
+        projectile.dropoff_min_multiplier = dropoff_min_multiplier;
         projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
     end)
 end

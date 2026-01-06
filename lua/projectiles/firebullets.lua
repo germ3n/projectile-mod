@@ -77,6 +77,9 @@ if SERVER then
     local get_weapon_min_speed = get_weapon_min_speed;
     local get_weapon_max_distance = get_weapon_max_distance;
     local get_weapon_tracer_colors = get_weapon_tracer_colors;
+    local get_weapon_dropoff_start = get_weapon_dropoff_start;
+    local get_weapon_dropoff_end = get_weapon_dropoff_end;
+    local get_weapon_dropoff_min_multiplier = get_weapon_dropoff_min_multiplier;
     
     local player_meta = FindMetaTable("Player");
     local get_lean_amount = player_meta.GetLeanAmount;
@@ -146,6 +149,9 @@ if SERVER then
         local min_speed = get_weapon_min_speed(inflictor, inflictor_class);
         local max_distance = get_weapon_max_distance(inflictor, inflictor_class);
         local tracer_colors = get_weapon_tracer_colors(inflictor, inflictor_class);
+        local dropoff_start = get_weapon_dropoff_start(inflictor, inflictor_class);
+        local dropoff_end = get_weapon_dropoff_end(inflictor, inflictor_class);
+        local dropoff_min_multiplier = get_weapon_dropoff_min_multiplier(inflictor, inflictor_class);
         for idx = 1, data.Num do
             local spread_dir = get_weapon_spread(inflictor, inflictor_class, data.Dir, data.Spread);
             broadcast_projectile(
@@ -164,6 +170,9 @@ if SERVER then
                 max_distance,
                 tracer_colors,
                 is_gmod_turret,
+                dropoff_start,
+                dropoff_end,
+                dropoff_min_multiplier,
                 get_bool(cv_net_reliable)
             );
         end

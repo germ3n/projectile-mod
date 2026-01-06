@@ -261,6 +261,7 @@ if CLIENT then
                 { type = "bool", cvar = "pro_drag_enabled", label = "Enable Drag" },
                 { type = "bool", cvar = "pro_gravity_enabled", label = "Enable Gravity" },
                 { type = "bool", cvar = "pro_damage_scaling", label = "Enable Damage Scaling" },
+                { type = "bool", cvar = "pro_damage_dropoff_enabled", label = "Enable Damage Dropoff" },
                 { type = "bool", cvar = "pro_wind_enabled", label = "Enable Wind (Experimental)" },
                 { type = "float", cvar = "pro_speed_scale", label = "Speed Scale", min = 0.1, max = 5.0, decimals = 2 },
                 { type = "float", cvar = "pro_weapon_damage_scale", label = "Damage Scale", min = 0.1, max = 5.0, decimals = 2 },
@@ -852,6 +853,9 @@ if CLIENT then
                         create_slider_with_copy(content, "Min Speed (Units/s)", "min_speed", class_name, CONFIG_TYPES["min_speed"]["default"], 0, 1000, 0, combo_src);
                         create_slider_with_copy(content, "Max Dist (Units)", "max_distance", class_name, CONFIG_TYPES["max_distance"]["default"], 0, 50000, 0, combo_src);
                         create_slider_with_copy(content, "Spread Bias", "spread_bias", class_name, CONFIG_TYPES["spread_bias"]["default"], -1.0, 1.0, 2, combo_src);
+                        create_slider_with_copy(content, "Dropoff Start (Units)", "dropoff_start", class_name, CONFIG_TYPES["dropoff_start"]["default"], 0, 50000, 0, combo_src);
+                        create_slider_with_copy(content, "Dropoff End (Units)", "dropoff_end", class_name, CONFIG_TYPES["dropoff_end"]["default"], 0, 50000, 0, combo_src);
+                        create_slider_with_copy(content, "Dropoff Min Multiplier", "dropoff_min_multiplier", class_name, CONFIG_TYPES["dropoff_min_multiplier"]["default"], 0.0, 1.0, 2, combo_src);
 
                         local div = vgui.Create("DPanel", content);
                         div:SetTall(2);
@@ -892,7 +896,7 @@ if CLIENT then
                             RunConsoleCommand("pro_weapon_config_reset_single_all", class_name);
                         end
 
-                        content:SetTall(430); 
+                        content:SetTall(520); 
                         category:SetContents(content);
                     end
                 end

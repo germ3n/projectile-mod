@@ -99,6 +99,20 @@ local WEAPON_SPREAD_BIAS = {
     ["weapon_shotgun"] = -1.0,
 };
 
+local WEAPON_DROPOFF_START = {
+    ["default"] = 5000.0,
+    ["weapon_shotgun"] = 500.0,
+};
+
+local WEAPON_DROPOFF_END = {
+    ["default"] = 10000.0,
+    ["weapon_shotgun"] = 1500.0,
+};
+
+local WEAPON_DROPOFF_MIN_MULTIPLIER = {
+    ["default"] = 0.5,
+};
+
 CONFIG_TYPES = {
     ["speed"] = WEAPON_SPEEDS,
     ["damage"] = WEAPON_DAMAGES,
@@ -111,6 +125,9 @@ CONFIG_TYPES = {
     ["max_distance"] = WEAPON_MAX_DISTANCE,
     ["tracer_colors"] = WEAPON_TRACER_COLORS,
     ["spread_bias"] = WEAPON_SPREAD_BIAS,
+    ["dropoff_start"] = WEAPON_DROPOFF_START,
+    ["dropoff_end"] = WEAPON_DROPOFF_END,
+    ["dropoff_min_multiplier"] = WEAPON_DROPOFF_MIN_MULTIPLIER,
 };
 
 local CONFIG_TYPES = CONFIG_TYPES;
@@ -166,6 +183,18 @@ end
 
 function get_weapon_spread_bias(weapon, class_name)
     return WEAPON_SPREAD_BIAS[class_name] or WEAPON_SPREAD_BIAS["default"];
+end
+
+function get_weapon_dropoff_start(weapon, class_name)
+    return WEAPON_DROPOFF_START[class_name] or WEAPON_DROPOFF_START["default"];
+end
+
+function get_weapon_dropoff_end(weapon, class_name)
+    return WEAPON_DROPOFF_END[class_name] or WEAPON_DROPOFF_END["default"];
+end
+
+function get_weapon_dropoff_min_multiplier(weapon, class_name)
+    return WEAPON_DROPOFF_MIN_MULTIPLIER[class_name] or WEAPON_DROPOFF_MIN_MULTIPLIER["default"];
 end
 
 if SERVER then
@@ -250,6 +279,9 @@ if SERVER then
         ["max_distance"] = table.Copy(WEAPON_MAX_DISTANCE),
         ["tracer_colors"] = table.Copy(WEAPON_TRACER_COLORS),
         ["spread_bias"] = table.Copy(WEAPON_SPREAD_BIAS),
+        ["dropoff_start"] = table.Copy(WEAPON_DROPOFF_START),
+        ["dropoff_end"] = table.Copy(WEAPON_DROPOFF_END),
+        ["dropoff_min_multiplier"] = table.Copy(WEAPON_DROPOFF_MIN_MULTIPLIER),
     };
 
     local player_meta = FindMetaTable("Player");
@@ -427,6 +459,9 @@ if SERVER then
             net.WriteTable(WEAPON_MAX_DISTANCE);
             net.WriteTable(WEAPON_TRACER_COLORS);
             net.WriteTable(WEAPON_SPREAD_BIAS);
+            net.WriteTable(WEAPON_DROPOFF_START);
+            net.WriteTable(WEAPON_DROPOFF_END);
+            net.WriteTable(WEAPON_DROPOFF_MIN_MULTIPLIER);
             net.Send(ply);
         end)
     end)
@@ -526,6 +561,9 @@ if CLIENT then
         WEAPON_MAX_DISTANCE = net.ReadTable();
         WEAPON_TRACER_COLORS = net.ReadTable();
         WEAPON_SPREAD_BIAS = net.ReadTable();
+        WEAPON_DROPOFF_START = net.ReadTable();
+        WEAPON_DROPOFF_END = net.ReadTable();
+        WEAPON_DROPOFF_MIN_MULTIPLIER = net.ReadTable();
         CONFIG_TYPES["speed"] = WEAPON_SPEEDS;
         CONFIG_TYPES["damage"] = WEAPON_DAMAGES;
         CONFIG_TYPES["penetration_power"] = WEAPON_PENETRATION_POWERS;
@@ -537,6 +575,9 @@ if CLIENT then
         CONFIG_TYPES["max_distance"] = WEAPON_MAX_DISTANCE;
         CONFIG_TYPES["tracer_colors"] = WEAPON_TRACER_COLORS;
         CONFIG_TYPES["spread_bias"] = WEAPON_SPREAD_BIAS;
+        CONFIG_TYPES["dropoff_start"] = WEAPON_DROPOFF_START;
+        CONFIG_TYPES["dropoff_end"] = WEAPON_DROPOFF_END;
+        CONFIG_TYPES["dropoff_min_multiplier"] = WEAPON_DROPOFF_MIN_MULTIPLIER;
         print("received full weapon config sync");
     end)
 
