@@ -1364,8 +1364,8 @@ if CLIENT then
             icon = "icon16/server_compressed.png",
             lazy_load = true,
             custom_draw = function(parent)
-                local marketplace_search_url = "https://projectilemod.directory/configs/search";
-                local api_base = "https://projectilemod.directory/";
+                local marketplace_search_url = "https://" .. GetConVar("pro_marketplace_base_url"):GetString() .. "/configs/search";
+                local api_base = "https://" .. GetConVar("pro_marketplace_base_url"):GetString() .. "/";
                 local current_sort = "date";
                 local current_auth_user = nil;
                 local current_view = "browse";
@@ -1448,10 +1448,14 @@ if CLIENT then
                                 local data = util.JSONToTable(body);
                                 current_auth_user = data;
                                 UpdateLoginButton("logged_in", data);
-                            else
+                            elseif code ~= 429 then -- rate limit
                                 cookie.Delete("projectile_api_key");
                                 current_auth_user = nil;
                                 UpdateLoginButton("logged_out");
+                            else
+                                current_auth_user = nil;
+                                UpdateLoginButton("logged_out");
+                                chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 100, 100), "Rate limit exceeded. Please try again later.");
                             end
                         end,
                         function(err)
@@ -2198,7 +2202,7 @@ if CLIENT then
                             draw.RoundedBox(4, 0, 0, w, h, me:IsHovered() and THEME.accent_hover or THEME.accent);
                         end
                         btn_browser.DoClick = function()
-                            gui.OpenURL("https://projectilemod.directory/auth/landing");
+                            gui.OpenURL("https://" .. GetConVar("pro_marketplace_base_url"):GetString() .. "/auth/landing");
                         end
 
                         local lbl_step2 = vgui.Create("DLabel", frame);

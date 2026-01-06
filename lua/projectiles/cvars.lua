@@ -43,4 +43,5 @@ PROJECTILES_CVARS = {
     ["pro_damage_scaling"] = CreateConVar("pro_damage_scaling", "1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Enable damage scaling", 0, 1),
     ["pro_damage_force_multiplier"] = CreateConVar("pro_damage_force_multiplier", "0.1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Damage force multiplier", 0.0, 50.0),
     ["pro_dropoff_enabled"] = CreateConVar("pro_damage_dropoff_enabled", "1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Enable damage dropoff", 0, 1),
+    ["pro_marketplace_base_url"] = CreateConVar("pro_marketplace_base_url", "projectilemod.directory", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Marketplace URL", 0, 1),
 };
