@@ -49,7 +49,12 @@ Designed for **Debian 12/13**. Should work on Ubuntu as well.
 
 5. **Follow prompts**
    
-   The installer will ask for your Steam Web API Key and domain name. Have them ready!
+   The installer will ask for:
+   - Your domain name
+   - Email address for SSL certificate
+   - Steam Web API Key
+   
+   The script will automatically configure nginx, SSL certificates, and all backend services.
 
 6. **Done!**
    
@@ -64,6 +69,7 @@ Designed for **Debian 12/13**. Should work on Ubuntu as well.
 - User banning system
 - Automatic worker calculation
 - Systemd service integration
+- Automatic nginx and SSL/TLS configuration
 
 ## Service Management
 
@@ -82,6 +88,15 @@ sudo systemctl status projectile-backend
 
 # View logs
 sudo journalctl -u projectile-backend -f
+
+# Test nginx configuration
+sudo nginx -t
+
+# Reload nginx
+sudo systemctl reload nginx
+
+# Renew SSL certificate (auto-renewed, but manual check)
+sudo certbot renew --dry-run
 ```
 
 ## File Locations
@@ -89,12 +104,16 @@ sudo journalctl -u projectile-backend -f
 - **Installation directory**: `/var/www/projectile_api/`
 - **Database**: `/var/www/projectile_api/src/database.db`
 - **Service file**: `/etc/systemd/system/projectile-backend.service`
+- **Nginx config**: `/etc/nginx/conf.d/default.conf`
+- **SSL certificates**: `/etc/letsencrypt/live/your-domain/`
 
 ## Security
 
 - Runs as dedicated `projectile-api` system user
 - No shell access for service user
 - Rate limiting enabled
-- UFW firewall configured
+- UFW firewall configured (HTTP/HTTPS + SSH)
+- TLS 1.2+ with modern cipher suites
+- HSTS enabled (6 months)
 - Environment-based secrets
 

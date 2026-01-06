@@ -55,6 +55,25 @@ echo "Installing Python dependencies..."
 sudo -u "$SERVICE_USER" "$VENV_DIR/bin/pip" install --upgrade pip
 sudo -u "$SERVICE_USER" "$VENV_DIR/bin/pip" install gunicorn flask requests werkzeug flask-limiter
 
+echo ""
+echo "Domain name is required for nginx and SSL setup."
+echo -n "Enter your domain name (e.g., projectilemod.directory): "
+read DOMAIN_NAME
+
+if [ -z "$DOMAIN_NAME" ]; then
+    echo "Error: Domain name is required"
+    exit 1
+fi
+
+echo ""
+echo -n "Enter your email for SSL certificate (Let's Encrypt notifications): "
+read SSL_EMAIL
+
+if [ -z "$SSL_EMAIL" ]; then
+    echo "Error: Email is required for SSL certificate"
+    exit 1
+fi
+
 echo "Generating secret key..."
 SECRET_KEY=$(openssl rand -hex 32)
 
@@ -126,10 +145,85 @@ systemctl enable "$SERVICE_NAME"
 echo "Starting service..."
 systemctl start "$SERVICE_NAME"
 
+echo "Installing certbot..."
+apt-get install -y certbot python3-certbot-nginx
+
+echo "Obtaining SSL certificate..."
+certbot certonly --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos --email "$SSL_EMAIL"
+
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to obtain SSL certificate"
+    exit 1
+fi
+
+echo "Configuring nginx with SSL..."
+cat > "/etc/nginx/conf.d/default.conf" << NGINX_EOF
+server {
+    if (\$host = $DOMAIN_NAME) {
+        return 301 https://\$host\$request_uri;
+    }
+
+  listen 80;
+  listen [::]:80;
+  server_name $DOMAIN_NAME;
+    return 404;
+}
+
+server {
+  listen 443 ssl http2;
+  listen [::]:443 ssl http2;
+  server_name $DOMAIN_NAME;
+  
+  ssl_certificate /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem;
+
+  ssl_session_timeout 1d;
+  ssl_session_cache shared:SSL:50m;
+  ssl_session_tickets off;
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+  ssl_prefer_server_ciphers off;
+
+  add_header Strict-Transport-Security "max-age=15768000" always;
+
+  location / {
+    proxy_pass http://127.0.0.1:8000;
+
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+
+    proxy_redirect off;
+
+    proxy_connect_timeout 90;
+    proxy_send_timeout 90;
+    proxy_read_timeout 90;
+
+    client_max_body_size 10M;
+  }
+
+  access_log /var/log/nginx/projectile_api_access.log;
+  error_log /var/log/nginx/projectile_api_error.log;
+}
+NGINX_EOF
+
+echo "Testing nginx configuration..."
+nginx -t
+
+if [ $? -eq 0 ]; then
+    echo "Reloading nginx..."
+    systemctl reload nginx
+else
+    echo "Error: Nginx configuration test failed"
+    exit 1
+fi
+
 echo ""
 echo "Installation complete!"
 echo "Installed to: $INSTALL_DIR"
 echo "Running as user: $SERVICE_USER"
+echo "Domain: https://$DOMAIN_NAME"
 echo ""
 echo "Service status:"
 systemctl status "$SERVICE_NAME" --no-pager
@@ -141,11 +235,15 @@ echo "  Restart: sudo systemctl restart $SERVICE_NAME"
 echo "  Status:  sudo systemctl status $SERVICE_NAME"
 echo "  Logs:    sudo journalctl -u $SERVICE_NAME -f"
 echo ""
-echo "Application directory: $INSTALL_DIR"
-echo "Database location: $APP_DIR/database.db"
+echo "Configuration:"
+echo "  Application directory: $INSTALL_DIR"
+echo "  Database location: $APP_DIR/database.db"
+echo "  Nginx config: /etc/nginx/conf.d/default.conf"
 if [ -n "$STEAM_API_KEY" ]; then
-    echo "Steam API: Configured (username sync enabled)"
+    echo "  Steam API: Configured (username sync enabled)"
 else
-    echo "Steam API: Not configured (username sync disabled)"
+    echo "  Steam API: Not configured (username sync disabled)"
 fi
+echo ""
+echo "Your API is now available at: https://$DOMAIN_NAME"
 
