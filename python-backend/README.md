@@ -21,6 +21,7 @@ Designed for **Debian 12/13**. Should work on Ubuntu as well.
 - A server running Debian 12/13
 - A domain name
 - SSH access to your server
+- A Steam Web API Key (get one at https://steamcommunity.com/dev/apikey)
 
 ### Installation
 
@@ -48,7 +49,7 @@ Designed for **Debian 12/13**. Should work on Ubuntu as well.
 
 5. **Follow prompts**
    
-   Monitor the installation progress and enter input when asked
+   The installer will ask for your Steam Web API Key and domain name. Have them ready!
 
 6. **Done!**
    
@@ -57,6 +58,7 @@ Designed for **Debian 12/13**. Should work on Ubuntu as well.
 ## Features
 
 - Steam OpenID authentication
+- Automatic username sync from Steam profiles
 - Config upload/download/management
 - Rate limiting
 - User banning system

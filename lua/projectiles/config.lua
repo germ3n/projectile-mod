@@ -1406,11 +1406,11 @@ if CLIENT then
                         btn_login:SetEnabled(false);
                         btn_login.user_data = nil;
                     elseif status == "logged_in" and user_data then
-                        btn_login:SetText(string.sub(user_data.steamid or "Unknown", 1, 12));
+                        btn_login:SetText(string.sub(user_data.username or "Unknown", 1, 12));
                         btn_login:SetEnabled(true);
                         btn_login.user_data = user_data;
                         btn_login.is_logged_in = true;
-                        btn_login:SetTooltip("Logged in as " .. (user_data.steamid or "User") .. ". Click to logout.");
+                        btn_login:SetTooltip("Logged in as " .. (user_data.username or "Unknown") .. ". Click to logout.");
                         
                         if IsValid(btn_my_configs) then
                             btn_my_configs:SetEnabled(true);
@@ -1604,7 +1604,7 @@ if CLIENT then
                             local info = vgui.Create("DLabel", card);
                             local date_str = string.sub(cfg.created_at or "", 1, 10);
                             local rating_display = string.format("+%d / -%d", cfg.thumbs_up or 0, cfg.thumbs_down or 0);
-                            info:SetText(string.format("By: %s  |  Rating: %s  |  Date: %s", cfg.steamid, rating_display, date_str));
+                            info:SetText(string.format("By: %s  |  Rating: %s  |  Date: %s", cfg.username or "Unknown", rating_display, date_str));
                             info:SetPos(10, 32);
                             info:SetSize(500, 15);
                             info:SetTextColor(THEME.text_dim);

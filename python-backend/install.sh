@@ -58,6 +58,17 @@ sudo -u "$SERVICE_USER" "$VENV_DIR/bin/pip" install gunicorn flask requests werk
 echo "Generating secret key..."
 SECRET_KEY=$(openssl rand -hex 32)
 
+echo ""
+echo "Steam API Key is required for automatic username sync."
+echo "Get your key from: https://steamcommunity.com/dev/apikey"
+echo -n "Enter your Steam Web API Key: "
+read STEAM_API_KEY
+
+if [ -z "$STEAM_API_KEY" ]; then
+    echo "Warning: No Steam API key provided. Username sync will be disabled."
+    STEAM_API_KEY=""
+fi
+
 calculate_workers() {
     local cpu_cores=$(nproc)
     local total_ram_mb=$(free -m | awk '/^Mem:/{print $2}')
@@ -97,6 +108,7 @@ Group=$SERVICE_USER
 WorkingDirectory=$WORKING_DIR
 Environment="PATH=$VENV_DIR/bin"
 Environment="SECRET_KEY=$SECRET_KEY"
+Environment="STEAM_API_KEY=$STEAM_API_KEY"
 ExecStart=$VENV_DIR/bin/gunicorn --bind 0.0.0.0:8000 --workers $WORKERS --timeout 120 --worker-class sync app:app
 Restart=always
 RestartSec=10
@@ -131,4 +143,9 @@ echo "  Logs:    sudo journalctl -u $SERVICE_NAME -f"
 echo ""
 echo "Application directory: $INSTALL_DIR"
 echo "Database location: $APP_DIR/database.db"
+if [ -n "$STEAM_API_KEY" ]; then
+    echo "Steam API: Configured (username sync enabled)"
+else
+    echo "Steam API: Not configured (username sync disabled)"
+fi
 

@@ -69,7 +69,7 @@ def init_db():
     conn.execute('''
         CREATE TABLE IF NOT EXISTS usernames (
             steamid TEXT PRIMARY KEY,
-            username TEXT NOT NULL
+            username TEXT NOT NULL CHECK(length(username) <= 32 AND length(username) > 0)
         )
     ''')
     
@@ -125,6 +125,39 @@ def get_username(steamid):
     row = conn.execute('SELECT username FROM usernames WHERE steamid = ?', (steamid,)).fetchone()
     conn.close()
     return row['username'] if row else None
+
+def fetch_steam_username(steamid):
+    api_key = os.environ.get('STEAM_API_KEY')
+    if not api_key:
+        return None
+    
+    try:
+        url = f'https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={api_key}&steamids={steamid}'
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            players = data.get('response', {}).get('players', [])
+            if players:
+                return players[0].get('personaname')
+    except Exception as e:
+        logger.error(f"Error fetching Steam username: {e}")
+    
+    return None
+
+def update_username(steamid):
+    if not steamid:
+        return False
+
+    username = fetch_steam_username(steamid)
+    if not username:
+        return False
+
+    conn = get_db_connection()
+    conn.execute('INSERT OR REPLACE INTO usernames (steamid, username) VALUES (?, ?)', (steamid, username[:32]))
+    conn.commit()
+    conn.close()
+    return True
 
 @app.route('/auth/landing')
 def auth_landing():
@@ -449,6 +482,7 @@ def delete_config():
         return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/users/me', methods=['GET'])
+@limiter.limit("1 per minute")
 def get_me():
     try:
         auth_header = request.headers.get('Authorization', '')
@@ -457,7 +491,8 @@ def get_me():
         steamid = get_steamid_from_token(token)
         if not steamid:
             return jsonify({"error": "Unauthorized"}), 401
-            
+        
+        update_username(steamid)
         banned, reason, expires_at = is_banned(steamid)
         username = get_username(steamid)
         
