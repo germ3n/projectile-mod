@@ -65,6 +65,13 @@ def init_db():
             expires_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS usernames (
+            steamid TEXT PRIMARY KEY,
+            username TEXT NOT NULL
+        )
+    ''')
     
     conn.execute('CREATE INDEX IF NOT EXISTS idx_configs_steamid ON configs(submitter_steamid)')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_sessions_steamid ON user_sessions(steamid)')
@@ -111,6 +118,13 @@ def is_banned(steamid):
         return True, row['reason'], row['expires_at']
     else:
         return False, None, None
+
+def get_username(steamid):
+    if not steamid: return None
+    conn = get_db_connection()
+    row = conn.execute('SELECT username FROM usernames WHERE steamid = ?', (steamid,)).fetchone()
+    conn.close()
+    return row['username'] if row else None
 
 @app.route('/auth/landing')
 def auth_landing():
@@ -240,6 +254,7 @@ def search_configs():
             result.append({
                 "id": row['id'],
                 "steamid": row['submitter_steamid'],
+                "username": get_username(row['submitter_steamid']),
                 "name": row['config_name'],
                 "flags": row['config_flags'],
                 "version": row['config_version'],
@@ -267,6 +282,7 @@ def fetch_config(config_id):
         return jsonify({
             "id": row['id'],
             "steamid": row['submitter_steamid'],
+            "username": get_username(row['submitter_steamid']),
             "name": row['config_name'],
             "flags": row['config_flags'],
             "version": row['config_version'],
@@ -443,10 +459,12 @@ def get_me():
             return jsonify({"error": "Unauthorized"}), 401
             
         banned, reason, expires_at = is_banned(steamid)
+        username = get_username(steamid)
+        
         if banned:
-            return jsonify({"steamid": steamid, "banned": True, "reason": reason, "expires_at": expires_at}), 200
+            return jsonify({"steamid": steamid, "username": username, "banned": True, "reason": reason, "expires_at": expires_at}), 200
 
-        return jsonify({"steamid": steamid, "banned": False}), 200
+        return jsonify({"steamid": steamid, "username": username, "banned": False}), 200
     except Exception as e:
         logger.error(f"Error in get_me: {e}")
         return jsonify({"error": "Internal server error"}), 500
