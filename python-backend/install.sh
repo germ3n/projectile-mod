@@ -18,7 +18,7 @@ fi
 
 echo "Creating dedicated system user..."
 if ! id "$SERVICE_USER" &>/dev/null; then
-    useradd -r -s /bin/bash -d "$INSTALL_DIR" -c "ProjectileMod API Service" "$SERVICE_USER"
+    useradd -r -s /bin/false -d "$INSTALL_DIR" -c "ProjectileMod API Service" "$SERVICE_USER"
     echo "Created user: $SERVICE_USER"
 else
     echo "User $SERVICE_USER already exists"
