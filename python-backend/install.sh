@@ -29,11 +29,11 @@ apt-get update
 apt-get install -y python3 python3-pip python3-venv ufw nginx openssl redis-server
 
 echo "Enabling ufw..."
+ufw default deny incoming
+ufw default allow outgoing
 ufw allow 'Nginx Full'
 ufw allow ssh
-ufw default deny
-ufw enable
-ufw reload
+ufw --force enable
 
 echo "Starting Redis..."
 systemctl enable redis-server
