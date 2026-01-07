@@ -391,9 +391,9 @@ local function move_projectile(shooter, projectile_data)
                 fire_bullets_config.Inflictor = projectile_data.weapon;
                 fire_bullets_config.Damage = final_damage;
                 fire_bullets_config.Force = final_damage * get_float(cv_damage_force_multiplier);
-                fire_bullets_config.Distance = 64;
+                fire_bullets_config.Distance = 2;
                 fire_bullets_config.Dir = projectile_data.dir;
-                fire_bullets_config.Src = enter_trace.HitPos - projectile_data.dir * 32;
+                fire_bullets_config.Src = enter_trace.HitPos - projectile_data.dir;
                 fire_bullets_config.Tracer = 0;
                 fire_bullets_config.AmmoType = projectile_data.ammo_type;
                 fire_bullets(shooter, fire_bullets_config);
