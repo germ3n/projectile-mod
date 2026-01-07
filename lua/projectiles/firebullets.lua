@@ -184,6 +184,7 @@ if SERVER then
                 dropoff_start,
                 dropoff_end,
                 dropoff_min_multiplier,
+                data.AmmoType,
                 get_bool(cv_net_reliable)
             );
         end
@@ -197,6 +198,7 @@ end
 if CLIENT then
     hook.Add("EntityFireBullets", "projectiles", function(shooter, data)
         if not get_bool(cv_projectiles_enabled) then return; end
+        if projectiles.currently_using_firebullets then return; end
 
         return false;
     end);

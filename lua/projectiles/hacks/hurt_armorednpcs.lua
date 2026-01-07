@@ -27,6 +27,22 @@ function hurt_armorednpcs(shooter, trace, dmginfo)
     return false;
 end
 
+local hook_add = hook.Add;
+local hook_remove = hook.Remove;
+function fx_patch_hurt_armorednpcs(enable)
+    if not bullets_hurt_armorednpcs then
+        return;
+    end
+
+    if enable then
+        hook_add("EntityFireBullets", "BulletsHurtArmoredNPCs", bullets_hurt_armorednpcs);
+        bullets_hurt_armorednpcs_patched = false;
+    else
+        hook_remove("EntityFireBullets", "BulletsHurtArmoredNPCs");
+        bullets_hurt_armorednpcs_patched = true;
+    end
+end
+
 timer.Create("projectiles_hack_hurt_armorednpcs", 3, 0, function()
     if not bullets_hurt_armorednpcs and hook.GetTable()["EntityFireBullets"] then
         bullets_hurt_armorednpcs = hook.GetTable()["EntityFireBullets"]["BulletsHurtArmoredNPCs"];

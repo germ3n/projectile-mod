@@ -114,6 +114,7 @@ local cv_render_wind_hud = get_convar("pro_render_wind_hud");
 local cv_sv_gravity = get_convar("sv_gravity");
 local cv_damage_force_multiplier = get_convar("pro_damage_force_multiplier");
 local cv_damage_dropoff_enabled = get_convar("pro_damage_dropoff_enabled");
+local cv_use_firebullets = get_convar("pro_use_firebullets");
 
 local convar_meta = FindMetaTable("ConVar");
 local get_bool = convar_meta.GetBool;
@@ -124,6 +125,7 @@ local get_string = convar_meta.GetString;
 local max = math.max;
 local dyn_splatter = dyn_splatter;
 local hurt_armorednpcs = hurt_armorednpcs;
+local fx_patch_all = fx_patch_all;
 
 local trace_filter = {nil, nil, nil};
 
@@ -244,6 +246,23 @@ local function apply_drag(projectile_data)
     end
 end
 
+local function apply_damage_info(projectile_data, enter_trace, final_damage, shooter, hit_entity)
+    local dmg_info = damage_info();
+    set_damage(dmg_info, final_damage);
+    if _is_valid(projectile_data.weapon) then 
+        set_inflictor(dmg_info, projectile_data.weapon); 
+        set_weapon(dmg_info, projectile_data.weapon);
+    end
+    set_attacker(dmg_info, shooter);
+    dmg_set_damage_type(dmg_info, DMG_BULLET);
+    set_damage_position(dmg_info, enter_trace.HitPos);
+    set_damage_force(dmg_info, projectile_data.dir * final_damage * get_float(cv_damage_force_multiplier));
+
+    if not hurt_armorednpcs(shooter, enter_trace, dmg_info) then
+        take_damage_info(hit_entity, dmg_info);
+    end
+end
+
 local function move_projectile(shooter, projectile_data)
     if projectile_data.hit or projectile_data.penetration_count <= 0 or projectile_data.damage < 1.0 or projectile_data.distance_traveled >= projectile_data.max_distance then 
         return true;
@@ -302,19 +321,22 @@ local function move_projectile(shooter, projectile_data)
 
     if get_bool(cv_debug) then debug_projectile_course(projectile_data, enter_trace); end
 
+    local use_firebullets = get_bool(cv_use_firebullets);
     if enter_trace.Hit then
-        if CLIENT then
-            local effect_data = effect_data();
-            set_origin(effect_data, enter_trace.HitPos);
-            set_start(effect_data, enter_trace.StartPos);
-            set_surface_prop(effect_data, enter_trace.SurfaceProps);
-            set_entity(effect_data, enter_trace.Entity);
-            set_hit_box(effect_data, enter_trace.HitBoxBone or 0);
-            set_damage_type(effect_data, DMG_BULLET);
-            effect("Impact", effect_data);
-        end
-    
         local hit_entity = enter_trace.Entity;
+        if CLIENT then
+            if not use_firebullets then
+                local effect_data = effect_data();
+                set_origin(effect_data, enter_trace.HitPos);
+                set_start(effect_data, enter_trace.StartPos);
+                set_surface_prop(effect_data, enter_trace.SurfaceProps);
+                set_entity(effect_data, enter_trace.Entity);
+                set_hit_box(effect_data, enter_trace.HitBoxBone or 0);
+                set_damage_type(effect_data, DMG_BULLET);
+                effect("Impact", effect_data);
+            end
+        end
+
         local current_hit_damage = projectile_data.damage;
         local current_penetration_power = projectile_data.penetration_power;
 
@@ -326,51 +348,58 @@ local function move_projectile(shooter, projectile_data)
         end
 
         if CLIENT and exit_trace and exit_trace.Hit then
-            local effect_data = effect_data();
-            set_origin(effect_data, exit_trace.HitPos);
-            set_start(effect_data, exit_trace.StartPos);
-            set_surface_prop(effect_data, exit_trace.SurfaceProps);
-            set_entity(effect_data, exit_trace.Entity);
-            set_hit_box(effect_data, exit_trace.HitBoxBone or 0);
-            set_damage_type(effect_data, DMG_BULLET);
-            effect("Impact", effect_data);
+            --if not use_firebullets then
+                local effect_data = effect_data();
+                set_origin(effect_data, exit_trace.HitPos);
+                set_start(effect_data, exit_trace.StartPos);
+                set_surface_prop(effect_data, exit_trace.SurfaceProps);
+                set_entity(effect_data, exit_trace.Entity);
+                set_hit_box(effect_data, exit_trace.HitBoxBone or 0);
+                set_damage_type(effect_data, DMG_BULLET);
+                effect("Impact", effect_data);
+            --end
         end
 
-        if hit_entity and hit_entity ~= NULL then
-            local final_damage = current_hit_damage * get_damage_multiplier(enter_trace.HitGroup);
-            
-            if SERVER then
-                if BREAKABLE_CLASSES[get_class(hit_entity)] then
-                    projectiles.disable_fire_bullets = true;
-                    fire_bullets_config.Attacker = shooter;
-                    fire_bullets_config.Damage = final_damage;
-                    fire_bullets_config.Force = final_damage * get_float(cv_damage_force_multiplier);
-                    fire_bullets_config.Distance = 1;
-                    fire_bullets_config.Dir = projectile_data.dir;
-                    fire_bullets_config.Src = enter_trace.HitPos - (projectile_data.dir * 0.5);
-                    fire_bullets_config.Tracer = 0;
-                    fire_bullets_config.AmmoType = "Pistol";
-                    fire_bullets(shooter, fire_bullets_config);
-                    projectiles.disable_fire_bullets = false;
-                else
-                    local dmg_info = damage_info();
-                    set_damage(dmg_info, final_damage);
-                    if _is_valid(projectile_data.weapon) then 
-                        set_inflictor(dmg_info, projectile_data.weapon); 
-                        set_weapon(dmg_info, projectile_data.weapon);
-                    end
-                    set_attacker(dmg_info, shooter);
-                    dmg_set_damage_type(dmg_info, DMG_BULLET);
-                    set_damage_position(dmg_info, enter_trace.HitPos);
-                    set_damage_force(dmg_info, projectile_data.dir * final_damage * get_float(cv_damage_force_multiplier));
+        local final_damage = current_hit_damage * get_damage_multiplier(enter_trace.HitGroup);
 
-                    if not hurt_armorednpcs(shooter, enter_trace, dmg_info) then
-                        take_damage_info(hit_entity, dmg_info);
+        if hit_entity and hit_entity ~= NULL then
+            if not use_firebullets then
+                if SERVER then
+                    if BREAKABLE_CLASSES[get_class(hit_entity)] then
+                        projectiles.disable_fire_bullets = true;
+                        fire_bullets_config.Attacker = shooter;
+                        fire_bullets_config.Inflictor = projectile_data.weapon;
+                        fire_bullets_config.Damage = final_damage;
+                        fire_bullets_config.Force = final_damage * get_float(cv_damage_force_multiplier);
+                        fire_bullets_config.Distance = 2;
+                        fire_bullets_config.Dir = projectile_data.dir;
+                        fire_bullets_config.Src = enter_trace.HitPos - projectile_data.dir;
+                        fire_bullets_config.Tracer = 0;
+                        fire_bullets_config.AmmoType = projectile_data.ammo_type;
+                        fire_bullets(shooter, fire_bullets_config);
+                        projectiles.disable_fire_bullets = false;
+                    else
+                        apply_damage_info(projectile_data, enter_trace, final_damage, shooter, hit_entity);
                     end
                 end
-            end
 
-            dyn_splatter(shooter, hit_entity, enter_trace.HitPos, enter_trace.HitNormal, final_damage);
+                dyn_splatter(shooter, hit_entity, enter_trace.HitPos, enter_trace.HitNormal, final_damage);
+            else
+                projectiles.disable_fire_bullets = true;
+                fx_patch_all(true);
+                fire_bullets_config.Attacker = shooter;
+                fire_bullets_config.Inflictor = projectile_data.weapon;
+                fire_bullets_config.Damage = final_damage;
+                fire_bullets_config.Force = final_damage * get_float(cv_damage_force_multiplier);
+                fire_bullets_config.Distance = 64;
+                fire_bullets_config.Dir = projectile_data.dir;
+                fire_bullets_config.Src = enter_trace.HitPos - projectile_data.dir * 32;
+                fire_bullets_config.Tracer = 0;
+                fire_bullets_config.AmmoType = projectile_data.ammo_type;
+                fire_bullets(shooter, fire_bullets_config);
+                fx_patch_all(false);
+                projectiles.disable_fire_bullets = false;
+            end
         end
         
         if stop_bullet then
@@ -406,7 +435,6 @@ local function move_projectile(shooter, projectile_data)
 
     return false;
 end
-
 
 local function debug_final_pos(projectile_data)
     local dur = get_float(cv_debug_dur);

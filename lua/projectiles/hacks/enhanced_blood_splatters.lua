@@ -62,6 +62,22 @@ function dyn_splatter(shooter, hit_entity, hit_pos, hit_normal, damage)
     effect("dynamic_blood_splatter_effect", effectdata, true, true);
 end
 
+local hook_add = hook.Add;
+local hook_remove = hook.Remove;
+function fx_patch_dyn_splatter(enable)
+    if not dyn_splatter_backup then
+        return;
+    end
+
+    if enable then
+        hook_add("EntityFireBullets", "dynsplatter", dyn_splatter_backup);
+        splatter_patched = false;
+    else
+        hook_remove("EntityFireBullets", "dynsplatter");
+        splatter_patched = true;
+    end
+end
+
 timer.Create("projectile_patch_zippy_blood_splatter", 3, 0, function()
     if not dyn_splatter_backup then
         if hook.GetTable()["EntityFireBullets"] then

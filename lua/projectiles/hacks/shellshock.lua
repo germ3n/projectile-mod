@@ -37,6 +37,20 @@ local cv_shell_enabled = nil;-- = GetConVar("shell_enabled");
 local shellshock_backup = nil;
 local shellshock_patched = false;
 
+function fx_patch_shellshock(enable)
+    if not shellshock_backup then
+        return;
+    end
+        
+    if enable then
+        hook.Add("EntityFireBullets", "ShellshockGettingBullets", shellshock_backup);
+        shellshock_patched = false;
+    else
+        hook.Remove("EntityFireBullets", "ShellshockGettingBullets");
+        shellshock_patched = true;
+    end
+end
+
 function do_shellshock(shooter, start_pos, end_pos, damage)
     if not cv_shell_enabled or not get_bool(cv_shell_enabled) then return; end
     --print(shooter, start_pos, end_pos, damage);

@@ -33,6 +33,27 @@ local function patched_rlb_entity_take_damage(ent, ...)
     rlb_entity_take_damage(ent, ...);
 end
 
+local hook_remove = hook.Remove;
+local hook_add = hook.Add;
+
+function fx_patch_rlb_fire_bullets(enable)
+    if not rlb_fire_bullets then
+        return;
+    end
+
+    if enable then
+        hook_add("EntityFireBullets", "EntityFireBullets_RealisticBlood", rlb_fire_bullets);
+        hook_add("EntityTakeDamage", "EntityTakeDamage_RealisticBlood", rlb_entity_take_damage);
+        fire_bullets_patched = false;
+        entity_take_damage_patched = false;
+    else
+        hook_remove("EntityFireBullets", "EntityFireBullets_RealisticBlood");
+        hook_remove("EntityTakeDamage", "EntityTakeDamage_RealisticBlood");
+        fire_bullets_patched = true;
+        entity_take_damage_patched = true;
+    end
+end
+
 timer.Create("projectile_patch_zippy_realistic_blood", 3, 0, function()
     if not rlb_fire_bullets or not rlb_entity_take_damage then
         local hooks = hook.GetTable();

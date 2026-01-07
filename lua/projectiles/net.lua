@@ -30,6 +30,7 @@ if SERVER then
     local write_uint = net.WriteUInt;
     local write_color = net.WriteColor;
     local write_bool = net.WriteBool;
+    local write_string = net.WriteString;
     local send_pvs = net.SendPVS;
     local send_pas = net.SendPAS;
     local broadcast = net.Broadcast;
@@ -44,7 +45,7 @@ if SERVER then
 
     local cv_net_send_method = GetConVar("pro_net_send_method");
 
-    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, is_gmod_turret, dropoff_start, dropoff_end, dropoff_min_multiplier, reliable)
+    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, is_gmod_turret, dropoff_start, dropoff_end, dropoff_min_multiplier, ammo_type, reliable)
         weapon.bullet_idx = (weapon.bullet_idx or 0) + 1;
 
         local time = cur_time();
@@ -81,6 +82,7 @@ if SERVER then
         write_float(dropoff_end);
         write_float(dropoff_min_multiplier);
         write_uint(tick, 32);
+        write_string(ammo_type);
 
         local send_method = get_int(cv_net_send_method);
         if send_method == 0 then
@@ -131,6 +133,7 @@ if SERVER then
                     dropoff_start = nil,
                     dropoff_end = nil,
                     dropoff_min_multiplier = nil,
+                    ammo_type = nil,
                 };
             end
 
@@ -182,6 +185,7 @@ if SERVER then
         projectile.dropoff_start = dropoff_start;
         projectile.dropoff_end = dropoff_end;
         projectile.dropoff_min_multiplier = dropoff_min_multiplier;
+        projectile.ammo_type = ammo_type;
         projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
     end
 end
@@ -194,6 +198,7 @@ if CLIENT then
     local read_uint = net.ReadUInt;
     local read_color = net.ReadColor;
     local read_bool = net.ReadBool;
+    local read_string = net.ReadString;
     local vector = Vector;
 
     net.Receive("projectile", function()
@@ -225,6 +230,7 @@ if CLIENT then
         local dropoff_end = read_float();
         local dropoff_min_multiplier = read_float();
         local tick = read_uint(32);
+        local ammo_type = read_string();
 
         if not projectile_store[shooter] then 
             projectile_store[shooter] = {
@@ -265,6 +271,7 @@ if CLIENT then
                     dropoff_start = nil,
                     dropoff_end = nil,
                     dropoff_min_multiplier = nil,
+                    ammo_type = nil,
                 };
             end
 
@@ -316,6 +323,7 @@ if CLIENT then
         projectile.dropoff_start = dropoff_start;
         projectile.dropoff_end = dropoff_end;
         projectile.dropoff_min_multiplier = dropoff_min_multiplier;
+        projectile.ammo_type = ammo_type;
         projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
     end)
 end
