@@ -297,7 +297,11 @@ if CLIENT then
                 { type = "header", label = "Costs & Taxes" },
                 { type = "float", cvar = "pro_penetration_power_cost_multiplier", label = "Power Cost Multiplier", min = 0.0, max = 5.0, decimals = 2 },
                 { type = "float", cvar = "pro_penetration_entry_cost_multiplier", label = "Entry Cost Multiplier", min = 0.0, max = 5.0, decimals = 2 },
+                { type = "float", cvar = "pro_penetration_exit_cost_multiplier", label = "Exit Cost Multiplier", min = 0.0, max = 5.0, decimals = 2 },
                 { type = "float", cvar = "pro_penetration_dmg_tax_per_unit", label = "Damage Tax (Per Unit)", min = 0.0, max = 10.0, decimals = 1 },
+                { type = "header", label = "Thin Material Optimization" },
+                { type = "float", cvar = "pro_penetration_thin_material_threshold", label = "Thin Material Threshold (Units)", min = 0.0, max = 100.0, decimals = 0 },
+                { type = "float", cvar = "pro_penetration_thin_material_scale", label = "Thin Material Min Scale", min = 0.0, max = 1.0, decimals = 2 },
             }
         },
         {
@@ -553,6 +557,86 @@ if CLIENT then
 
                 local selected_source = nil;
                 local selected_dest = nil;
+                local mode_by_ammo = false;
+                local selected_ammo = nil;
+
+                local mode_toggle = vgui.Create("DPanel", parent);
+                mode_toggle:Dock(TOP);
+                mode_toggle:SetTall(35);
+                mode_toggle:DockMargin(0, 0, 0, 5);
+                mode_toggle.Paint = function(s, w, h)
+                    draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
+                end
+
+                local btn_individual = vgui.Create("DButton", mode_toggle);
+                btn_individual:Dock(LEFT);
+                btn_individual:SetText("Individual Weapons");
+                btn_individual:SetTextColor(THEME.text);
+                btn_individual:DockMargin(5, 5, 2, 5);
+                btn_individual.Paint = function(s, w, h)
+                    local col = not mode_by_ammo and THEME.accent or Color(60, 60, 60);
+                    if s:IsHovered() and mode_by_ammo then
+                        col = Color(80, 80, 80);
+                    end
+                    draw.RoundedBox(4, 0, 0, w, h, col);
+                end
+                btn_individual.PerformLayout = function(s, w, h)
+                    s:SetWide(mode_toggle:GetWide() / 2 - 6);
+                end
+
+                local btn_ammo_type = vgui.Create("DButton", mode_toggle);
+                btn_ammo_type:Dock(FILL);
+                btn_ammo_type:SetText("By Ammo Type");
+                btn_ammo_type:SetTextColor(THEME.text);
+                btn_ammo_type:DockMargin(2, 5, 5, 5);
+                btn_ammo_type.Paint = function(s, w, h)
+                    local col = mode_by_ammo and THEME.accent or Color(60, 60, 60);
+                    if s:IsHovered() and not mode_by_ammo then
+                        col = Color(80, 80, 80);
+                    end
+                    draw.RoundedBox(4, 0, 0, w, h, col);
+                end
+
+                local HL2_WEAPON_AMMO_MAP = {
+                    ["weapon_pistol"] = "Pistol",
+                    ["weapon_357"] = "357",
+                    ["weapon_shotgun"] = "Buckshot",
+                    ["weapon_smg1"] = "SMG1",
+                    ["weapon_ar2"] = "AR2",
+                    ["weapon_alyxgun"] = "AlyxGun",
+                    ["weapon_annabelle"] = "Buckshot",
+                    ["npc_turret_floor"] = "AR2",
+                    ["npc_turret_ceiling"] = "Pistol",
+                    ["npc_turret_ground"] = "AR2",
+                    ["prop_vehicle_airboat"] = "AirboatGun",
+                    ["func_tank"] = "AR2",
+                    ["gmod_turret"] = "Pistol",
+                };
+
+                local function get_weapons_by_ammo()
+                    local ammo_map = {};
+                    for idx = 1, #sorted_weapons do
+                        local class_name = sorted_weapons[idx];
+                        if not (WEAPON_BLACKLIST and WEAPON_BLACKLIST[class_name]) then
+                            local ammo = nil;
+                            
+                            if HL2_WEAPON_AMMO_MAP[class_name] then
+                                ammo = HL2_WEAPON_AMMO_MAP[class_name];
+                            else
+                                local wep_table = weapons.Get(class_name);
+                                if wep_table and wep_table.Primary and wep_table.Primary.Ammo then
+                                    ammo = wep_table.Primary.Ammo;
+                                end
+                            end
+                            
+                            if ammo and ammo ~= "" and ammo ~= "none" then
+                                ammo_map[ammo] = ammo_map[ammo] or {};
+                                table.insert(ammo_map[ammo], class_name);
+                            end
+                        end
+                    end
+                    return ammo_map;
+                end
 
                 local search_bar = vgui.Create("DPanel", parent);
                 search_bar:Dock(TOP);
@@ -582,11 +666,28 @@ if CLIENT then
                     end
                 end
 
-                local search_right = vgui.Create("DTextEntry", search_bar);
+                local search_right_container = vgui.Create("DPanel", search_bar);
+                search_right_container:Dock(FILL);
+                search_right_container.Paint = function() end
+
+                local search_right = vgui.Create("DTextEntry", search_right_container);
                 search_right:Dock(FILL);
                 search_right:DockMargin(4, 8, 8, 8);
                 search_right:SetPlaceholderText("Search Destination Weapon...");
                 search_right.Paint = function(s, w, h)
+                    draw.RoundedBox(4, 0, 0, w, h, Color(20, 20, 20, 200));
+                    s:DrawTextEntryText(THEME.text, THEME.accent, THEME.text);
+                    if s:GetValue() == "" and s:GetPlaceholderText() then
+                        draw.SimpleText(s:GetPlaceholderText(), s:GetFont(), 5, h / 2, THEME.text_dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER);
+                    end
+                end
+
+                local search_ammo = vgui.Create("DTextEntry", search_right_container);
+                search_ammo:Dock(FILL);
+                search_ammo:DockMargin(4, 8, 8, 8);
+                search_ammo:SetPlaceholderText("Search Ammo Type...");
+                search_ammo:SetVisible(false);
+                search_ammo.Paint = function(s, w, h)
                     draw.RoundedBox(4, 0, 0, w, h, Color(20, 20, 20, 200));
                     s:DrawTextEntryText(THEME.text, THEME.accent, THEME.text);
                     if s:GetValue() == "" and s:GetPlaceholderText() then
@@ -613,9 +714,10 @@ if CLIENT then
                 local left_header = vgui.Create("DPanel", left_panel);
                 left_header:Dock(TOP);
                 left_header:SetTall(30);
+                left_header.header_text = "SOURCE (Copy From)";
                 left_header.Paint = function(s, w, h)
                     draw.RoundedBoxEx(4, 0, 0, w, h, THEME.bg_dark, true, true, false, false);
-                    draw.SimpleText("SOURCE (Copy From)", "DermaDefaultBold", w/2, h/2, THEME.accent, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER);
+                    draw.SimpleText(s.header_text, "DermaDefaultBold", w/2, h/2, THEME.accent, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER);
                 end
 
                 local left_scroll = vgui.Create("DScrollPanel", left_panel);
@@ -632,9 +734,10 @@ if CLIENT then
                 local right_header = vgui.Create("DPanel", right_panel);
                 right_header:Dock(TOP);
                 right_header:SetTall(30);
+                right_header.header_text = "DESTINATION (Configure)";
                 right_header.Paint = function(s, w, h)
                     draw.RoundedBoxEx(4, 0, 0, w, h, THEME.bg_dark, true, true, false, false);
-                    draw.SimpleText("DESTINATION (Configure)", "DermaDefaultBold", w/2, h/2, THEME.accent, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER);
+                    draw.SimpleText(s.header_text, "DermaDefaultBold", w/2, h/2, THEME.accent, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER);
                 end
 
                 local right_scroll = vgui.Create("DScrollPanel", right_panel);
@@ -651,6 +754,26 @@ if CLIENT then
                 local config_scroll = vgui.Create("DScrollPanel", config_panel);
                 config_scroll:Dock(FILL);
                 config_scroll:DockMargin(10, 10, 10, 10);
+
+                local ammo_list_panel = vgui.Create("DPanel", lists_container);
+                ammo_list_panel:Dock(FILL);
+                ammo_list_panel:SetVisible(false);
+                ammo_list_panel.Paint = function(s, w, h)
+                    draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
+                end
+
+                local ammo_header = vgui.Create("DPanel", ammo_list_panel);
+                ammo_header:Dock(TOP);
+                ammo_header:SetTall(30);
+                ammo_header.header_text = "AMMO TYPES (Select to Configure)";
+                ammo_header.Paint = function(s, w, h)
+                    draw.RoundedBoxEx(4, 0, 0, w, h, THEME.bg_dark, true, true, false, false);
+                    draw.SimpleText(s.header_text, "DermaDefaultBold", w/2, h/2, THEME.accent, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER);
+                end
+
+                local ammo_scroll = vgui.Create("DScrollPanel", ammo_list_panel);
+                ammo_scroll:Dock(FILL);
+                ammo_scroll:DockMargin(5, 5, 5, 5);
 
                 local function create_weapon_button(parent_scroll, class_name, is_source)
                     local btn = vgui.Create("DButton", parent_scroll);
@@ -682,10 +805,41 @@ if CLIENT then
                     return btn;
                 end
 
-                local function rebuild_config_panel(class_name)
+                local function create_ammo_button(parent_scroll, ammo_name, weapon_count)
+                    local btn = vgui.Create("DButton", parent_scroll);
+                    btn:Dock(TOP);
+                    btn:SetTall(30);
+                    btn:SetText("");
+                    btn:DockMargin(0, 0, 0, 2);
+                    
+                    btn.Paint = function(s, w, h)
+                        local is_selected = selected_ammo == ammo_name;
+                        local bg_col = Color(35, 35, 35);
+                        
+                        if is_selected then
+                            bg_col = THEME.accent;
+                        elseif s:IsHovered() then
+                            bg_col = Color(50, 50, 50);
+                        end
+                        
+                        draw.RoundedBox(4, 0, 0, w, h, bg_col);
+                        
+                        local text_col = is_selected and Color(255, 255, 255) or THEME.text;
+                        draw.SimpleText(ammo_name, "DermaDefault", 10, h/2 - 5, text_col, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER);
+                        draw.SimpleText(weapon_count .. " weapon" .. (weapon_count == 1 and "" or "s"), "DermaDefault", 10, h/2 + 7, Color(150, 150, 150), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER);
+                        
+                        if is_selected then
+                            draw.SimpleText("●", "DermaDefaultBold", w - 10, h/2, Color(255,255,255), TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER);
+                        end
+                    end
+                    
+                    return btn;
+                end
+
+                local function rebuild_config_panel(class_name, is_ammo_mode, ammo_weapons)
                     config_scroll:Clear();
                     
-                    if not class_name then
+                    if not class_name and not is_ammo_mode then
                         local no_sel = vgui.Create("DLabel", config_scroll);
                         no_sel:SetText("Select a destination weapon to configure");
                         no_sel:SetTextColor(THEME.text_dim);
@@ -693,6 +847,42 @@ if CLIENT then
                         no_sel:DockMargin(10, 10, 10, 10);
                         no_sel:SetFont("DermaDefaultBold");
                         return;
+                    end
+
+                    if is_ammo_mode and not selected_ammo then
+                        local no_sel = vgui.Create("DLabel", config_scroll);
+                        no_sel:SetText("Select an ammo type to configure");
+                        no_sel:SetTextColor(THEME.text_dim);
+                        no_sel:Dock(TOP);
+                        no_sel:DockMargin(10, 10, 10, 10);
+                        no_sel:SetFont("DermaDefaultBold");
+                        return;
+                    end
+
+                    if is_ammo_mode and ammo_weapons then
+                        local info_panel = vgui.Create("DPanel", config_scroll);
+                        info_panel:Dock(TOP);
+                        info_panel:SetTall(60);
+                        info_panel:DockMargin(0, 0, 0, 10);
+                        info_panel.Paint = function(s, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, Color(40, 40, 60));
+                            draw.SimpleText("Ammo Type: " .. selected_ammo, "DermaDefaultBold", 10, 15, THEME.accent, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER);
+                            draw.SimpleText("Weapons: " .. #ammo_weapons, "DermaDefault", 10, 35, THEME.text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER);
+                        end
+
+                        local weapons_label = vgui.Create("DLabel", config_scroll);
+                        weapons_label:SetText("Weapons using " .. selected_ammo .. ": " .. table.concat(ammo_weapons, ", "));
+                        weapons_label:SetTextColor(THEME.text_dim);
+                        weapons_label:SetWrap(true);
+                        weapons_label:SetAutoStretchVertical(true);
+                        weapons_label:Dock(TOP);
+                        weapons_label:DockMargin(0, 0, 0, 10);
+
+                        local div = vgui.Create("DPanel", config_scroll);
+                        div:SetTall(2);
+                        div:Dock(TOP);
+                        div:DockMargin(0, 0, 0, 10);
+                        div.Paint = function(s, w, h) draw.RoundedBox(0, 0, 0, w, h, THEME.divider) end
                     end
 
                     local function create_slider_row(label_text, cfg_type, default_val, min_val, max_val, decimals)
@@ -703,23 +893,34 @@ if CLIENT then
                         panel.Paint = function(s, w, h) end
                         
                         local current_table = CONFIG_TYPES[cfg_type];
-                        local current_val = current_table and current_table[class_name];
                         local is_using_default = false;
                         local default_source = "";
-                        
                         local actual_value;
-                        if current_val and type(current_val) == "number" then
-                            actual_value = current_val;
-                        else
+
+                        if is_ammo_mode then
                             local def = current_table and current_table["default"];
                             if def and type(def) == "number" then
                                 actual_value = def;
-                                is_using_default = true;
-                                default_source = "global default";
                             else
                                 actual_value = default_val;
-                                is_using_default = true;
-                                default_source = "fallback default";
+                            end
+                            is_using_default = true;
+                            default_source = "batch mode (shows default)";
+                        else
+                            local current_val = current_table and current_table[class_name];
+                            if current_val and type(current_val) == "number" then
+                                actual_value = current_val;
+                            else
+                                local def = current_table and current_table["default"];
+                                if def and type(def) == "number" then
+                                    actual_value = def;
+                                    is_using_default = true;
+                                    default_source = "global default";
+                                else
+                                    actual_value = default_val;
+                                    is_using_default = true;
+                                    default_source = "fallback default";
+                                end
                             end
                         end
                         
@@ -750,7 +951,7 @@ if CLIENT then
                         btn_copy:DockMargin(5, 2, 0, 2);
                         btn_copy:SetTextColor(THEME.text);
                         btn_copy.Paint = function(s, w, h)
-                            local enabled = selected_source and selected_source ~= class_name;
+                            local enabled = is_ammo_mode and selected_source or (selected_source and selected_source ~= class_name);
                             local col = Color(60, 60, 60);
                             if not enabled then
                                 col = Color(40, 40, 40);
@@ -764,19 +965,30 @@ if CLIENT then
                                 LocalPlayer():ChatPrint("Select a source weapon on the left first.");
                                 return;
                             end
-                            if selected_source == class_name then
-                                LocalPlayer():ChatPrint("Cannot copy from itself.");
-                                return;
-                            end
-                            RunConsoleCommand("pro_weapon_config_copy_single", cfg_type, selected_source, class_name);
-                            LocalPlayer():ChatPrint("Copied " .. label_text .. " from " .. selected_source);
-                            timer.Simple(0.1, function()
-                                if IsValid(config_scroll) then
-                                    rebuild_config_panel(class_name);
+                            if is_ammo_mode then
+                                if not ammo_weapons or #ammo_weapons == 0 then
+                                    LocalPlayer():ChatPrint("No weapons found for this ammo type.");
+                                    return;
                                 end
-                            end);
+                                for _, wep_class in ipairs(ammo_weapons) do
+                                    RunConsoleCommand("pro_weapon_config_copy_single", cfg_type, selected_source, wep_class);
+                                end
+                                LocalPlayer():ChatPrint("Copied " .. label_text .. " from " .. selected_source .. " to " .. #ammo_weapons .. " weapons");
+                            else
+                                if selected_source == class_name then
+                                    LocalPlayer():ChatPrint("Cannot copy from itself.");
+                                    return;
+                                end
+                                RunConsoleCommand("pro_weapon_config_copy_single", cfg_type, selected_source, class_name);
+                                LocalPlayer():ChatPrint("Copied " .. label_text .. " from " .. selected_source);
+                                timer.Simple(0.1, function()
+                                    if IsValid(config_scroll) then
+                                        rebuild_config_panel(class_name);
+                                    end
+                                end);
+                            end
                         end
-                        btn_copy:SetTooltip("Copy " .. label_text .. " from source weapon");
+                        btn_copy:SetTooltip(is_ammo_mode and ("Copy " .. label_text .. " to all " .. selected_ammo .. " weapons") or ("Copy " .. label_text .. " from source weapon"));
                     
                         local btn_reset = vgui.Create("DButton", panel);
                         btn_reset:SetText("Reset");
@@ -788,15 +1000,26 @@ if CLIENT then
                             draw.RoundedBox(4, 0, 0, w, h, s:IsHovered() and Color(80, 80, 80) or Color(60, 60, 60))
                         end
                         btn_reset.DoClick = function()
-                            RunConsoleCommand("pro_weapon_config_reset_single", cfg_type, class_name);
-                            LocalPlayer():ChatPrint("Reset " .. label_text .. " to default");
-                            timer.Simple(0.1, function()
-                                if IsValid(config_scroll) then
-                                    rebuild_config_panel(class_name);
+                            if is_ammo_mode then
+                                if not ammo_weapons or #ammo_weapons == 0 then
+                                    LocalPlayer():ChatPrint("No weapons found for this ammo type.");
+                                    return;
                                 end
-                            end);
+                                for _, wep_class in ipairs(ammo_weapons) do
+                                    RunConsoleCommand("pro_weapon_config_reset_single", cfg_type, wep_class);
+                                end
+                                LocalPlayer():ChatPrint("Reset " .. label_text .. " to default for " .. #ammo_weapons .. " weapons");
+                            else
+                                RunConsoleCommand("pro_weapon_config_reset_single", cfg_type, class_name);
+                                LocalPlayer():ChatPrint("Reset " .. label_text .. " to default");
+                                timer.Simple(0.1, function()
+                                    if IsValid(config_scroll) then
+                                        rebuild_config_panel(class_name);
+                                    end
+                                end);
+                            end
                         end
-                        btn_reset:SetTooltip("Reset " .. label_text .. " to default");
+                        btn_reset:SetTooltip(is_ammo_mode and ("Reset " .. label_text .. " to default for all " .. selected_ammo .. " weapons") or ("Reset " .. label_text .. " to default"));
                     
                         local slider = vgui.Create("DNumSlider", panel);
                         slider:Dock(FILL);
@@ -812,16 +1035,27 @@ if CLIENT then
                         end
                     
                         local function send_update()
-                            net.Start("projectile_weapon_config_update");
-                            net.WriteString(cfg_type);
-                            net.WriteString(class_name);
-                            net.WriteFloat(math.Round(slider:GetValue(), decimals));
-                            net.SendToServer();
-                            timer.Simple(0.1, function()
-                                if IsValid(config_scroll) then
-                                    rebuild_config_panel(class_name);
+                            if is_ammo_mode then
+                                if not ammo_weapons or #ammo_weapons == 0 then return; end
+                                for _, wep_class in ipairs(ammo_weapons) do
+                                    net.Start("projectile_weapon_config_update");
+                                    net.WriteString(cfg_type);
+                                    net.WriteString(wep_class);
+                                    net.WriteFloat(math.Round(slider:GetValue(), decimals));
+                                    net.SendToServer();
                                 end
-                            end);
+                            else
+                                net.Start("projectile_weapon_config_update");
+                                net.WriteString(cfg_type);
+                                net.WriteString(class_name);
+                                net.WriteFloat(math.Round(slider:GetValue(), decimals));
+                                net.SendToServer();
+                                timer.Simple(0.1, function()
+                                    if IsValid(config_scroll) then
+                                        rebuild_config_panel(class_name);
+                                    end
+                                end);
+                            end
                         end
                     
                         slider.Think = function(s)
@@ -870,11 +1104,11 @@ if CLIENT then
                     btn_copy_all.PerformLayout = function(s, w, h)
                         s:SetWide(buttons_panel:GetWide() / 2 - 3);
                     end
-                    btn_copy_all:SetText("Copy All From Source Weapon");
+                    btn_copy_all:SetText(is_ammo_mode and "Copy All From Source To Ammo Type" or "Copy All From Source Weapon");
                     btn_copy_all:SetTextColor(THEME.text);
                     btn_copy_all:DockMargin(0, 0, 2, 0);
                     btn_copy_all.Paint = function(s, w, h)
-                        local enabled = selected_source and selected_source ~= class_name;
+                        local enabled = is_ammo_mode and selected_source or (selected_source and selected_source ~= class_name);
                         local col = Color(180, 120, 40);
                         if not enabled then
                             col = Color(60, 50, 30);
@@ -888,35 +1122,57 @@ if CLIENT then
                             LocalPlayer():ChatPrint("Select a source weapon on the left first.");
                             return;
                         end
-                        if selected_source == class_name then
-                            LocalPlayer():ChatPrint("Cannot copy from itself.");
-                            return;
-                        end
-                        RunConsoleCommand("pro_weapon_config_copy_all", selected_source, class_name);
-                        LocalPlayer():ChatPrint("Copied all values from " .. selected_source);
-                        timer.Simple(0.1, function()
-                            if IsValid(config_scroll) then
-                                rebuild_config_panel(class_name);
+                        if is_ammo_mode then
+                            if not ammo_weapons or #ammo_weapons == 0 then
+                                LocalPlayer():ChatPrint("No weapons found for this ammo type.");
+                                return;
                             end
-                        end);
+                            for _, wep_class in ipairs(ammo_weapons) do
+                                RunConsoleCommand("pro_weapon_config_copy_all", selected_source, wep_class);
+                            end
+                            LocalPlayer():ChatPrint("Copied all values from " .. selected_source .. " to " .. #ammo_weapons .. " weapons");
+                        else
+                            if selected_source == class_name then
+                                LocalPlayer():ChatPrint("Cannot copy from itself.");
+                                return;
+                            end
+                            RunConsoleCommand("pro_weapon_config_copy_all", selected_source, class_name);
+                            LocalPlayer():ChatPrint("Copied all values from " .. selected_source);
+                            timer.Simple(0.1, function()
+                                if IsValid(config_scroll) then
+                                    rebuild_config_panel(class_name);
+                                end
+                            end);
+                        end
                     end
 
                     local btn_reset_all = vgui.Create("DButton", buttons_panel);
                     btn_reset_all:Dock(FILL);
-                    btn_reset_all:SetText("Reset All To Default");
+                    btn_reset_all:SetText(is_ammo_mode and "Reset All Ammo Type Weapons" or "Reset All To Default");
                     btn_reset_all:SetTextColor(THEME.text);
                     btn_reset_all:DockMargin(2, 0, 0, 0);
                     btn_reset_all.Paint = function(s, w, h)
                         draw.RoundedBox(4, 0, 0, w, h, s:IsHovered() and Color(180, 60, 60) or Color(150, 40, 40))
                     end
                     btn_reset_all.DoClick = function()
-                        RunConsoleCommand("pro_weapon_config_reset_single_all", class_name);
-                        LocalPlayer():ChatPrint("Reset all values to default");
-                        timer.Simple(0.1, function()
-                            if IsValid(config_scroll) then
-                                rebuild_config_panel(class_name);
+                        if is_ammo_mode then
+                            if not ammo_weapons or #ammo_weapons == 0 then
+                                LocalPlayer():ChatPrint("No weapons found for this ammo type.");
+                                return;
                             end
-                        end);
+                            for _, wep_class in ipairs(ammo_weapons) do
+                                RunConsoleCommand("pro_weapon_config_reset_single_all", wep_class);
+                            end
+                            LocalPlayer():ChatPrint("Reset all values to default for " .. #ammo_weapons .. " weapons");
+                        else
+                            RunConsoleCommand("pro_weapon_config_reset_single_all", class_name);
+                            LocalPlayer():ChatPrint("Reset all values to default");
+                            timer.Simple(0.1, function()
+                                if IsValid(config_scroll) then
+                                    rebuild_config_panel(class_name);
+                                end
+                            end);
+                        end
                     end
                 end
 
@@ -949,6 +1205,47 @@ if CLIENT then
                     end
                 end
 
+                local function populate_ammo(filter)
+                    ammo_scroll:Clear();
+                    local ammo_map = get_weapons_by_ammo();
+                    local sorted_ammo = {};
+                    for ammo_name, _ in pairs(ammo_map) do
+                        table.insert(sorted_ammo, ammo_name);
+                    end
+                    table.sort(sorted_ammo);
+                    
+                    for _, ammo_name in ipairs(sorted_ammo) do
+                        if filter and filter ~= "" and not string.find(string.lower(ammo_name), string.lower(filter), 1, true) then continue; end
+                        
+                        local weapons_in_ammo = ammo_map[ammo_name];
+                        local btn = create_ammo_button(ammo_scroll, ammo_name, #weapons_in_ammo);
+                        btn.DoClick = function()
+                            selected_ammo = ammo_name;
+                            populate_ammo(search_ammo:GetValue());
+                            rebuild_config_panel(nil, true, weapons_in_ammo);
+                        end
+                    end
+                end
+
+                local function switch_mode(to_ammo_mode)
+                    mode_by_ammo = to_ammo_mode;
+                    
+                    search_right:SetVisible(not to_ammo_mode);
+                    search_ammo:SetVisible(to_ammo_mode);
+                    
+                    right_panel:SetVisible(not to_ammo_mode);
+                    ammo_list_panel:SetVisible(to_ammo_mode);
+                    
+                    if to_ammo_mode then
+                        ammo_header.header_text = "AMMO TYPES (Select to Configure)";
+                        selected_ammo = nil;
+                        populate_ammo();
+                        rebuild_config_panel(nil, true, nil);
+                    else
+                        rebuild_config_panel(selected_dest);
+                    end
+                end
+
                 populate_left();
                 populate_right();
                 rebuild_config_panel(nil);
@@ -959,6 +1256,20 @@ if CLIENT then
 
                 search_right.OnChange = function(s)
                     populate_right(s:GetValue());
+                end
+
+                search_ammo.OnChange = function(s)
+                    populate_ammo(s:GetValue());
+                end
+
+                btn_individual.DoClick = function()
+                    if not mode_by_ammo then return; end
+                    switch_mode(false);
+                end
+
+                btn_ammo_type.DoClick = function()
+                    if mode_by_ammo then return; end
+                    switch_mode(true);
                 end
             end
         },
@@ -2254,7 +2565,7 @@ if CLIENT then
             end
         },
         {
-            name = "Debug",
+            name = "", -- Debug
             icon = "icon16/bug.png",
             vars = {
                 { type = "header", label = "Visualization" },
@@ -2269,7 +2580,7 @@ if CLIENT then
 
     local function OpenConfigMenu()
         local frame = vgui.Create("DFrame");
-        frame:SetSize(800, 800);
+        frame:SetSize(870, 830);
         frame:Center();
         frame:SetTitle(""); 
         frame:MakePopup();

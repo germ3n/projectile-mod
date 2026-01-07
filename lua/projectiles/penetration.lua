@@ -33,6 +33,9 @@ local cv_ricochet_damage_multiplier = get_convar("pro_ricochet_damage_multiplier
 local cv_penetration_power_cost_multiplier = get_convar("pro_penetration_power_cost_multiplier");
 local cv_penetration_dmg_tax_per_unit = get_convar("pro_penetration_dmg_tax_per_unit");
 local cv_penetration_entry_cost_multiplier = get_convar("pro_penetration_entry_cost_multiplier");
+local cv_penetration_exit_cost_multiplier = get_convar("pro_penetration_exit_cost_multiplier");
+local cv_penetration_thin_material_threshold = get_convar("pro_penetration_thin_material_threshold");
+local cv_penetration_thin_material_scale = get_convar("pro_penetration_thin_material_scale");
 local cv_damage_scaling = get_convar("pro_damage_scaling");
 local convar_meta = FindMetaTable("ConVar");
 local get_bool = convar_meta.GetBool;
@@ -215,10 +218,10 @@ function handle_penetration(shooter, projectile_data, src, dir, penetration_powe
         return true, nil, nil;
     end
 
+    local enter_surf_data = get_surface_data(enter_trace.SurfaceProps);
     if get_bool(cv_ricochet_enabled) then
         random_seed(projectile_data.random_seed + projectile_data.penetration_count);
 
-        local enter_surf_data = get_surface_data(enter_trace.SurfaceProps);
         local enter_name = enter_surf_data and enter_surf_data.name and lower(enter_surf_data.name) or "unknown";
         local hit_normal = enter_trace.HitNormal;
         local dot_result = dot(dir, hit_normal);
@@ -252,41 +255,38 @@ function handle_penetration(shooter, projectile_data, src, dir, penetration_powe
         return true, nil, nil;
     end
 
-    local enter_surf_data = get_surface_data(enter_trace.SurfaceProps);
     local exit_surf_data = get_surface_data(exit_trace.SurfaceProps);
 
-    --local enter_mat = enter_trace.MatType;
-    --local exit_mat = exit_trace.MatType;
+    local exit_name = exit_surf_data and exit_surf_data.name and lower(exit_surf_data.name) or "unknown";
+    local enter_name = enter_surf_data and enter_surf_data.name and lower(enter_surf_data.name) or "unknown";
+    
+    local exit_pen = 1.0 - (exit_surf_data and SURFACE_PROPS_PENETRATION[exit_name] or 1.0);
+    local enter_pen = 1.0 - (enter_surf_data and SURFACE_PROPS_PENETRATION[enter_name] or 1.0);
 
-    --local is_grate_surf = (enter_mat == MAT_GRATE) or (enter_mat == MAT_GLASS);
-    local resistance;-- = 1.0;
-    local entry_cost;-- = 0.0;
-
-    --if is_grate_surf then
-    --    resistance = 0.05;
-    --    entry_cost = 0.05;
-    --elseif enter_mat == MAT_FLESH then 
-        --resistance = 0.05;
-        --entry_cost = 1.0;
-    --else
-        local exit_name = exit_surf_data and exit_surf_data.name and lower(exit_surf_data.name) or "unknown";
-        local enter_name = enter_surf_data and enter_surf_data.name and lower(enter_surf_data.name) or "unknown";
-        local exit_pen = 1.0 - (exit_surf_data and SURFACE_PROPS_PENETRATION[exit_name] or 1.0);
-        local enter_pen = 1.0 - (enter_surf_data and SURFACE_PROPS_PENETRATION[enter_name] or 1.0);
-
-        resistance = (enter_pen + exit_pen) * 0.5;
-        entry_cost = enter_pen * get_float(cv_penetration_entry_cost_multiplier);
-    --end
+    local resistance = (enter_pen + exit_pen) * 0.5;
+    
+    local entry_cost_mult = get_float(cv_penetration_entry_cost_multiplier);
+    local entry_cost = enter_pen * entry_cost_mult;
+    local exit_cost = exit_pen * (entry_cost_mult * get_float(cv_penetration_exit_cost_multiplier));
 
     local dist = distance(exit_trace.HitPos, enter_trace.HitPos);
+    
+    local thickness_scale = 1.0;
+    local thin_threshold = get_float(cv_penetration_thin_material_threshold);
+    if dist < thin_threshold and thin_threshold > 0 then
+        local min_scale = get_float(cv_penetration_thin_material_scale);
+        local thickness_ratio = dist / thin_threshold;
+        thickness_scale = min_scale + (thickness_ratio * (1.0 - min_scale));
+    end
+    
     local power_cost_multiplier = get_float(cv_penetration_power_cost_multiplier);
-    local power_cost = (dist * (resistance + entry_cost)) * power_cost_multiplier;
+    local power_cost = (dist * (resistance + entry_cost + exit_cost)) * power_cost_multiplier * thickness_scale;
     if projectile_data.penetration_power < power_cost then
         return true, nil, nil;
     end
 
     local dmg_tax_per_unit = get_float(cv_penetration_dmg_tax_per_unit);
-    local dmg_loss = dmg_tax_per_unit * dist * (resistance + entry_cost);
+    local dmg_loss = dmg_tax_per_unit * dist * (resistance + entry_cost + exit_cost) * thickness_scale;
 
     projectile_data.damage = projectile_data.damage - dmg_loss;
 

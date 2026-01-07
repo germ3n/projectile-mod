@@ -18,6 +18,8 @@ HL2_WEAPON_CLASSES = {
     "weapon_shotgun",
     "weapon_smg1",
     "weapon_ar2",
+    "weapon_alyxgun",
+    "weapon_annabelle",
     "npc_turret_floor",
     "npc_turret_ceiling",
     "npc_turret_ground",
@@ -27,17 +29,7 @@ HL2_WEAPON_CLASSES = {
 };
 
 local WEAPON_SPEEDS = {
-    ["weapon_pistol"] = 2000,
-    ["weapon_357"] = 500,
-    ["weapon_shotgun"] = 2000,
-    ["weapon_smg1"] = 2000,
-    ["weapon_ar2"] = 2000,
-    ["npc_turret_floor"] = 2000,
-    ["npc_turret_ceiling"] = 2000,
-    ["npc_turret_ground"] = 2000,
-    ["prop_vehicle_airboat"] = 2000,
-    ["func_tank"] = 2000,
-    ["default"] = 2000,
+    ["default"] = 4000,
 };
 
 local WEAPON_DAMAGES = {

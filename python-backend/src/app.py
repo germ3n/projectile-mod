@@ -190,6 +190,9 @@ def auth_landing():
     '''
 
 @app.route('/auth/login')
+@limiter.limit("1 per minute")
+@limiter.limit("10 per hour")
+@limiter.limit("25 per day")
 def login():
     try:
         steam_openid_url = 'https://steamcommunity.com/openid/login'
@@ -210,6 +213,9 @@ def login():
         return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/auth/authorize')
+@limiter.limit("1 per minute")
+@limiter.limit("10 per hour")
+@limiter.limit("25 per day")
 def authorize():
     try:
         params = request.args.to_dict()
@@ -258,7 +264,7 @@ def authorize():
         return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/configs/search', methods=['GET'])
-@limiter.limit("30 per minute")
+@limiter.limit("15 per minute")
 def search_configs():
     try:
         limit = request.args.get('limit', 10, type=int)
@@ -303,6 +309,7 @@ def search_configs():
         return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/fetch-config/<int:config_id>', methods=['GET'])
+@limiter.limit("15 per minute")
 def fetch_config(config_id):
     try:
         conn = get_db_connection()
@@ -482,7 +489,7 @@ def delete_config():
         return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/users/me', methods=['GET'])
-@limiter.limit("1 per minute")
+@limiter.limit("5 per minute")
 def get_me():
     try:
         auth_header = request.headers.get('Authorization', '')
