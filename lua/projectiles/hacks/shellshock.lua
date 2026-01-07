@@ -30,7 +30,6 @@ local get_float = convar_meta.GetFloat;
 local SHOCK_DISTANCE = 30;
 local MAX_SHOCK = 10;
 
-local cv_projectiles_enabled = GetConVar("pro_projectiles_enabled");
 local cv_shell_fadespeed = nil;-- = GetConVar("shell_fadespeed");
 local cv_shell_enabled = nil;-- = GetConVar("shell_enabled");
 
@@ -89,7 +88,7 @@ timer.Create("projectiles_hack_shellshock", 3, 0, function()
         return;
     end
 
-    if get_bool(cv_projectiles_enabled) then
+    if projectiles["pro_projectiles_enabled"] then
         if not shellshock_patched then
             hook.Remove("EntityFireBullets", "ShellshockGettingBullets");
             shellshock_patched = true;

@@ -29,7 +29,8 @@ HL2_WEAPON_CLASSES = {
 };
 
 local WEAPON_SPEEDS = {
-    ["default"] = 4000,
+    ["weapon_357"] = 500,
+    ["default"] = 2000,
 };
 
 local WEAPON_DAMAGES = {

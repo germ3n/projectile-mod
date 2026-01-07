@@ -5,7 +5,6 @@ local fire_bullets_patched = false;
 local entity_take_damage_patched = false;
 local rlb_fire_bullets = nil;
 local rlb_entity_take_damage = nil;
-local cv_projectiles_enabled = GetConVar("pro_projectiles_enabled");
 local guard_rlb_fire_bullets = false;
 local BLOOD_COLOR_RED = BLOOD_COLOR_RED;
 local DONT_BLEED = DONT_BLEED;
@@ -66,7 +65,7 @@ timer.Create("projectile_patch_zippy_realistic_blood", 3, 0, function()
         end
     end
 
-    if get_bool(cv_projectiles_enabled) then
+    if projectiles["pro_projectiles_enabled"] then
         if not fire_bullets_patched then
             hook.Remove("EntityFireBullets", "EntityFireBullets_RealisticBlood");
             fire_bullets_patched = true;

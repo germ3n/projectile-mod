@@ -3,6 +3,8 @@
 
 AddCSLuaFile();
 
+local projectiles = projectiles;
+
 local is_singleplayer = game.SinglePlayer();
 local is_valid = IsValid;
 local effect = util.Effect;
@@ -24,7 +26,6 @@ local set_flags = effect_data_meta.SetFlags;
 local convar_meta = FindMetaTable("ConVar");
 local get_bool = convar_meta.GetBool;
 
-local cv_projectiles_enabled = GetConVar("pro_projectiles_enabled");
 local cv_splatter_enabled = nil;
 local cv_splatter_predict = nil;
 
@@ -50,7 +51,7 @@ local function should_bullet_impact(ent)
 end
 
 function dyn_splatter(shooter, hit_entity, hit_pos, hit_normal, damage)
-    if not cv_splatter_enabled or not get_bool(cv_splatter_enabled) or not should_bullet_impact(shooter) then return; end
+    if not cv_splatter_enabled or not get_bool(cv_splatter_enabled) or not should_bullet_impact(shooter) then return false; end
 
     local effectdata = effect_data();
     set_origin(effectdata, hit_pos);
@@ -60,6 +61,8 @@ function dyn_splatter(shooter, hit_entity, hit_pos, hit_normal, damage)
     set_entity(effectdata, hit_entity);
     set_flags(effectdata, hit_entity:GetBloodColor() + 1);
     effect("dynamic_blood_splatter_effect", effectdata, true, true);
+
+    return true;
 end
 
 local hook_add = hook.Add;
@@ -92,7 +95,7 @@ timer.Create("projectile_patch_zippy_blood_splatter", 3, 0, function()
         cv_splatter_predict = GetConVar("dynamic_blood_splatter_predict");
     end
 
-    if get_bool(cv_projectiles_enabled) then
+    if projectiles["pro_projectiles_enabled"] then
         if not splatter_patched then
             hook.Remove("EntityFireBullets", "dynsplatter");
             splatter_patched = true;

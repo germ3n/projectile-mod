@@ -25,23 +25,6 @@ local tonumber = tonumber;
 local color = Color;
 local vector = Vector;
 
-local cv_ricochet_enabled = get_convar("pro_ricochet_enabled");
-local cv_ricochet_chance = get_convar("pro_ricochet_chance");
-local cv_ricochet_spread = get_convar("pro_ricochet_spread");
-local cv_ricochet_speed_multiplier = get_convar("pro_ricochet_speed_multiplier");
-local cv_ricochet_damage_multiplier = get_convar("pro_ricochet_damage_multiplier");
-local cv_penetration_power_cost_multiplier = get_convar("pro_penetration_power_cost_multiplier");
-local cv_penetration_dmg_tax_per_unit = get_convar("pro_penetration_dmg_tax_per_unit");
-local cv_penetration_entry_cost_multiplier = get_convar("pro_penetration_entry_cost_multiplier");
-local cv_penetration_exit_cost_multiplier = get_convar("pro_penetration_exit_cost_multiplier");
-local cv_penetration_thin_material_threshold = get_convar("pro_penetration_thin_material_threshold");
-local cv_penetration_thin_material_scale = get_convar("pro_penetration_thin_material_scale");
-local cv_damage_scaling = get_convar("pro_damage_scaling");
-local convar_meta = FindMetaTable("ConVar");
-local get_bool = convar_meta.GetBool;
-local get_float = convar_meta.GetFloat;
-local get_string = convar_meta.GetString;
-
 local vector_meta = FindMetaTable("Vector");
 local dot = vector_meta.Dot;
 local get_normalized = vector_meta.GetNormalized;
@@ -56,13 +39,9 @@ local max = math.max;
 
 local MAX_DISTANCE = 180 * 180;
 
-local cv_debug_dur = get_convar("pro_debug_duration");
-local cv_debug_col = get_convar("pro_debug_color");
-local cv_debug_ricochet = get_convar("pro_debug_ricochet");
-
 local function debug_ricochet(projectile_data, enter_trace, chance, reflect, spread)
-    local dur = get_float(cv_debug_dur);
-    local col_vec = string_split(get_string(cv_debug_col), " ");
+    local dur = projectiles["pro_debug_duration"];
+    local col_vec = string_split(projectiles["pro_debug_color"], " ");
     local col = color(tonumber(col_vec[1]), tonumber(col_vec[2]), tonumber(col_vec[3]), col_vec[4] and tonumber(col_vec[4]) or 150);
 
     debug_text(enter_trace.HitPos, "ricochet", dur, false);
@@ -219,7 +198,7 @@ function handle_penetration(shooter, projectile_data, src, dir, penetration_powe
     end
 
     local enter_surf_data = get_surface_data(enter_trace.SurfaceProps);
-    if get_bool(cv_ricochet_enabled) then
+    if projectiles["pro_ricochet_enabled"] then
         random_seed(projectile_data.random_seed + projectile_data.penetration_count);
 
         local enter_name = enter_surf_data and enter_surf_data.name and lower(enter_surf_data.name) or "unknown";
@@ -229,18 +208,18 @@ function handle_penetration(shooter, projectile_data, src, dir, penetration_powe
         local chance = rand(0, 1);
         local mat_chance = RICOCHET_MAT_CHANCE_MULTIPLIERS[enter_name];
         local angle_scale = 1.0 + dot_result;
-        local chance_threshold = get_float(cv_ricochet_chance) * mat_chance * angle_scale;
+        local chance_threshold = projectiles["pro_ricochet_chance"] * mat_chance * angle_scale;
         if chance < chance_threshold then
             local reflect = dir - (2 * dot_result * hit_normal);
             local spread = vector_rand();
-            vec_mul(spread, get_float(cv_ricochet_spread));
+            vec_mul(spread, projectiles["pro_ricochet_spread"]);
     
             projectile_data.dir = get_normalized(reflect + spread);
-            projectile_data.speed = projectile_data.speed * get_float(cv_ricochet_speed_multiplier);
-            projectile_data.damage = projectile_data.damage * get_float(cv_ricochet_damage_multiplier);
+            projectile_data.speed = projectile_data.speed * projectiles["pro_ricochet_speed_multiplier"];
+            projectile_data.damage = projectile_data.damage * projectiles["pro_ricochet_damage_multiplier"];
             projectile_data.pos = enter_trace.HitPos + (projectile_data.dir * 2);
     
-            if get_bool(cv_debug_ricochet) then debug_ricochet(projectile_data, enter_trace, chance, reflect, spread); end
+            if projectiles["pro_debug_ricochet"] then debug_ricochet(projectile_data, enter_trace, chance, reflect, spread); end
 
             return false, nil, nil;
         end
@@ -265,27 +244,27 @@ function handle_penetration(shooter, projectile_data, src, dir, penetration_powe
 
     local resistance = (enter_pen + exit_pen) * 0.5;
     
-    local entry_cost_mult = get_float(cv_penetration_entry_cost_multiplier);
+    local entry_cost_mult = projectiles["pro_penetration_entry_cost_multiplier"];
     local entry_cost = enter_pen * entry_cost_mult;
-    local exit_cost = exit_pen * (entry_cost_mult * get_float(cv_penetration_exit_cost_multiplier));
+    local exit_cost = exit_pen * (entry_cost_mult * projectiles["pro_penetration_exit_cost_multiplier"]);
 
     local dist = distance(exit_trace.HitPos, enter_trace.HitPos);
     
     local thickness_scale = 1.0;
-    local thin_threshold = get_float(cv_penetration_thin_material_threshold);
+    local thin_threshold = projectiles["pro_penetration_thin_material_threshold"];
     if dist < thin_threshold and thin_threshold > 0 then
-        local min_scale = get_float(cv_penetration_thin_material_scale);
+        local min_scale = projectiles["pro_penetration_thin_material_scale"];
         local thickness_ratio = dist / thin_threshold;
         thickness_scale = min_scale + (thickness_ratio * (1.0 - min_scale));
     end
     
-    local power_cost_multiplier = get_float(cv_penetration_power_cost_multiplier);
+    local power_cost_multiplier = projectiles["pro_penetration_power_cost_multiplier"];
     local power_cost = (dist * (resistance + entry_cost + exit_cost)) * power_cost_multiplier * thickness_scale;
     if projectile_data.penetration_power < power_cost then
         return true, nil, nil;
     end
 
-    local dmg_tax_per_unit = get_float(cv_penetration_dmg_tax_per_unit);
+    local dmg_tax_per_unit = projectiles["pro_penetration_dmg_tax_per_unit"];
     local dmg_loss = dmg_tax_per_unit * dist * (resistance + entry_cost + exit_cost) * thickness_scale;
 
     projectile_data.damage = projectile_data.damage - dmg_loss;
@@ -314,7 +293,7 @@ local HITGROUP_MULTIPLIERS = {
 };
 
 function get_damage_multiplier(hitgroup)
-    if not get_bool(cv_damage_scaling) then
+    if not projectiles["pro_damage_scaling"] then
         return 1.0;
     end
 

@@ -1,40 +1,88 @@
 AddCSLuaFile();
 
 local projectiles = projectiles;
+local next = next;
+local PROJECTILES_CVARS = PROJECTILES_CVARS;
 
 local convar_meta = FindMetaTable("ConVar");
 local get_bool = convar_meta.GetBool;
 local get_float = convar_meta.GetFloat;
+local get_int = convar_meta.GetInt;
 local get_string = convar_meta.GetString;
 
-local get_convar = GetConVar;
-
-local next = next;
-
-local red = Color(255, 0, 0);
-local green = Color(0, 255, 0);
-local blue = Color(0, 0, 255);
-local white = Color(255, 255, 255);
-
-local TRACK_CVARS = {
-    {"projectiles_enabled", "bool", "pro_projectiles_enabled"},
-    {"debug_projectiles", "bool", "pro_debug_projectiles"},
-    {"debug_duration", "float", "pro_debug_duration"},
-    {"debug_color", "string", "pro_debug_color"},
-    {"debug_penetration", "bool", "pro_debug_penetration"},
-    {"ricochet_enabled", "bool", "pro_ricochet_enabled"},
-    {"ricochet_chance", "float", "pro_ricochet_chance"},
-    {"ricochet_spread", "float", "pro_ricochet_spread"},
-    {"ricochet_speed_multiplier", "float", "pro_ricochet_speed_multiplier"},
-    {"ricochet_damage_multiplier", "float", "pro_ricochet_damage_multiplier"},
-    {"ricochet_distance_multiplier", "float", "pro_ricochet_distance_multiplier"},
-    {"drag_enabled", "bool", "pro_drag_enabled"},
-    {"drag_multiplier", "float", "pro_drag_multiplier"},
-    {"drag_water_multiplier", "float", "pro_drag_water_multiplier"},
-    {"gravity_enabled", "bool", "pro_gravity_enabled"},
-    {"gravity_multiplier", "float", "pro_gravity_multiplier"},
-    {"gravity_water_multiplier", "float", "pro_gravity_water_multiplier"},
-    {"gravity", "float", "sv_gravity"},
+local get_funcs = {
+    ["bool"] = get_bool,
+    ["float"] = get_float,
+    ["int"] = get_int,
+    ["string"] = get_string,
 };
+
+for cvar_name, cvar_data in next, PROJECTILES_CVARS do
+    local cvar = cvar_data[1];
+    local cvar_type = cvar_data[2];
+    projectiles[cvar_name] = get_funcs[cvar_type](cvar);
+end
+
+if SERVER then
+    util.AddNetworkString("projectiles_cache_update");
+
+    local net_start = net.Start;
+    local write_bool = net.WriteBool;
+    local write_float = net.WriteFloat;
+    local write_int = net.WriteInt;
+    local write_string = net.WriteString;
+    local broadcast = net.Broadcast;
+
+    local write_funcs = {
+        ["bool"] = write_bool,
+        ["float"] = write_float,
+        ["int"] = function(val) write_int(val, 32); end,
+        ["string"] = write_string,
+    };
+
+    local function change_callback(cvar_name, old_value, new_value)
+        local cvar_data = PROJECTILES_CVARS[cvar_name];
+        if not cvar_data then return; end
+
+        local cvar = cvar_data[1];
+        local cvar_type = cvar_data[2];
+        local value = get_funcs[cvar_type](cvar);
+        projectiles[cvar_name] = value;
+
+        net_start("projectiles_cache_update");
+        write_string(cvar_name);
+        write_funcs[cvar_type](value);
+        broadcast();
+    end
+
+    for cvar_name, cvar_data in next, PROJECTILES_CVARS do
+        cvars.AddChangeCallback(cvar_name, change_callback, "projectiles_cache");
+    end
+end
+
+if CLIENT then
+    local read_bool = net.ReadBool;
+    local read_float = net.ReadFloat;
+    local read_int = net.ReadInt;
+    local read_string = net.ReadString;
+
+    local read_funcs = {
+        ["bool"] = read_bool,
+        ["float"] = read_float,
+        ["int"] = function() return read_int(32); end,
+        ["string"] = read_string,
+    };
+
+    net.Receive("projectiles_cache_update", function()
+        local cvar_name = read_string();
+        local cvar_data = PROJECTILES_CVARS[cvar_name];
+        if not cvar_data then return; end
+
+        local cvar_type = cvar_data[2];
+        projectiles[cvar_name] = read_funcs[cvar_type]();
+
+        LocalPlayer():ChatPrint("Updated " .. cvar_name .. " to " .. tostring(projectiles[cvar_name]));
+    end);
+end
 
 print("loaded projectiles cache");

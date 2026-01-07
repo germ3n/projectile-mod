@@ -32,8 +32,8 @@ if SERVER then
 
     concommand.Add("pro_config_reset_cvars", function(ply, cmd, args)
         if ply ~= NULL and (not is_superadmin(ply)) then return; end
-        for cvar_name, cvar in next, PROJECTILES_CVARS do
-            RunConsoleCommand(cvar_name, get_default(cvar));
+        for cvar_name, cvar_data in next, PROJECTILES_CVARS do
+            RunConsoleCommand(cvar_name, get_default(cvar_data[1]));
         end
 
         print("reset all projectile cvars");
@@ -264,11 +264,13 @@ if CLIENT then
                 { type = "bool", cvar = "pro_damage_dropoff_enabled", label = "Enable Damage Dropoff" },
                 { type = "bool", cvar = "pro_use_firebullets", label = "Use FireBullets (might help resolve issues with some mods)" },
                 { type = "bool", cvar = "pro_wind_enabled", label = "Enable Wind (Experimental)" },
+                { type = "bool", cvar = "pro_blood_splatter_enabled", label = "Enable Blood Splatters" },
                 { type = "float", cvar = "pro_speed_scale", label = "Speed Scale", min = 0.1, max = 5.0, decimals = 2 },
                 { type = "float", cvar = "pro_weapon_damage_scale", label = "Damage Scale", min = 0.1, max = 5.0, decimals = 2 },
                 { type = "float", cvar = "pro_penetration_power_scale", label = "Power Scale", min = 0.1, max = 5.0, decimals = 2 },
                 { type = "float", cvar = "pro_damage_force_multiplier", label = "Damage Force Multiplier", min = 0.0, max = 50.0, decimals = 3 },
                 { type = "float", cvar = "pro_npc_shootpos_forward", label = "NPC Shoot Position Forward Offset", min = 0.0, max = 200.0, decimals = 0 },
+                --{ type = "float", cvar = "pro_blood_splatter_scale", label = "Blood Splatter Scale", min = 0.0, max = 10.0, decimals = 2 },
             }
         },
         {
@@ -302,6 +304,9 @@ if CLIENT then
                 { type = "header", label = "Thin Material Optimization" },
                 { type = "float", cvar = "pro_penetration_thin_material_threshold", label = "Thin Material Threshold (Units)", min = 0.0, max = 100.0, decimals = 0 },
                 { type = "float", cvar = "pro_penetration_thin_material_scale", label = "Thin Material Min Scale", min = 0.0, max = 1.0, decimals = 2 },
+                { type = "header", label = "Exit Trace Settings" },
+                { type = "float", cvar = "pro_penetration_trace_to_exit_max_distance", label = "Max Trace Distance (Units)", min = 0.0, max = 1000.0, decimals = 0 },
+                { type = "float", cvar = "pro_penetration_trace_to_exit_step_size", label = "Trace Step Size (Units)", min = 0.0, max = 30.0, decimals = 1 },
             }
         },
         {

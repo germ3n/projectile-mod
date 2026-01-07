@@ -41,17 +41,6 @@ local function get_weapon_spread(weapon, class_name, dir, spread)
     return final_dir;
 end
 
-local convar_meta = FindMetaTable("ConVar");
-local get_bool = convar_meta.GetBool;
-local get_float = convar_meta.GetFloat;
-
-local cv_projectiles_enabled = GetConVar("pro_projectiles_enabled");
-local cv_penetration_power_scale = GetConVar("pro_penetration_power_scale");
-local cv_weapon_damage_scale = GetConVar("pro_weapon_damage_scale");
-local cv_speed_scale = GetConVar("pro_speed_scale");
-local cv_net_reliable = GetConVar("pro_net_reliable");
-local cv_npc_shootpos_forward = GetConVar("pro_npc_shootpos_forward");
-
 local TURRET_AND_MOUNTED_WEAPONS_WHITELIST = {
     ["npc_turret_floor"] = true,
     ["npc_turret_ceiling"] = true,
@@ -101,7 +90,7 @@ if SERVER then
     local npc_pistol_effect_fix = npc_pistol_effect_fix;
 
     hook.Add("EntityFireBullets", "projectiles", function(shooter, data)
-        if projectiles.disable_fire_bullets or not get_bool(cv_projectiles_enabled) then return; end
+        if projectiles.disable_fire_bullets or not projectiles["pro_projectiles_enabled"] then return; end
         if not shooter or shooter == NULL then return; end
         --print(shooter, data.Inflictor, data.Damage);
 
@@ -142,17 +131,17 @@ if SERVER then
         end
 
         local inflictor_class = get_class(inflictor);
-        local speed = get_weapon_speed(inflictor, inflictor_class) * get_float(cv_speed_scale);
-        local damage = get_weapon_damage(inflictor, inflictor_class, data.Damage) * get_float(cv_weapon_damage_scale);
+        local speed = get_weapon_speed(inflictor, inflictor_class) * projectiles["pro_speed_scale"];
+        local damage = get_weapon_damage(inflictor, inflictor_class, data.Damage) * projectiles["pro_weapon_damage_scale"];
         local src = calculate_lean_pos and calculate_lean_pos(data.Src, angle(data.Dir), lean_amount, shooter) or data.Src;
         
         if is_npc then
-            local npc_offset = get_float(cv_npc_shootpos_forward);
+            local npc_offset = projectiles["pro_npc_shootpos_forward"];
             if npc_offset > 0 then
                 src = src + data.Dir * npc_offset;
             end
         end
-        local penetration_power = get_weapon_penetration_power(inflictor, inflictor_class) * get_float(cv_penetration_power_scale);
+        local penetration_power = get_weapon_penetration_power(inflictor, inflictor_class) * projectiles["pro_penetration_power_scale"];
         local penetration_count = get_weapon_penetration_count(inflictor, inflictor_class);
         local drag = get_weapon_drag(inflictor, inflictor_class);
         local mass = get_weapon_mass(inflictor, inflictor_class);
@@ -185,7 +174,7 @@ if SERVER then
                 dropoff_end,
                 dropoff_min_multiplier,
                 data.AmmoType,
-                get_bool(cv_net_reliable)
+                projectiles["pro_net_reliable"]
             );
         end
 
@@ -197,7 +186,7 @@ end
 
 if CLIENT then
     hook.Add("EntityFireBullets", "projectiles", function(shooter, data)
-        if not get_bool(cv_projectiles_enabled) then return; end
+        if not projectiles["pro_projectiles_enabled"] then return; end
         if projectiles.currently_using_firebullets then return; end
 
         return false;

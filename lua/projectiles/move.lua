@@ -17,6 +17,7 @@ local string_format = string.format;
 local CONTENTS_WATER = CONTENTS_WATER;
 local MASK_WATER = MASK_WATER;
 local DMG_BULLET = DMG_BULLET;
+local DONT_BLEED = DONT_BLEED;
 local effect_data = EffectData;
 local effect = util.Effect;
 local vector = Vector;
@@ -34,6 +35,9 @@ local NULL = NULL;
 local get_world = game.GetWorld;
 local engine_tick_count = engine.TickCount;
 local sqrt = math.sqrt;
+local _is_valid = IsValid;
+local clamp = math.Clamp;
+local util_decal = util.Decal;
 
 local entity_meta = FindMetaTable("Entity");
 local is_valid = entity_meta.IsValid;
@@ -48,6 +52,9 @@ local get_nw2_int = entity_meta.GetNW2Int;
 local player_meta = FindMetaTable("Player");
 local toggle_lag_compensation = player_meta.LagCompensation;
 local is_listen_server_host = player_meta.IsListenServerHost;
+
+local entity_meta = FindMetaTable("Entity");
+local get_blood_color = entity_meta.GetBloodColor;
 
 local damage_info_meta = FindMetaTable("CTakeDamageInfo");
 local set_damage = damage_info_meta.SetDamage;
@@ -67,6 +74,7 @@ local set_surface_prop = effect_data_meta.SetSurfaceProp;
 local set_entity = effect_data_meta.SetEntity;
 local set_hit_box = effect_data_meta.SetHitBox;
 local set_damage_type = effect_data_meta.SetDamageType;
+local set_normal = effect_data_meta.SetNormal;
 
 local cusercmd_meta = FindMetaTable("CUserCmd");
 local get_command_number = cusercmd_meta.CommandNumber;
@@ -79,11 +87,6 @@ local vec_mul = vector_meta.Mul;
 local vec_add = vector_meta.Add;
 local to_screen = vector_meta.ToScreen;
 
-local cv_debug = get_convar("pro_debug_projectiles");
-local cv_debug_dur = get_convar("pro_debug_duration");
-local cv_debug_col = get_convar("pro_debug_color");
-local cv_debug_pen = get_convar("pro_debug_penetration");
-
 local BREAKABLE_CLASSES = {
     ["func_breakable_surf"] = true,
     ["func_breakable"] = true,
@@ -91,36 +94,20 @@ local BREAKABLE_CLASSES = {
     ["prop_physics_multiplayer"] = true,
 };
 
-local cv_drag_enabled = get_convar("pro_drag_enabled");
-local cv_drag_multiplier = get_convar("pro_drag_multiplier");
-local cv_drag_water_multiplier = get_convar("pro_drag_water_multiplier");
-local cv_gravity_enabled = get_convar("pro_gravity_enabled");
-local cv_gravity_multiplier = get_convar("pro_gravity_multiplier");
-local cv_gravity_water_multiplier = get_convar("pro_gravity_water_multiplier");
-local cv_drop_multiplier = get_convar("pro_drop_multiplier");
-local cv_wind_enabled = get_convar("pro_wind_enabled");
-local cv_wind_strength = get_convar("pro_wind_strength");
-local cv_wind_strength_min_variance = get_convar("pro_wind_strength_min_variance");
-local cv_wind_strength_max_variance = get_convar("pro_wind_strength_max_variance");
-local cv_wind_min_update_interval = get_convar("pro_wind_min_update_interval");
-local cv_wind_max_update_interval = get_convar("pro_wind_max_update_interval");
-local cv_wind_gust_chance = get_convar("pro_wind_gust_chance");
-local cv_wind_gust_min_strength = get_convar("pro_wind_gust_min_strength");
-local cv_wind_gust_max_strength = get_convar("pro_wind_gust_max_strength");
-local cv_wind_gust_min_duration = get_convar("pro_wind_gust_min_duration");
-local cv_wind_gust_max_duration = get_convar("pro_wind_gust_max_duration");
-local cv_wind_jitter_amount = get_convar("pro_wind_jitter_amount");
-local cv_render_wind_hud = get_convar("pro_render_wind_hud");
+local BLOOD_COLOR_DECALS = {
+    [BLOOD_COLOR_RED] = "Blood",
+    [BLOOD_COLOR_YELLOW] = "YellowBlood",
+    [BLOOD_COLOR_GREEN] = "YellowBlood",
+    [BLOOD_COLOR_MECH] = "BeerSplash",
+    [BLOOD_COLOR_ANTLION] = "YellowBlood",
+    [BLOOD_COLOR_ZOMBIE] = "Blood",
+    [BLOOD_COLOR_ANTLION_WORKER] = "YellowBlood",
+};
+
 local cv_sv_gravity = get_convar("sv_gravity");
-local cv_damage_force_multiplier = get_convar("pro_damage_force_multiplier");
-local cv_damage_dropoff_enabled = get_convar("pro_damage_dropoff_enabled");
-local cv_use_firebullets = get_convar("pro_use_firebullets");
 
 local convar_meta = FindMetaTable("ConVar");
-local get_bool = convar_meta.GetBool;
 local get_float = convar_meta.GetFloat;
-local get_int = convar_meta.GetInt;
-local get_string = convar_meta.GetString;
 
 local max = math.max;
 local dyn_splatter = dyn_splatter;
@@ -166,8 +153,8 @@ local fire_bullets_config = {
 };
 
 local function debug_projectile_course(projectile_data, enter_trace)
-    local dur = get_float(cv_debug_dur);
-    local col_vec = string_split(get_string(cv_debug_col), " ");
+    local dur = projectiles["pro_debug_duration"];
+    local col_vec = string_split(projectiles["pro_debug_color"], " ");
     local col = color(tonumber(col_vec[1]), tonumber(col_vec[2]), tonumber(col_vec[3]), col_vec[4] and tonumber(col_vec[4]) or 150);
 
     debug_line(projectile_data.pos, enter_trace.HitPos, dur, col, true);
@@ -178,7 +165,7 @@ local function debug_projectile_course(projectile_data, enter_trace)
 end
 
 local function debug_penetration(projectile_data, current_hit_damage, current_penetration_power, exit_pos, enter_trace, exit_trace)
-    local dur = get_float(cv_debug_dur);
+    local dur = projectiles["pro_debug_duration"];
     debug_line(enter_trace.HitPos, exit_pos, dur, color(255, 0, 0, 150), true);
     debug_box(exit_pos, vector(-1, -1, -1), vector(1, 1, 1), dur, color(255, 0, 0, 150), true);
 
@@ -198,11 +185,8 @@ end
 
 local do_shellshock = do_shellshock;
 
-local _is_valid = IsValid;
-local clamp = math.Clamp;
-
 local function calculate_damage_dropoff(projectile_data)
-    if not get_bool(cv_damage_dropoff_enabled) then
+    if not projectiles["pro_damage_dropoff_enabled"] then
         return false;
     end
 
@@ -230,10 +214,10 @@ local function calculate_damage_dropoff(projectile_data)
 end
 
 local function apply_drag(projectile_data)
-    if get_bool(cv_drag_enabled) then
-        local drag_factor = projectile_data.drag * tick_interval * get_float(cv_drag_multiplier);
+    if projectiles["pro_drag_enabled"] then
+        local drag_factor = projectile_data.drag * tick_interval * projectiles["pro_drag_multiplier"];
         if band(point_contents(projectile_data.pos), CONTENTS_WATER) ~= 0 then
-            drag_factor = drag_factor * get_float(cv_drag_water_multiplier);
+            drag_factor = drag_factor * projectiles["pro_drag_water_multiplier"];
         end
 
         projectile_data.speed = projectile_data.speed - projectile_data.speed * drag_factor;
@@ -256,7 +240,7 @@ local function apply_damage_info(projectile_data, enter_trace, final_damage, sho
     set_attacker(dmg_info, shooter);
     dmg_set_damage_type(dmg_info, DMG_BULLET);
     set_damage_position(dmg_info, enter_trace.HitPos);
-    set_damage_force(dmg_info, projectile_data.dir * final_damage * get_float(cv_damage_force_multiplier));
+    set_damage_force(dmg_info, projectile_data.dir * final_damage * projectiles["pro_damage_force_multiplier"]);
 
     if not hurt_armorednpcs(shooter, enter_trace, dmg_info) then
         take_damage_info(hit_entity, dmg_info);
@@ -282,22 +266,22 @@ local function move_projectile(shooter, projectile_data)
 
     local current_velocity = projectile_data.dir * projectile_data.speed;
     
-    if get_bool(cv_gravity_enabled) then
-        local gravity_strength = get_float(cv_sv_gravity) * projectile_data.drop * get_float(cv_gravity_multiplier);
+    if projectiles["pro_gravity_enabled"] then
+        local gravity_strength = get_float(cv_sv_gravity) * projectile_data.drop * projectiles["pro_gravity_multiplier"];
         gravity_vector.z = -gravity_strength;
         if band(point_contents(projectile_data.pos), CONTENTS_WATER) ~= 0 then
-            gravity_vector.z = gravity_vector.z * get_float(cv_gravity_water_multiplier);
+            gravity_vector.z = gravity_vector.z * projectiles["pro_gravity_water_multiplier"];
         end
 
         current_velocity.z = current_velocity.z + gravity_vector.z * tick_interval;
     end
 
-    if get_bool(cv_wind_enabled) then
+    if projectiles["pro_wind_enabled"] then
         current_velocity.x = current_velocity.x + wind_vector.x * tick_interval;
         current_velocity.y = current_velocity.y + wind_vector.y * tick_interval;
     end
 
-    if get_bool(cv_gravity_enabled) or get_bool(cv_wind_enabled) then
+    if projectiles["pro_gravity_enabled"] or projectiles["pro_wind_enabled"] then
         projectile_data.dir = get_normalized(current_velocity);
         projectile_data.speed = vec_len(current_velocity);
     end
@@ -319,9 +303,9 @@ local function move_projectile(shooter, projectile_data)
     
     local enter_trace = projectile_move_trace(projectile_data.pos, new_pos, trace_filter);
 
-    if get_bool(cv_debug) then debug_projectile_course(projectile_data, enter_trace); end
+    if projectiles["pro_debug_projectiles"] then debug_projectile_course(projectile_data, enter_trace); end
 
-    local use_firebullets = get_bool(cv_use_firebullets);
+    local use_firebullets = projectiles["pro_use_firebullets"];
     if enter_trace.Hit then
         local hit_entity = enter_trace.Entity;
         if CLIENT then
@@ -343,7 +327,7 @@ local function move_projectile(shooter, projectile_data)
         local stop_bullet, exit_pos, exit_trace = handle_penetration(shooter, projectile_data, enter_trace.HitPos, projectile_data.dir, projectile_data.penetration_power, enter_trace);
 
         -- todo: fix
-        if get_bool(cv_debug_pen) and exit_pos then
+        if projectiles["pro_debug_penetration"] and exit_pos then
             debug_penetration(projectile_data, current_hit_damage, current_penetration_power, exit_pos, enter_trace, exit_trace);
         end
 
@@ -370,7 +354,7 @@ local function move_projectile(shooter, projectile_data)
                         fire_bullets_config.Attacker = shooter;
                         fire_bullets_config.Inflictor = projectile_data.weapon;
                         fire_bullets_config.Damage = final_damage;
-                        fire_bullets_config.Force = final_damage * get_float(cv_damage_force_multiplier);
+                        fire_bullets_config.Force = final_damage * projectiles["pro_damage_force_multiplier"];
                         fire_bullets_config.Distance = 2;
                         fire_bullets_config.Dir = projectile_data.dir;
                         fire_bullets_config.Src = enter_trace.HitPos - projectile_data.dir;
@@ -383,14 +367,29 @@ local function move_projectile(shooter, projectile_data)
                     end
                 end
 
-                dyn_splatter(shooter, hit_entity, enter_trace.HitPos, enter_trace.HitNormal, final_damage);
+                if not dyn_splatter(shooter, hit_entity, enter_trace.HitPos, enter_trace.HitNormal, final_damage) then
+                    if CLIENT and projectiles["pro_blood_splatter_enabled"] and hit_entity and _is_valid(hit_entity) then
+                        local blood_color = get_blood_color(hit_entity);
+                        if blood_color and blood_color ~= DONT_BLEED then
+                            local blood_effect = effect_data();
+                            set_origin(blood_effect, enter_trace.HitPos);
+                            set_normal(blood_effect, enter_trace.HitNormal);
+                            set_flags(blood_effect, blood_color);
+                            --set_scale(blood_effect, clamp(final_damage * projectiles["pro_blood_splatter_scale"], 1, 10));
+                            effect("BloodImpact", blood_effect);
+                            
+                            --local decal_name = BLOOD_COLOR_DECALS[blood_color] or "Blood";
+                            --util_decal(decal_name, enter_trace.HitPos + enter_trace.HitNormal, enter_trace.HitPos - enter_trace.HitNormal);
+                        end
+                    end
+                end
             else
                 projectiles.disable_fire_bullets = true;
                 fx_patch_all(true);
                 fire_bullets_config.Attacker = shooter;
                 fire_bullets_config.Inflictor = projectile_data.weapon;
                 fire_bullets_config.Damage = final_damage;
-                fire_bullets_config.Force = final_damage * get_float(cv_damage_force_multiplier);
+                fire_bullets_config.Force = final_damage * projectiles["pro_damage_force_multiplier"];
                 fire_bullets_config.Distance = 2;
                 fire_bullets_config.Dir = projectile_data.dir;
                 fire_bullets_config.Src = enter_trace.HitPos - projectile_data.dir;
@@ -437,8 +436,8 @@ local function move_projectile(shooter, projectile_data)
 end
 
 local function debug_final_pos(projectile_data)
-    local dur = get_float(cv_debug_dur);
-    local col_vec = string_split(get_string(cv_debug_col), " ");
+    local dur = projectiles["pro_debug_duration"];
+    local col_vec = string_split(projectiles["pro_debug_color"], " ");
     local col = color(tonumber(col_vec[1]), tonumber(col_vec[2]), tonumber(col_vec[3]), col_vec[4] and tonumber(col_vec[4]) or 150);
 
     debug_box(projectile_data.pos, vector(-1, -1, -1), vector(1, 1, 1), dur, col, true);
@@ -490,7 +489,7 @@ local function get_wind_at_tick(tick)
 
     --todo: overhaul this
     local time = tick * tick_interval;
-    local jitter_amt = get_float(cv_wind_jitter_amount);
+    local jitter_amt = projectiles["pro_wind_jitter_amount"];
     local jitter_x = get_turbulence(time * 0.5, 0);
     local jitter_y = get_turbulence(time * 0.5, 50);
     local wind_speed = sqrt(wind_x * wind_x + wind_y * wind_y);
@@ -502,7 +501,7 @@ local function get_wind_at_tick(tick)
 end
 
 local function update_wind_target(is_wind_update, has_gust_finished)
-    local base_strength = get_float(cv_wind_strength);
+    local base_strength = projectiles["pro_wind_strength"];
     local tick_count = engine_tick_count();
     local time = tick_count * tick_interval;
     local duration = 0;
@@ -517,10 +516,10 @@ local function update_wind_target(is_wind_update, has_gust_finished)
     elseif pending_gust then
         
     elseif is_wind_update then
-        strength = base_strength * rand(get_float(cv_wind_strength_min_variance), get_float(cv_wind_strength_max_variance));
-        duration = rand(get_float(cv_wind_min_update_interval), get_float(cv_wind_max_update_interval));
+        strength = base_strength * rand(projectiles["pro_wind_strength_min_variance"], projectiles["pro_wind_strength_max_variance"]);
+        duration = rand(projectiles["pro_wind_min_update_interval"], projectiles["pro_wind_max_update_interval"]);
 
-        if rand(0, 1) < get_float(cv_wind_gust_chance) then
+        if rand(0, 1) < projectiles["pro_wind_gust_chance"] then
             --todo: implement gust
         end
     end
@@ -558,7 +557,7 @@ local function move_projectiles(ply, mv, cmd)
     while idx <= active_projectile_count do
         local hit = move_projectile(ply, projectiles.active_projectiles[idx]);
         if hit then
-            if get_bool(cv_debug) then debug_final_pos(projectiles.active_projectiles[idx]); end
+            if projectiles["pro_debug_projectiles"] then debug_final_pos(projectiles.active_projectiles[idx]); end
             projectiles.active_projectiles[idx] = projectiles.active_projectiles[active_projectile_count];
             projectiles.active_projectiles[active_projectile_count] = nil;
             active_projectile_count = active_projectile_count - 1;
@@ -579,7 +578,7 @@ if SERVER then
             end
         end
 
-        if get_bool(cv_wind_enabled) then
+        if projectiles["pro_wind_enabled"] then
             local tick_count = engine_tick_count();
             local time = tick_count * tick_interval;
             local wind_update = time > next_wind_update_time;
@@ -653,7 +652,7 @@ if CLIENT then
     local simple_text = draw.SimpleText;
     
     hook.Add("HUDPaint", "projectiles_wind_hud", function()
-        if not get_bool(cv_wind_enabled) or not get_bool(cv_render_wind_hud) then return; end
+        if not projectiles["pro_wind_enabled"] or not projectiles["pro_render_wind_hud"] then return; end
     
         local cx, cy = scr_w() / 2, 150;
         local arrow_size = 40;

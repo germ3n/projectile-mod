@@ -1,5 +1,7 @@
 -- https://steamcommunity.com/sharedfiles/filedetails/?id=3047373358
 
+local projectiles = projectiles;
+
 local bullets_hurt_armorednpcs = nil;
 local bullets_hurt_armorednpcs_patched = false;
 
@@ -8,8 +10,6 @@ local is_valid = IsValid;
 
 local convar_meta = FindMetaTable("ConVar");
 local get_bool = convar_meta.GetBool;
-
-local cv_projectiles_enabled = GetConVar("pro_projectiles_enabled");
 
 function hurt_armorednpcs(shooter, trace, dmginfo)
     if is_valid(trace.Entity) and trace.Entity.CustomBulletHit then
@@ -52,7 +52,7 @@ timer.Create("projectiles_hack_hurt_armorednpcs", 3, 0, function()
         return;
     end
 
-    if not get_bool(cv_projectiles_enabled) then -- unpatch
+    if not projectiles["pro_projectiles_enabled"] then -- unpatch
         if bullets_hurt_armorednpcs_patched then
             hook.Add("EntityFireBullets", "BulletsHurtArmoredNPCs", bullets_hurt_armorednpcs);
             bullets_hurt_armorednpcs_patched = false;

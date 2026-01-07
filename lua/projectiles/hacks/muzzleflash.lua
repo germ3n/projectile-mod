@@ -1,13 +1,13 @@
 --https://steamcommunity.com/sharedfiles/filedetails/?id=3061075767
 
+local projectiles = projectiles;
+
 local next = next;
 local muzzleflash_moretracers = nil;
 local muzzleflash_pistolfix = nil;
 
 local convar_meta = FindMetaTable("ConVar");
 local get_bool = convar_meta.GetBool;
-
-local cv_projectiles_enabled = GetConVar("pro_projectiles_enabled");
 
 timer.Create("projectiles_hack_muzzleflash", 3, 0, function()
     if not muzzleflash_moretracers and hook.GetTable()["EntityFireBullets"] then
@@ -22,7 +22,7 @@ timer.Create("projectiles_hack_muzzleflash", 3, 0, function()
         return;
     end
 
-    if not get_bool(cv_projectiles_enabled) then -- disable hack
+    if not projectiles["pro_projectiles_enabled"] then -- disable hack
         hook.Add("EntityFireBullets", "MoreTracersForHL2Weps", muzzleflash_moretracers);
         hook.Add("EntityFireBullets", "NPCPistolEffectFix", muzzleflash_pistolfix);
     else

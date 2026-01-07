@@ -32,8 +32,8 @@ function projectiles_backup_config(type, flags)
 
     if bit.band(flags, PROJECTILES_BACKUP_CVARS) ~= 0 then
         backup.cvars = {};
-        for cvar_name, cvar in next, PROJECTILES_CVARS do
-            backup.cvars[cvar_name] = cvar:GetString();
+        for cvar_name, cvar_data in next, PROJECTILES_CVARS do
+            backup.cvars[cvar_name] = cvar_data[1]:GetString();
         end
     end
 

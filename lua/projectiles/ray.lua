@@ -31,11 +31,10 @@ local projectile_trace_config = {
 };
 
 function trace_to_exit(enter_trace, start_pos, dir, mins, maxs, shooter)
-    local dist = 0;
     local first_contents = 0;
-    
-    while dist <= 90 do
-        dist = dist + 4.0;
+    local max_distance = projectiles["pro_penetration_trace_to_exit_max_distance"];
+    local step_size = projectiles["pro_penetration_trace_to_exit_step_size"];
+    for dist = 0, max_distance, step_size do
         local check_pos = start_pos + (dir * dist);
 
         if first_contents == 0 then
@@ -47,7 +46,7 @@ function trace_to_exit(enter_trace, start_pos, dir, mins, maxs, shooter)
         if (band(current_contents, MASK_SHOT_HULL) == 0) or (band(current_contents, CONTENTS_HITBOX) ~= 0 and current_contents ~= first_contents) then
             local exit_trace = trace_line_ex({
                 start = check_pos,
-                endpos = check_pos - (dir * 4.0),
+                endpos = check_pos - (dir * step_size),
                 mask = MASK_SHOT_HULL,
                 filter = shooter,
                 mins = mins,
@@ -67,8 +66,7 @@ function trace_to_exit(enter_trace, start_pos, dir, mins, maxs, shooter)
                 if (box_trace.Fraction < 1.0 or box_trace.AllSolid) and not box_trace.StartSolid then
                     return box_trace.HitPos, box_trace;
                 end
-                
-                goto _continue;
+                continue;
             end
 
             if not (exit_trace.Fraction < 1.0 or exit_trace.AllSolid or exit_trace.StartSolid) or exit_trace.StartSolid then
@@ -78,7 +76,7 @@ function trace_to_exit(enter_trace, start_pos, dir, mins, maxs, shooter)
                         return start_pos + dir, enter_trace;
                     end
                 end
-                goto _continue;
+                continue;
             end
 
             if band(exit_trace.SurfaceFlags, 0x80) ~= 0 then -- NODRAW
@@ -92,7 +90,6 @@ function trace_to_exit(enter_trace, start_pos, dir, mins, maxs, shooter)
             end
         end
         
-        ::_continue::
     end
 
     return nil, nil;
