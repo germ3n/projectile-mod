@@ -493,7 +493,17 @@ local function hash_string(str)
     return h;
 end
 
-local wind_seed = hash_string(game.GetMap());
+local map_hash = hash_string(game.GetMap());
+if SERVER then
+    PROJECTILES_CVARS["pro_wind_seed_random"][1]:SetInt(math.random(1, 2147483647));
+end
+
+local function get_wind_seed()
+    local random_seed = PROJECTILES_CVARS["pro_wind_seed_random"][1]:GetInt();--projectiles["pro_wind_seed_random"];
+    return bxor(map_hash, random_seed);
+end
+
+local wind_seed = get_wind_seed();
 
 local function get_turbulence(val, offset)
     local n = 0;
@@ -607,7 +617,23 @@ local function move_projectiles(ply, mv, cmd)
     local active_projectile_count = #projectiles.active_projectiles;
     if active_projectile_count == 0 then return; end
 
-    if SERVER and ply:IsPlayer() then toggle_lag_compensation(ply, true); end
+    if SERVER and ply:IsPlayer() then 
+        if projectiles["pro_wind_enabled"] and cmd then
+            if not wind_initialized then
+                initialize_wind();
+            end
+            
+            local cmd_tick = tick_count(cmd);
+            while cmd_tick >= next_wind_update_tick do
+                local gust = gust_end_tick > 0 and next_wind_update_tick >= gust_end_tick;
+                update_wind_target(true, gust);
+            end
+            
+            wind_vector = get_wind_at_tick(cmd_tick);
+        end
+        
+        toggle_lag_compensation(ply, true); 
+    end
     
     local idx = 1;
     while idx <= active_projectile_count do
@@ -628,12 +654,6 @@ end
 if SERVER then
     hook.Add("SetupMove", "projectiles_tick", move_projectiles)
     hook.Add("Tick", "projectiles_tick", function()
-        for shooter, _ in next, projectile_store do
-            if is_valid(shooter) and shooter:IsNPC() then 
-                move_projectiles(shooter, nil, nil);
-            end
-        end
-
         if projectiles["pro_wind_enabled"] then
             if not wind_initialized then
                 initialize_wind();
@@ -646,7 +666,15 @@ if SERVER then
             end
     
             wind_vector = get_wind_at_tick(tick_count);
-        else
+        end
+        
+        for shooter, _ in next, projectile_store do
+            if is_valid(shooter) and shooter:IsNPC() then 
+                move_projectiles(shooter, nil, nil);
+            end
+        end
+        
+        if not projectiles["pro_wind_enabled"] then
             if wind_target_vector.x ~= 0.0 or wind_target_vector.y ~= 0.0 then
                 wind_target_vector.x = 0.0;
                 wind_target_vector.y = 0.0;
