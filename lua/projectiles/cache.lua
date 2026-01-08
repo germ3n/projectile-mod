@@ -55,7 +55,21 @@ if SERVER then
         broadcast();
     end
 
+    local IGNORE_CVARS = {
+        ["pro_render_enabled"] = true,
+        ["pro_render_min_distance"] = true,
+        ["pro_spawn_fade_distance"] = true,
+        ["pro_spawn_fade_time"] = true,
+        ["pro_spawn_offset"] = true,
+        ["pro_min_trail_length"] = true,
+        ["pro_distance_scale_enabled"] = true,
+        ["pro_distance_scale_start"] = true,
+        ["pro_distance_scale_max"] = true,
+        ["pro_render_wind_hud"] = true,
+    };
+
     for cvar_name, cvar_data in next, PROJECTILES_CVARS do
+        if IGNORE_CVARS[cvar_name] then continue; end
         cvars.AddChangeCallback(cvar_name, change_callback, "projectiles_cache");
     end
 end

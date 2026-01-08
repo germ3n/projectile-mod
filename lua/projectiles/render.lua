@@ -29,18 +29,38 @@ local distance_to_sqr = vector_meta.DistToSqr;
 local length_sqr = vector_meta.LengthSqr;
 
 local cv_render_enabled = GetConVar("pro_render_enabled");
-local cv_render_min_distance = CreateClientConVar("pro_render_min_distance", "64", true, false, "Minimum distance from camera to render projectiles", 0, 10000);
-local cv_spawn_fade_distance = CreateClientConVar("pro_spawn_fade_distance", "100", true, false, "Distance before switching from spawn pos to trail", 0, 1000);
-local cv_spawn_fade_time = CreateClientConVar("pro_spawn_fade_time", "0.15", true, false, "Time in seconds for trail spawn fade", 0, 2.0);
-local cv_spawn_offset = CreateClientConVar("pro_spawn_offset", "40", true, false, "Forward offset for local player spawn trails", 0, 200);
-local cv_min_trail_length = CreateClientConVar("pro_min_trail_length", "8", true, false, "Minimum visual trail length", 0, 100);
-local cv_distance_scale_enabled = CreateClientConVar("pro_distance_scale_enabled", "1", true, false, "Enable distance scaling", 0, 1);
-local cv_distance_scale_start = CreateClientConVar("pro_distance_scale_start", "1024", true, false, "Distance at which projectiles start scaling up", 0, 10000);
-local cv_distance_scale_max = CreateClientConVar("pro_distance_scale_max", "3.0", true, false, "Maximum distance scale multiplier", 1.0, 10.0);
+local cv_render_min_distance = GetConVar("pro_render_min_distance");
+local cv_spawn_fade_distance = GetConVar("pro_spawn_fade_distance");
+local cv_spawn_fade_time = GetConVar("pro_spawn_fade_time");
+local cv_spawn_offset = GetConVar("pro_spawn_offset");
+local cv_min_trail_length = GetConVar("pro_min_trail_length");
+local cv_distance_scale_enabled = GetConVar("pro_distance_scale_enabled");
+local cv_distance_scale_start = GetConVar("pro_distance_scale_start");
+local cv_distance_scale_max = GetConVar("pro_distance_scale_max");
 
 local convar_meta = FindMetaTable("ConVar");
 local get_bool = convar_meta.GetBool;
 local get_float = convar_meta.GetFloat;
+
+local cached_render_enabled = get_bool(cv_render_enabled);
+local cached_render_min_distance = get_float(cv_render_min_distance);
+local cached_spawn_fade_distance = get_float(cv_spawn_fade_distance);
+local cached_spawn_fade_time = get_float(cv_spawn_fade_time);
+local cached_spawn_offset = get_float(cv_spawn_offset);
+local cached_min_trail_length = get_float(cv_min_trail_length);
+local cached_distance_scale_enabled = get_bool(cv_distance_scale_enabled);
+local cached_distance_scale_start = get_float(cv_distance_scale_start);
+local cached_distance_scale_max = get_float(cv_distance_scale_max);
+
+cvars.AddChangeCallback("pro_render_enabled", function(_, _, new) cached_render_enabled = tobool(new); end);
+cvars.AddChangeCallback("pro_render_min_distance", function(_, _, new) cached_render_min_distance = tonumber(new); end);
+cvars.AddChangeCallback("pro_spawn_fade_distance", function(_, _, new) cached_spawn_fade_distance = tonumber(new); end);
+cvars.AddChangeCallback("pro_spawn_fade_time", function(_, _, new) cached_spawn_fade_time = tonumber(new); end);
+cvars.AddChangeCallback("pro_spawn_offset", function(_, _, new) cached_spawn_offset = tonumber(new); end);
+cvars.AddChangeCallback("pro_min_trail_length", function(_, _, new) cached_min_trail_length = tonumber(new); end);
+cvars.AddChangeCallback("pro_distance_scale_enabled", function(_, _, new) cached_distance_scale_enabled = tobool(new); end);
+cvars.AddChangeCallback("pro_distance_scale_start", function(_, _, new) cached_distance_scale_start = tonumber(new); end);
+cvars.AddChangeCallback("pro_distance_scale_max", function(_, _, new) cached_distance_scale_max = tonumber(new); end);
 
 local sprite_batch_core = {};
 local sprite_batch_glow = {};
@@ -48,7 +68,7 @@ local sprite_batch_outer = {};
 local beam_batch = {};
 
 local function render_projectiles()
-    if not get_bool(cv_render_enabled) then return; end
+    if not cached_render_enabled then return; end
     
     local cur_time_val = tick_count() * tick_interval;
     local real_time = unpredicted_cur_time();
@@ -58,14 +78,14 @@ local function render_projectiles()
 
     local ply = local_player();
     local cam_pos = eye_pos();
-    local min_dist_sqr = get_float(cv_render_min_distance);
+    local min_dist_sqr = cached_render_min_distance;
     min_dist_sqr = min_dist_sqr * min_dist_sqr;
-    local spawn_fade_dist = get_float(cv_spawn_fade_distance);
-    local spawn_fade_time = get_float(cv_spawn_fade_time);
-    local spawn_offset = get_float(cv_spawn_offset);
-    local min_trail_length = get_float(cv_min_trail_length);
-    local dist_scale_start = get_float(cv_distance_scale_start);
-    local dist_scale_max = get_float(cv_distance_scale_max);
+    local spawn_fade_dist = cached_spawn_fade_distance;
+    local spawn_fade_time = cached_spawn_fade_time;
+    local spawn_offset = cached_spawn_offset;
+    local min_trail_length = cached_min_trail_length;
+    local dist_scale_start = cached_distance_scale_start;
+    local dist_scale_max = cached_distance_scale_max;
 
     local core_idx = 0;
     local glow_idx = 0;
