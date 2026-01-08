@@ -1,0 +1,4 @@
+[submodule "native-module/gmod-headers"]
+	path = native-module/gmod-headers
+	url = https://github.com/Facepunch/gmod-module-base/
+	branch = development
