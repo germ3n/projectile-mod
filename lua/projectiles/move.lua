@@ -111,18 +111,12 @@ local PROP_PHYSICS_CLASSES = {
 };
 
 local function should_filter_entity(ent)
-    if _is_valid(ent) and PROP_PHYSICS_CLASSES[get_class(ent)] then
-        return true;
-    end
+    if not _is_valid(ent) then return false; end
+    if not PROP_PHYSICS_CLASSES[get_class(ent)] then return true; end
     
     local phys = get_physics_object(ent);
-    if not _is_valid(phys) then
-        return true;
-    end
-    
-    if not is_motion_enabled(phys) then
-        return false;
-    end
+    if not _is_valid(phys) then return true; end
+    if not is_motion_enabled(phys) then return false; end
     
     return true;
 end
