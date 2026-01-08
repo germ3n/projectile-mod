@@ -45,6 +45,7 @@ local is_valid = entity_meta.IsValid;
 local take_damage_info = entity_meta.TakeDamageInfo;
 local fire_bullets = entity_meta.FireBullets;
 local get_class = entity_meta.GetClass;
+local get_physics_object = entity_meta.GetPhysicsObject;
 
 local player_meta = FindMetaTable("Player");
 local toggle_lag_compensation = player_meta.LagCompensation;
@@ -52,6 +53,9 @@ local is_listen_server_host = player_meta.IsListenServerHost;
 
 local entity_meta = FindMetaTable("Entity");
 local get_blood_color = entity_meta.GetBloodColor;
+
+local physobj_meta = FindMetaTable("PhysObj");
+local is_motion_enabled = physobj_meta.IsMotionEnabled;
 
 local damage_info_meta = FindMetaTable("CTakeDamageInfo");
 local set_damage = damage_info_meta.SetDamage;
@@ -100,6 +104,28 @@ local BLOOD_COLOR_DECALS = {
     [BLOOD_COLOR_ZOMBIE] = "Blood",
     [BLOOD_COLOR_ANTLION_WORKER] = "YellowBlood",
 };
+
+local PROP_PHYSICS_CLASSES = {
+    ["prop_physics"] = true,
+    ["prop_physics_multiplayer"] = true,
+};
+
+local function should_filter_entity(ent)
+    if not PROP_PHYSICS_CLASSES[get_class(ent)] then
+        return true;
+    end
+    
+    local phys = get_physics_object(ent);
+    if not _is_valid(phys) then
+        return true;
+    end
+    
+    if not is_motion_enabled(phys) then
+        return false;
+    end
+    
+    return true;
+end
 
 local cv_sv_gravity = get_convar("sv_gravity");
 
@@ -295,7 +321,11 @@ local function move_projectile(shooter, projectile_data)
     
     trace_filter[1] = not projectile_data.is_gmod_turret and shooter or projectile_data.weapon;
     trace_filter[2] = projectile_data.weapon;
-    trace_filter[3] = projectile_data.last_hit_entity;
+    if projectile_data.last_hit_entity and should_filter_entity(projectile_data.last_hit_entity) then
+        trace_filter[3] = projectile_data.last_hit_entity;
+    else
+        trace_filter[3] = nil;
+    end
     if CLIENT then do_water_trace(projectile_data, new_pos, trace_filter); end -- had to move to seperate funcs cuz i hit more than 60 upvalues
     
     local enter_trace = projectile_move_trace(projectile_data.pos, new_pos, trace_filter);
