@@ -2593,7 +2593,7 @@ if CLIENT then
         frame.Paint = function(s, w, h)
             draw.RoundedBox(6, 0, 0, w, h, THEME.bg_dark)
             draw.RoundedBoxEx(6, 0, 0, w, 25, THEME.header_bg, true, true, false, false)
-            draw.SimpleText("Projectile Configuration", "DermaDefaultBold", 10, 12, THEME.text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            draw.SimpleText("ProjectileMod+ Configuration", "DermaDefaultBold", 10, 12, THEME.text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
         end
         
         local sheet = vgui.Create("DPropertySheet", frame);
@@ -2679,10 +2679,10 @@ if CLIENT then
     concommand.Add("pro_config", OpenConfigMenu);
 
     hook.Add("PopulateToolMenu", "ProjectilesAddToSpawnMenu", function()
-        spawnmenu.AddToolMenuOption("Utilities", "Projectile Mod", "ProjectileConfig", "Configuration", "", "", function(panel)
+        spawnmenu.AddToolMenuOption("Utilities", "ProjectileMod+", "ProjectileConfig", "Configuration", "", "", function(panel)
             panel:ClearControls();
             
-            panel:Help("Projectile Mod Configuration");
+            panel:Help("ProjectileMod+ Configuration");
             panel:Help("Configure weapon ballistics, penetration, ricochet, and more.");
             
             local btn = panel:Button("Open Config Menu");

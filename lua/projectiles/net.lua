@@ -16,6 +16,8 @@ local projectile_store = projectile_store;
 local BUFFER_SIZE = 0x400; -- must be power of 2
 
 if SERVER then
+    local seed_counter = 0;
+
     local entity_meta = FindMetaTable("Entity");
     local eye_pos = entity_meta.EyePos;
 
@@ -50,7 +52,9 @@ if SERVER then
 
         local time = cur_time();
         local tick = floor(0.5 + time / tick_interval);
-        local random_seed = tonumber(crc(tostring(pos) .. tostring(dir))); -- random seed for ricochet
+        --local random_seed = tonumber(crc(tostring(pos) .. tostring(dir))); -- random seed for ricochet
+
+        seed_counter = band(seed_counter + 1, 0xFFFFFFFF);
 
         net_start("projectile", reliable and false or true);
         write_entity(shooter);
@@ -74,7 +78,7 @@ if SERVER then
         write_float(drop);
         write_float(min_speed);
         write_float(max_distance);
-        write_uint(random_seed, 32); -- random seed for ricochet
+        write_uint(seed_counter, 32); -- random seed for ricochet
         write_color(tracer_colors[1]);
         write_color(tracer_colors[2]);
         write_bool(is_gmod_turret);
