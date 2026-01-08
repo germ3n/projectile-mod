@@ -169,7 +169,7 @@ if SERVER then
         projectile.min_speed = min_speed;
         projectile.distance_traveled = 0.0;
         projectile.max_distance = max_distance;
-        projectile.random_seed = random_seed;
+        projectile.random_seed = seed_counter;
         projectile.old_pos.x = pos.x;
         projectile.old_pos.y = pos.y;
         projectile.old_pos.z = pos.z;

@@ -70,12 +70,6 @@ function trace_to_exit(enter_trace, start_pos, dir, mins, maxs, shooter)
             end
 
             if not (exit_trace.Fraction < 1.0 or exit_trace.AllSolid or exit_trace.StartSolid) or exit_trace.StartSolid then
-                if enter_trace.Entity and is_valid(enter_trace.Entity) then
-                    local class = get_class(enter_trace.Entity);
-                    if string_find(class, "func_breakable", 1, true) or string_find(class, "prop_physics", 1, true) then
-                        return start_pos + dir, enter_trace;
-                    end
-                end
                 continue;
             end
 
