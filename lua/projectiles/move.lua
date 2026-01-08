@@ -111,7 +111,7 @@ local PROP_PHYSICS_CLASSES = {
 };
 
 local function should_filter_entity(ent)
-    if not PROP_PHYSICS_CLASSES[get_class(ent)] then
+    if _is_valid(ent) and PROP_PHYSICS_CLASSES[get_class(ent)] then
         return true;
     end
     
