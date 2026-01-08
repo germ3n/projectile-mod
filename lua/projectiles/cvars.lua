@@ -50,8 +50,8 @@ PROJECTILES_CVARS = {
     ["pro_damage_force_multiplier"] = { CreateConVar("pro_damage_force_multiplier", "0.1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Damage force multiplier", 0.0, 50.0), "float" },
     ["pro_damage_dropoff_enabled"] = { CreateConVar("pro_damage_dropoff_enabled", "1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Enable damage dropoff", 0, 1), "bool" },
     ["pro_marketplace_base_url"] = { CreateConVar("pro_marketplace_base_url", "migration.projectilemod.directory", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Marketplace URL"), "string" },
-    ["pro_npc_shootpos_forward"] = { CreateConVar("pro_npc_shootpos_forward", "0", bit.bor(FCVAR_NOTIFY, FCVAR_CHEAT, FCVAR_ARCHIVE, FCVAR_REPLICATED), "Forward offset for NPC bullet spawn position", 0, 200), "float" },
-    ["pro_use_firebullets"] = { CreateConVar("pro_use_firebullets", "0", bit.bor(FCVAR_NOTIFY, FCVAR_CHEAT, FCVAR_ARCHIVE, FCVAR_REPLICATED), "Use firebullets to inflict damage", 0, 1), "bool" },
+    ["pro_npc_shootpos_forward"] = { CreateConVar("pro_npc_shootpos_forward", "0", bit.bor(FCVAR_NOTIFY, FCVAR_ARCHIVE, FCVAR_REPLICATED), "Forward offset for NPC bullet spawn position", 0, 200), "float" },
+    ["pro_use_firebullets"] = { CreateConVar("pro_use_firebullets", "0", bit.bor(FCVAR_NOTIFY, FCVAR_ARCHIVE, FCVAR_REPLICATED), "Use firebullets to inflict damage", 0, 1), "bool" },
     ["pro_blood_splatter_enabled"] = { CreateConVar("pro_blood_splatter_enabled", "1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Enable blood splatter", 0, 1), "bool" },
     --["pro_blood_splatter_scale"] = { CreateConVar("pro_blood_splatter_scale", "0.5", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Blood splatter scale", 0.0, 10.0), "float" },
 };
