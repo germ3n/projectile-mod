@@ -17,6 +17,8 @@ local trace_line_ex = util.TraceLine;
 local get_surface_data = util.GetSurfaceData;
 local string_format = string.format;
 local CONTENTS_WATER = CONTENTS_WATER;
+local CONTENTS_SLIME = CONTENTS_SLIME;
+local CONTENTS_WATER_AND_SLIME = bit.bor(CONTENTS_WATER, CONTENTS_SLIME);
 local MASK_WATER = MASK_WATER;
 local DMG_BULLET = DMG_BULLET;
 local DONT_BLEED = DONT_BLEED;
@@ -43,6 +45,7 @@ local util_decal = util.Decal;
 local entity_meta = FindMetaTable("Entity");
 local is_valid = entity_meta.IsValid;
 local take_damage_info = entity_meta.TakeDamageInfo;
+local dispatch_trace_attack = entity_meta.DispatchTraceAttack;
 local fire_bullets = entity_meta.FireBullets;
 local get_class = entity_meta.GetClass;
 local get_physics_object = entity_meta.GetPhysicsObject;
@@ -134,8 +137,8 @@ local fx_patch_all = fx_patch_all;
 local trace_filter = {nil, nil, nil};
 
 local function do_water_trace(projectile_data, new_pos, filter)
-    local was_in_water = band(point_contents(projectile_data.pos), CONTENTS_WATER) ~= 0;
-    local is_in_water = band(point_contents(new_pos), CONTENTS_WATER) ~= 0;
+    local was_in_water = band(point_contents(projectile_data.pos), CONTENTS_WATER_AND_SLIME) ~= 0;
+    local is_in_water = band(point_contents(new_pos), CONTENTS_WATER_AND_SLIME) ~= 0;
 
     if not was_in_water and is_in_water then
         local water_trace = trace_line_ex({
@@ -233,7 +236,7 @@ end
 local function apply_drag(projectile_data)
     if projectiles["pro_drag_enabled"] then
         local drag_factor = projectile_data.drag * tick_interval * projectiles["pro_drag_multiplier"];
-        if band(point_contents(projectile_data.pos), CONTENTS_WATER) ~= 0 then
+        if band(point_contents(projectile_data.pos), CONTENTS_WATER_AND_SLIME) ~= 0 then
             drag_factor = drag_factor * projectiles["pro_drag_water_multiplier"];
         end
 
@@ -260,6 +263,7 @@ local function apply_damage_info(projectile_data, enter_trace, final_damage, sho
     set_damage_force(dmg_info, projectile_data.dir * final_damage * projectiles["pro_damage_force_multiplier"]);
 
     if not hurt_armorednpcs(shooter, enter_trace, dmg_info) then
+        --dispatch_trace_attack(hit_entity, dmg_info, enter_trace, projectile_data.dir);
         take_damage_info(hit_entity, dmg_info);
     end
 end
@@ -282,11 +286,10 @@ local function move_projectile(shooter, projectile_data)
     end
 
     local current_velocity = projectile_data.dir * projectile_data.speed;
-    
     if projectiles["pro_gravity_enabled"] then
         local gravity_strength = get_float(cv_sv_gravity) * projectile_data.drop * projectiles["pro_gravity_multiplier"];
         gravity_vector.z = -gravity_strength;
-        if band(point_contents(projectile_data.pos), CONTENTS_WATER) ~= 0 then
+        if band(point_contents(projectile_data.pos), CONTENTS_WATER_AND_SLIME) ~= 0 then
             gravity_vector.z = gravity_vector.z * projectiles["pro_gravity_water_multiplier"];
         end
 
@@ -676,7 +679,15 @@ local function move_projectiles(ply, mv, cmd)
 end
 
 if SERVER then
-    hook.Add("SetupMove", "projectiles_tick", move_projectiles)
+    local entity_meta = FindMetaTable("Entity");
+    local get_velocity = entity_meta.GetVelocity;
+
+    hook.Add("SetupMove", "projectiles_tick", function(ply, mv, cmd)
+        projectiles.shooter_velocities[ply] = get_velocity(ply);
+
+        move_projectiles(ply, mv, cmd);
+    end);
+    
     hook.Add("Tick", "projectiles_tick", function()
         if projectiles["pro_wind_enabled"] then
             if not wind_initialized then
@@ -715,13 +726,22 @@ if SERVER then
 
     hook.Add("EntityRemoved", "projectiles_cleanup", function(ent)
         projectile_store[ent] = nil;
+        projectiles.shooter_velocities[ent] = nil;
     end);
 else
     local is_first_time_predicted = IsFirstTimePredicted;
     local local_player = LocalPlayer;
     local is_singleplayer = game.SinglePlayer();
     local last_tick_count = engine_tick_count();
+
+    local entity_meta = FindMetaTable("Entity");
+    local get_velocity = entity_meta.GetVelocity;
     hook.Add("CreateMove", "projectiles_tick", function(cmd)
+        local ply = local_player();
+        if _is_valid(ply) then
+            projectiles.shooter_velocities[ply] = get_velocity(ply);
+        end
+
         local tick = tick_count(cmd);
         if get_command_number(cmd) ~= 0 and ((tick > last_tick_count) or is_singleplayer) then
             if projectiles["pro_wind_enabled"] then
@@ -762,6 +782,7 @@ else
         for ent, _ in next, projectile_store do
             if is_valid(ent) then continue; end
             projectile_store[ent] = nil;
+            projectiles.shooter_velocities[ent] = nil;
         end
     end);
 end

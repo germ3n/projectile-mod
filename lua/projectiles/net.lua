@@ -204,10 +204,11 @@ if CLIENT then
     local read_bool = net.ReadBool;
     local read_string = net.ReadString;
     local vector = Vector;
+    local is_singleplayer = game.SinglePlayer();
 
     net.Receive("projectile", function()
         local shooter = read_entity();
-        --if shooter == local_player then return; end -- no need to process own projectiles
+        if not is_singleplayer and shooter == local_player() then return; end -- todo: probably better way to handle singleplayer sessions
 
         local weapon = read_entity();
         local time = read_float();

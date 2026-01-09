@@ -5,6 +5,9 @@ local projectiles = projectiles;
 local zero_vec = Vector(0, 0, 0);
 local rand = math.Rand;
 local abs = math.abs;
+local shared_random = util.SharedRandom;
+
+projectiles.shooter_velocities = projectiles.shooter_velocities or {};
 
 local angle_meta = FindMetaTable("Angle");
 local right = angle_meta.Right;
@@ -15,7 +18,7 @@ local angle = vector_meta.Angle;
 
 local CONFIG_TYPES = CONFIG_TYPES;
 
-local function get_weapon_spread(weapon, class_name, dir, spread)
+local function get_weapon_spread(weapon, class_name, dir, spread, seed)
     if spread.x == 0.0 and spread.y == 0.0 then
         return dir;
     end
@@ -28,13 +31,15 @@ local function get_weapon_spread(weapon, class_name, dir, spread)
     local vec_right = right(angle_dir);
     local vec_up = up(angle_dir);
 
+    local attempt = 0;
     repeat
-        final_spread_x = rand(-1, 1) * flatness + rand(-1, 1) * (1.0 - flatness);
-        final_spread_y = rand(-1, 1) * flatness + rand(-1, 1) * (1.0 - flatness);
+        final_spread_x = shared_random("spread_x_" .. seed .. "_" .. attempt, -1, 1) * flatness + shared_random("spread_x2_" .. seed .. "_" .. attempt, -1, 1) * (1.0 - flatness);
+        final_spread_y = shared_random("spread_y_" .. seed .. "_" .. attempt, -1, 1) * flatness + shared_random("spread_y2_" .. seed .. "_" .. attempt, -1, 1) * (1.0 - flatness);
         if bias < 0.0 then
             final_spread_x = final_spread_x >= 0.0 and 1.0 - final_spread_x or -1.0 -final_spread_x;
             final_spread_y = final_spread_y >= 0.0 and 1.0 - final_spread_y or -1.0 -final_spread_y;
         end
+        attempt = attempt + 1;
     until (final_spread_x * final_spread_x + final_spread_y * final_spread_y) <= 1.0;
 
     local final_dir = dir + (final_spread_x * spread.x * vec_right) + (final_spread_y * spread.y * vec_up);
@@ -78,6 +83,8 @@ if SERVER then
 
     local vector_meta = FindMetaTable("Vector");
     local angle = vector_meta.Angle;
+    local get_normalized = vector_meta.GetNormalized;
+    local vec_length = vector_meta.Length;
 
     local NULL = NULL;
     local entity_meta = FindMetaTable("Entity");
@@ -88,6 +95,10 @@ if SERVER then
     local npc_get_active_weapon = npc_meta.GetActiveWeapon;
 
     local npc_pistol_effect_fix = npc_pistol_effect_fix;
+
+    local get_velocity = entity_meta.GetVelocity;
+    local get_ground_entity = entity_meta.GetGroundEntity;
+    local vector = Vector;
 
     hook.Add("EntityFireBullets", "projectiles", function(shooter, data)
         if projectiles.disable_fire_bullets or not projectiles["pro_projectiles_enabled"] then return; end
@@ -153,13 +164,39 @@ if SERVER then
         local dropoff_end = get_weapon_dropoff_end(inflictor, inflictor_class);
         local dropoff_min_multiplier = get_weapon_dropoff_min_multiplier(inflictor, inflictor_class);
         for idx = 1, data.Num do
-            local spread_dir = get_weapon_spread(inflictor, inflictor_class, data.Dir, data.Spread);
+            local spread_dir = get_weapon_spread(inflictor, inflictor_class, data.Dir, data.Spread, idx);
+            local final_dir = spread_dir;
+            local final_speed = speed;
+
+            if projectiles["pro_inherit_shooter_velocity"] then
+                local inherited_vel = projectiles.shooter_velocities[shooter] or get_velocity(shooter);
+                if projectiles["pro_inherit_ground_entity_velocity"] then
+                    local ground = get_ground_entity(shooter);
+                    if ground and ground ~= NULL then
+                        local ground_vel = get_velocity(ground);
+                        if ground_vel then
+                            inherited_vel = vector(inherited_vel.x + ground_vel.x, inherited_vel.y + ground_vel.y, inherited_vel.z + ground_vel.z);
+                        end
+                    end
+                end
+                
+                local scale = projectiles["pro_inherit_shooter_velocity_scale"];
+                local combined_vel = vector(
+                    spread_dir.x * speed + inherited_vel.x * scale,
+                    spread_dir.y * speed + inherited_vel.y * scale,
+                    spread_dir.z * speed + inherited_vel.z * scale
+                );
+                
+                final_dir = get_normalized(combined_vel);
+                final_speed = vec_length(combined_vel);
+            end
+
             broadcast_projectile(
                 shooter,
                 inflictor,
                 src,
-                spread_dir, 
-                speed,
+                final_dir, 
+                final_speed,
                 damage,
                 drag,
                 penetration_power,
@@ -185,9 +222,208 @@ if SERVER then
 end
 
 if CLIENT then
+    local local_player = LocalPlayer;
+    local band = bit.band;
+    local cur_time = CurTime;
+    local vector = Vector;
+    local NULL = NULL;
+    local projectile_store = projectile_store;
+    local BUFFER_SIZE = 0x400;
+    
+    local entity_meta = FindMetaTable("Entity");
+    local get_class = entity_meta.GetClass;
+    local get_velocity = entity_meta.GetVelocity;
+    local get_ground_entity = entity_meta.GetGroundEntity;
+    
+    local player_meta = FindMetaTable("Player");
+    local get_lean_amount = player_meta.GetLeanAmount;
+    local player_get_active_weapon = player_meta.GetActiveWeapon;
+    
+    local vector_meta = FindMetaTable("Vector");
+    local angle = vector_meta.Angle;
+    local get_normalized = vector_meta.GetNormalized;
+    local vec_length = vector_meta.Length;
+    
+    local function create_local_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, dropoff_start, dropoff_end, dropoff_min_multiplier, ammo_type)
+        if not projectile_store[shooter] then 
+            projectile_store[shooter] = {
+                received = 0,
+                last_received_idx = 0,
+                buffer = {},
+                active_projectiles = {},
+                buffer_size = BUFFER_SIZE,
+            };
+
+            for i = 1, BUFFER_SIZE do
+                projectile_store[shooter].buffer[i] = {
+                    hit = true,
+                    weapon = nil,
+                    time = nil,
+                    pos = vector(),
+                    dir = vector(),
+                    speed = nil,
+                    damage = nil,
+                    damage_initial = nil,
+                    drag = nil,
+                    penetration_power = nil,
+                    penetration_count = nil,
+                    last_hit_entity = nil,
+                    mass = nil,
+                    drop = nil,
+                    min_speed = nil,
+                    distance_traveled = nil,
+                    max_distance = nil,
+                    random_seed = nil,
+                    old_pos = vector(),
+                    trace_filter = {nil, nil, nil},
+                    tracer_colors = {nil, nil},
+                    is_gmod_turret = false,
+                    spawn_pos = vector(),
+                    spawn_time = nil,
+                    vel = vector(),
+                    old_vel = vector(),
+                    dropoff_start = nil,
+                    dropoff_end = nil,
+                    dropoff_min_multiplier = nil,
+                    ammo_type = nil,
+                };
+            end
+
+            projectile_store[shooter].active_projectiles = {};
+        end
+
+        local time = cur_time();
+        projectile_store[shooter].last_received_idx = projectile_store[shooter].last_received_idx + 1;
+        local projectile_idx = band(projectile_store[shooter].last_received_idx - 1, projectile_store[shooter].buffer_size - 1) + 1;
+
+        local projectile = projectile_store[shooter].buffer[projectile_idx];
+        projectile.weapon = weapon;
+        projectile.time = time;
+        projectile.pos.x = pos.x;
+        projectile.pos.y = pos.y;
+        projectile.pos.z = pos.z;
+        projectile.dir.x = dir.x;
+        projectile.dir.y = dir.y;
+        projectile.dir.z = dir.z;
+        projectile.speed = speed;
+        projectile.damage = damage;
+        projectile.damage_initial = damage;
+        projectile.drag = drag;
+        projectile.penetration_power = penetration_power;
+        projectile.penetration_count = penetration_count;
+        projectile.last_hit_entity = nil;
+        projectile.hit = false;
+        projectile.mass = mass;
+        projectile.drop = drop;
+        projectile.min_speed = min_speed;
+        projectile.distance_traveled = 0.0;
+        projectile.max_distance = max_distance;
+        projectile.random_seed = 0;
+        projectile.old_pos.x = pos.x;
+        projectile.old_pos.y = pos.y;
+        projectile.old_pos.z = pos.z;
+        projectile.tracer_colors[1] = tracer_colors[1];
+        projectile.tracer_colors[2] = tracer_colors[2];
+        projectile.is_gmod_turret = false;
+        projectile.spawn_pos.x = pos.x;
+        projectile.spawn_pos.y = pos.y;
+        projectile.spawn_pos.z = pos.z;
+        projectile.spawn_time = time;
+        projectile.vel.x = dir.x * speed;
+        projectile.vel.y = dir.y * speed;
+        projectile.vel.z = dir.z * speed;
+        projectile.old_vel.x = projectile.vel.x;
+        projectile.old_vel.y = projectile.vel.y;
+        projectile.old_vel.z = projectile.vel.z;
+        projectile.dropoff_start = dropoff_start;
+        projectile.dropoff_end = dropoff_end;
+        projectile.dropoff_min_multiplier = dropoff_min_multiplier;
+        projectile.ammo_type = ammo_type;
+        projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
+    end
+
+    local is_first_time_predicted = IsFirstTimePredicted;
     hook.Add("EntityFireBullets", "projectiles", function(shooter, data)
         if not projectiles["pro_projectiles_enabled"] then return; end
         if projectiles.currently_using_firebullets then return; end
+        if shooter ~= local_player() then return false; end
+        if not is_first_time_predicted() then return false; end
+
+        local inflictor = data.Inflictor;
+        if not inflictor or inflictor == NULL then
+            inflictor = player_get_active_weapon(shooter);
+        end
+
+        if not inflictor or inflictor == NULL then
+            return false;
+        end
+
+        local inflictor_class = get_class(inflictor);
+        local speed = get_weapon_speed(inflictor, inflictor_class) * projectiles["pro_speed_scale"];
+        local damage = get_weapon_damage(inflictor, inflictor_class, data.Damage) * projectiles["pro_weapon_damage_scale"];
+        local lean_amount = get_lean_amount and get_lean_amount(shooter) or 0.0;
+        local src = calculate_lean_pos and calculate_lean_pos(data.Src, angle(data.Dir), lean_amount, shooter) or data.Src;
+        local penetration_power = get_weapon_penetration_power(inflictor, inflictor_class) * projectiles["pro_penetration_power_scale"];
+        local penetration_count = get_weapon_penetration_count(inflictor, inflictor_class);
+        local drag = get_weapon_drag(inflictor, inflictor_class);
+        local mass = get_weapon_mass(inflictor, inflictor_class);
+        local drop = get_weapon_drop(inflictor, inflictor_class);
+        local min_speed = get_weapon_min_speed(inflictor, inflictor_class);
+        local max_distance = get_weapon_max_distance(inflictor, inflictor_class);
+        local tracer_colors = get_weapon_tracer_colors(inflictor, inflictor_class);
+        local dropoff_start = get_weapon_dropoff_start(inflictor, inflictor_class);
+        local dropoff_end = get_weapon_dropoff_end(inflictor, inflictor_class);
+        local dropoff_min_multiplier = get_weapon_dropoff_min_multiplier(inflictor, inflictor_class);
+
+        for idx = 1, data.Num do
+            local spread_dir = get_weapon_spread(inflictor, inflictor_class, data.Dir, data.Spread, idx);
+            local final_dir = spread_dir;
+            local final_speed = speed;
+
+            if projectiles["pro_inherit_shooter_velocity"] then
+                local inherited_vel = projectiles.shooter_velocities[shooter] or get_velocity(shooter);
+                if projectiles["pro_inherit_ground_entity_velocity"] then
+                    local ground = get_ground_entity(shooter);
+                    if ground and ground ~= NULL then
+                        local ground_vel = get_velocity(ground);
+                        if ground_vel then
+                            inherited_vel = vector(inherited_vel.x + ground_vel.x, inherited_vel.y + ground_vel.y, inherited_vel.z + ground_vel.z);
+                        end
+                    end
+                end
+                
+                local scale = projectiles["pro_inherit_shooter_velocity_scale"];
+                local combined_vel = vector(
+                    spread_dir.x * speed + inherited_vel.x * scale,
+                    spread_dir.y * speed + inherited_vel.y * scale,
+                    spread_dir.z * speed + inherited_vel.z * scale
+                );
+                
+                final_dir = get_normalized(combined_vel);
+                final_speed = vec_length(combined_vel);
+            end
+
+            create_local_projectile(
+                shooter,
+                inflictor,
+                src,
+                final_dir,
+                final_speed,
+                damage,
+                drag,
+                penetration_power,
+                penetration_count,
+                mass,
+                drop,
+                min_speed,
+                max_distance,
+                tracer_colors,
+                dropoff_start,
+                dropoff_end,
+                dropoff_min_multiplier,
+                data.AmmoType
+            );
+        end
 
         return false;
     end);

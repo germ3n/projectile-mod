@@ -62,4 +62,7 @@ PROJECTILES_CVARS = {
     ["pro_use_firebullets"] = { CreateConVar("pro_use_firebullets", "0", bit.bor(FCVAR_NOTIFY, FCVAR_ARCHIVE, FCVAR_REPLICATED), "Use firebullets to inflict damage", 0, 1), "bool" },
     ["pro_blood_splatter_enabled"] = { CreateConVar("pro_blood_splatter_enabled", "1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Enable blood splatter", 0, 1), "bool" },
     --["pro_blood_splatter_scale"] = { CreateConVar("pro_blood_splatter_scale", "0.5", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Blood splatter scale", 0.0, 10.0), "float" },
+    ["pro_inherit_shooter_velocity"] = { CreateConVar("pro_inherit_shooter_velocity", "1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Inherit shooter velocity", 0, 1), "bool" },
+    ["pro_inherit_shooter_velocity_scale"] = { CreateConVar("pro_inherit_shooter_velocity_scale", "1.0", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Shooter velocity inheritance scale", 0.0, 2.0), "float" },
+    ["pro_inherit_ground_entity_velocity"] = { CreateConVar("pro_inherit_ground_entity_velocity", "1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Inherit ground entity velocity (moving platforms/vehicles)", 0, 1), "bool" },
 };
