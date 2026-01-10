@@ -112,7 +112,7 @@ if SERVER then
         
         local seed_counter = hash_projectile(pos.x, pos.y, pos.z, dir.x, dir.y, dir.z);
 
-        net_start("projectile", reliable and false or true);
+        net_start("projectile", not reliable);
         write_entity(shooter);
         write_entity(weapon);
         --write_uint(band(weapon.bullet_idx, 255), 8);
