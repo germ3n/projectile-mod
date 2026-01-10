@@ -37,8 +37,6 @@ local distance = vector_meta.Distance;
 local tick_count = engine.TickCount;
 local max = math.max;
 
-local MAX_DISTANCE = 180 * 180;
-
 local function debug_ricochet(projectile_data, enter_trace, chance, reflect, spread)
     local dur = projectiles["pro_debug_duration"];
     local col_vec = string_split(projectiles["pro_debug_color"], " ");

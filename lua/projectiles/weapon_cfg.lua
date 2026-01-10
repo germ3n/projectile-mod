@@ -10,7 +10,9 @@ local TRACER_TYPE_TO_INDEX = {
     ["glow"] = 2,
 };
 
-local WEAPON_BLACKLIST = {};
+local WEAPON_BLACKLIST = {
+    ["default"] = false,
+};
 
 HL2_WEAPON_CLASSES = {
     "weapon_pistol",
@@ -29,8 +31,7 @@ HL2_WEAPON_CLASSES = {
 };
 
 local WEAPON_SPEEDS = {
-    ["weapon_357"] = 500,
-    ["default"] = 2000,
+    ["default"] = 3000,
 };
 
 local WEAPON_DAMAGES = {
@@ -107,6 +108,7 @@ local WEAPON_DROPOFF_MIN_MULTIPLIER = {
 };
 
 CONFIG_TYPES = {
+    ["blacklist"] = WEAPON_BLACKLIST,
     ["speed"] = WEAPON_SPEEDS,
     ["damage"] = WEAPON_DAMAGES,
     ["penetration_power"] = WEAPON_PENETRATION_POWERS,
@@ -125,6 +127,10 @@ CONFIG_TYPES = {
 
 local CONFIG_TYPES = CONFIG_TYPES;
 local HL2_WEAPON_CLASSES = HL2_WEAPON_CLASSES;
+
+function is_weapon_blacklisted(weapon, class_name)
+    return WEAPON_BLACKLIST[class_name] == true;
+end
 
 function get_weapon_speed(weapon, class_name)
     return WEAPON_SPEEDS[class_name] or WEAPON_SPEEDS["default"];
@@ -193,6 +199,7 @@ end
 if SERVER then
     util.AddNetworkString("projectile_weapon_config_sync");
     util.AddNetworkString("projectile_weapon_config_update");
+    util.AddNetworkString("projectile_weapon_config_reset");
 
     local function initialize_db()
         if not sql.TableExists("projectile_weapon_data") then
@@ -237,7 +244,11 @@ if SERVER then
                                     end
                                 end
                             else
-                                target_table[raw_name] = val;
+                                if target_table["default"] ~= nil and type(target_table["default"]) == "boolean" then
+                                    target_table[raw_name] = (val == 1);
+                                else
+                                    target_table[raw_name] = val;
+                                end
                             end
                         end
                     end
@@ -261,6 +272,7 @@ if SERVER then
     end
 
     local ORIGINAL_TABLES = {
+        ["blacklist"] = table.Copy(WEAPON_BLACKLIST),
         ["speed"] = table.Copy(WEAPON_SPEEDS),
         ["damage"] = table.Copy(WEAPON_DAMAGES),
         ["penetration_power"] = table.Copy(WEAPON_PENETRATION_POWERS),
@@ -303,10 +315,9 @@ if SERVER then
         local class_name = args[2];
         reset_config_to_db(cfg_type, class_name);
 
-        net.Start("projectile_weapon_config_update");
+        net.Start("projectile_weapon_config_reset");
         net.WriteString(cfg_type);
         net.WriteString(class_name);
-        net.WriteBool(true); -- set to nil
         net.Broadcast();
 
         print("reset weapon config: " .. cfg_type .. " for " .. class_name);
@@ -319,10 +330,9 @@ if SERVER then
         for cfg_type, cfg_table in next, CONFIG_TYPES do
             reset_config_to_db(cfg_type, class_name);
 
-            net.Start("projectile_weapon_config_update");
+            net.Start("projectile_weapon_config_reset");
             net.WriteString(cfg_type);
             net.WriteString(class_name);
-            net.WriteBool(true); -- set to nil
             net.Broadcast();
         end
 
@@ -333,6 +343,7 @@ if SERVER then
         if ply ~= NULL and (not is_superadmin(ply)) then return; end
         sql.Query("DELETE FROM projectile_weapon_data");
 
+        table.CopyFromTo(ORIGINAL_TABLES["blacklist"], WEAPON_BLACKLIST);
         table.CopyFromTo(ORIGINAL_TABLES["speed"], WEAPON_SPEEDS);
         table.CopyFromTo(ORIGINAL_TABLES["damage"], WEAPON_DAMAGES);
         table.CopyFromTo(ORIGINAL_TABLES["penetration_power"], WEAPON_PENETRATION_POWERS);
@@ -344,6 +355,10 @@ if SERVER then
         table.CopyFromTo(ORIGINAL_TABLES["max_distance"], WEAPON_MAX_DISTANCE);
         table.CopyFromTo(ORIGINAL_TABLES["tracer_colors"], WEAPON_TRACER_COLORS);
         table.CopyFromTo(ORIGINAL_TABLES["spread_bias"], WEAPON_SPREAD_BIAS);
+        table.CopyFromTo(ORIGINAL_TABLES["dropoff_start"], WEAPON_DROPOFF_START);
+        table.CopyFromTo(ORIGINAL_TABLES["dropoff_end"], WEAPON_DROPOFF_END);
+        table.CopyFromTo(ORIGINAL_TABLES["dropoff_min_multiplier"], WEAPON_DROPOFF_MIN_MULTIPLIER);
+        CONFIG_TYPES["blacklist"] = WEAPON_BLACKLIST;
         CONFIG_TYPES["speed"] = WEAPON_SPEEDS;
         CONFIG_TYPES["damage"] = WEAPON_DAMAGES;
         CONFIG_TYPES["penetration_power"] = WEAPON_PENETRATION_POWERS;
@@ -355,7 +370,11 @@ if SERVER then
         CONFIG_TYPES["max_distance"] = WEAPON_MAX_DISTANCE;
         CONFIG_TYPES["tracer_colors"] = WEAPON_TRACER_COLORS;
         CONFIG_TYPES["spread_bias"] = WEAPON_SPREAD_BIAS;
+        CONFIG_TYPES["dropoff_start"] = WEAPON_DROPOFF_START;
+        CONFIG_TYPES["dropoff_end"] = WEAPON_DROPOFF_END;
+        CONFIG_TYPES["dropoff_min_multiplier"] = WEAPON_DROPOFF_MIN_MULTIPLIER;
         net.Start("projectile_weapon_config_sync");
+        net.WriteTable(WEAPON_BLACKLIST);
         net.WriteTable(WEAPON_SPEEDS);
         net.WriteTable(WEAPON_DAMAGES);
         net.WriteTable(WEAPON_PENETRATION_POWERS);
@@ -367,6 +386,9 @@ if SERVER then
         net.WriteTable(WEAPON_MAX_DISTANCE);
         net.WriteTable(WEAPON_TRACER_COLORS);
         net.WriteTable(WEAPON_SPREAD_BIAS);
+        net.WriteTable(WEAPON_DROPOFF_START);
+        net.WriteTable(WEAPON_DROPOFF_END);
+        net.WriteTable(WEAPON_DROPOFF_MIN_MULTIPLIER);
         net.Broadcast();
 
         print("reset all weapon configs");
@@ -382,22 +404,33 @@ if SERVER then
         local target_table = CONFIG_TYPES[cfg_type];
         if target_table then
             target_table[to_class_name] = target_table[from_class_name];
-            if target_table[to_class_name] then
-                save_config_to_db(cfg_type, to_class_name, target_table[to_class_name]);
+            if target_table[to_class_name] ~= nil then
+                local val = target_table[to_class_name];
+                local is_bool = type(val) == "boolean";
+                
+                if is_bool then
+                    save_config_to_db(cfg_type, to_class_name, val and 1 or 0);
+                else
+                    save_config_to_db(cfg_type, to_class_name, val);
+                end
 
                 net.Start("projectile_weapon_config_update");
                 net.WriteString(cfg_type);
                 net.WriteString(to_class_name);
-                net.WriteBool(false); -- set to value
-                net.WriteFloat(target_table[to_class_name]);
+                net.WriteBool(is_bool);
+                if is_bool then
+                    net.WriteBool(val);
+                else
+                    net.WriteFloat(val);
+                end
+
                 net.Broadcast();
             else
                 reset_config_to_db(cfg_type, to_class_name);
 
-                net.Start("projectile_weapon_config_update");
+                net.Start("projectile_weapon_config_reset");
                 net.WriteString(cfg_type);
                 net.WriteString(to_class_name);
-                net.WriteBool(true); -- set to nil
                 net.Broadcast();
             end
 
@@ -418,18 +451,29 @@ if SERVER then
             reset_config_to_db(cfg_type, to_class_name);
             cfg_table[to_class_name] = cfg_table[from_class_name];
 
-            net.Start("projectile_weapon_config_update");
-            net.WriteString(cfg_type);
-            net.WriteString(to_class_name);
-            if cfg_table[to_class_name] then
-                net.WriteBool(false); -- set to value
-                net.WriteFloat(cfg_table[to_class_name]);
+            if cfg_table[to_class_name] ~= nil then
+                local val = cfg_table[to_class_name];
+                local is_bool = type(val) == "boolean";
+                
+                if is_bool then
+                    save_config_to_db(cfg_type, to_class_name, val and 1 or 0);
+                else
+                    save_config_to_db(cfg_type, to_class_name, val);
+                end
 
-                save_config_to_db(cfg_type, to_class_name, cfg_table[to_class_name]);
-            else
-                net.WriteBool(true); -- set to nil
+                net.Start("projectile_weapon_config_update");
+                net.WriteString(cfg_type);
+                net.WriteString(to_class_name);
+                net.WriteBool(false);
+                net.WriteBool(is_bool);
+                if is_bool then
+                    net.WriteBool(val);
+                else
+                    net.WriteFloat(val);
+                end
+
+                net.Broadcast();
             end
-            net.Broadcast();
 
             print("copied weapon config: " .. cfg_type .. " from " .. from_class_name .. " to " .. to_class_name);
         end
@@ -441,6 +485,7 @@ if SERVER then
         timer.Simple(1, function()
             if not IsValid(ply) then return end
             net.Start("projectile_weapon_config_sync");
+            net.WriteTable(WEAPON_BLACKLIST);
             net.WriteTable(WEAPON_SPEEDS);
             net.WriteTable(WEAPON_DAMAGES);
             net.WriteTable(WEAPON_PENETRATION_POWERS);
@@ -456,7 +501,7 @@ if SERVER then
             net.WriteTable(WEAPON_DROPOFF_END);
             net.WriteTable(WEAPON_DROPOFF_MIN_MULTIPLIER);
             net.Send(ply);
-        end)
+        end);
     end)
 
     net.Receive("projectile_weapon_config_update", function(len, ply)
@@ -490,20 +535,36 @@ if SERVER then
             end
         else
             local class_name = net.ReadString();
-            local val = net.ReadFloat();
+            local is_bool = net.ReadBool();
             local target_table = CONFIG_TYPES[cfg_type];
             if target_table then
-                print("updated weapon config: " .. cfg_type .. " for " .. class_name .. " -> " .. val);
-                
-                target_table[class_name] = val;
-                save_config_to_db(cfg_type, class_name, val);
+                if is_bool then
+                    local val = net.ReadBool();
+                    print("updated weapon config: " .. cfg_type .. " for " .. class_name .. " -> " .. tostring(val));
+                    
+                    target_table[class_name] = val;
+                    save_config_to_db(cfg_type, class_name, val and 1 or 0);
 
-                net.Start("projectile_weapon_config_update");
-                net.WriteString(cfg_type);
-                net.WriteString(class_name);
-                net.WriteBool(false); -- set to value
-                net.WriteFloat(val);
-                net.Broadcast();
+                    net.Start("projectile_weapon_config_update");
+                    net.WriteString(cfg_type);
+                    net.WriteString(class_name);
+                    net.WriteBool(true);
+                    net.WriteBool(val);
+                    net.Broadcast();
+                else
+                    local val = net.ReadFloat();
+                    print("updated weapon config: " .. cfg_type .. " for " .. class_name .. " -> " .. val);
+                    
+                    target_table[class_name] = val;
+                    save_config_to_db(cfg_type, class_name, val);
+
+                    net.Start("projectile_weapon_config_update");
+                    net.WriteString(cfg_type);
+                    net.WriteString(class_name);
+                    net.WriteBool(false);
+                    net.WriteFloat(val);
+                    net.Broadcast();
+                end
             end
         end
     end);
@@ -543,6 +604,7 @@ end
 
 if CLIENT then
     net.Receive("projectile_weapon_config_sync", function()
+        WEAPON_BLACKLIST = net.ReadTable();
         WEAPON_SPEEDS = net.ReadTable();
         WEAPON_DAMAGES = net.ReadTable();
         WEAPON_PENETRATION_POWERS = net.ReadTable();
@@ -557,6 +619,7 @@ if CLIENT then
         WEAPON_DROPOFF_START = net.ReadTable();
         WEAPON_DROPOFF_END = net.ReadTable();
         WEAPON_DROPOFF_MIN_MULTIPLIER = net.ReadTable();
+        CONFIG_TYPES["blacklist"] = WEAPON_BLACKLIST;
         CONFIG_TYPES["speed"] = WEAPON_SPEEDS;
         CONFIG_TYPES["damage"] = WEAPON_DAMAGES;
         CONFIG_TYPES["penetration_power"] = WEAPON_PENETRATION_POWERS;
@@ -572,15 +635,11 @@ if CLIENT then
         CONFIG_TYPES["dropoff_end"] = WEAPON_DROPOFF_END;
         CONFIG_TYPES["dropoff_min_multiplier"] = WEAPON_DROPOFF_MIN_MULTIPLIER;
         print("received full weapon config sync");
-    end)
+    end);
 
     net.Receive("projectile_weapon_config_update", function()
         local cfg_type = net.ReadString();
         local class_name = net.ReadString();
-        if net.ReadBool() then -- reset to default (nil)
-            CONFIG_TYPES[cfg_type][class_name] = nil;
-            return;
-        end
 
         if cfg_type == "tracer_colors" then
             local tracer_colors = { net.ReadColor(), net.ReadColor() };
@@ -590,14 +649,31 @@ if CLIENT then
                 LocalPlayer():ChatPrint("Updated " .. cfg_type .. " for " .. class_name .. " to " .. tracer_colors[1] .. " and " .. tracer_colors[2]);
             end
         else
-            local val = net.ReadFloat();
+            local is_bool = net.ReadBool();
             local target_table = CONFIG_TYPES[cfg_type];
             if target_table then
-                target_table[class_name] = val;
-                LocalPlayer():ChatPrint("Updated " .. cfg_type .. " for " .. class_name .. " to " .. val);
+                if is_bool then
+                    local val = net.ReadBool();
+                    target_table[class_name] = val;
+                    LocalPlayer():ChatPrint("Updated " .. cfg_type .. " for " .. class_name .. " to " .. tostring(val));
+                else
+                    local val = net.ReadFloat();
+                    target_table[class_name] = val;
+                    LocalPlayer():ChatPrint("Updated " .. cfg_type .. " for " .. class_name .. " to " .. val);
+                end
             end
         end
-    end)
+    end);
+
+    net.Receive("projectile_weapon_config_reset", function()
+        local cfg_type = net.ReadString();
+        local class_name = net.ReadString();
+        local target_table = CONFIG_TYPES[cfg_type];
+        if target_table then
+            target_table[class_name] = nil;
+            LocalPlayer():ChatPrint("Reset " .. cfg_type .. " for " .. class_name .. " to default");
+        end
+    end);
 end
 
 print("loaded projectile weapon config");

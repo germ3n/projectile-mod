@@ -1049,6 +1049,7 @@ if CLIENT then
                                     net.Start("projectile_weapon_config_update");
                                     net.WriteString(cfg_type);
                                     net.WriteString(wep_class);
+                                    net.WriteBool(false);
                                     net.WriteFloat(math.Round(slider:GetValue(), decimals));
                                     net.SendToServer();
                                 end
@@ -1056,6 +1057,7 @@ if CLIENT then
                                 net.Start("projectile_weapon_config_update");
                                 net.WriteString(cfg_type);
                                 net.WriteString(class_name);
+                                net.WriteBool(false);
                                 net.WriteFloat(math.Round(slider:GetValue(), decimals));
                                 net.SendToServer();
                                 timer.Simple(0.1, function()
@@ -1082,6 +1084,203 @@ if CLIENT then
                         end
                     end
 
+                    local function create_checkbox_row(label_text, cfg_type, default_val)
+                        local panel = vgui.Create("DPanel", config_scroll);
+                        panel:Dock(TOP);
+                        panel:SetTall(30);
+                        panel:DockMargin(0, 0, 0, 2);
+                        panel.Paint = function(s, w, h) end
+                        
+                        local current_table = CONFIG_TYPES[cfg_type];
+                        local is_using_default = false;
+                        local default_source = "";
+                        local actual_value;
+
+                        if is_ammo_mode then
+                            local def = current_table and current_table["default"];
+                            if def ~= nil and type(def) == "boolean" then
+                                actual_value = def;
+                            else
+                                actual_value = default_val;
+                            end
+
+                            is_using_default = true;
+                            default_source = "batch mode (shows default)";
+                        else
+                            local current_val = current_table and current_table[class_name];
+                            if current_val ~= nil and type(current_val) == "boolean" then
+                                actual_value = current_val;
+                            else
+                                local def = current_table and current_table["default"];
+                                if def ~= nil and type(def) == "boolean" then
+                                    actual_value = def;
+                                    is_using_default = true;
+                                    default_source = "global default";
+                                else
+                                    actual_value = default_val;
+                                    is_using_default = true;
+                                    default_source = "fallback default";
+                                end
+                            end
+                        end
+                        
+                        local label = vgui.Create("DLabel", panel);
+                        label:SetText(label_text);
+                        label:Dock(LEFT);
+                        label:SetWide(140);
+                        label:SetTextColor(THEME.text_dim);
+                        if is_using_default then
+                            label:SetTooltip(label_text .. " (using " .. default_source .. ": " .. tostring(actual_value) .. ")");
+                        end
+                    
+                        if is_using_default then
+                            local indicator = vgui.Create("DPanel", panel);
+                            indicator:Dock(LEFT);
+                            indicator:SetWide(4);
+                            indicator:DockMargin(0, 6, 4, 6);
+                            indicator.Paint = function(s, w, h)
+                                draw.RoundedBox(1, 0, 0, w, h, Color(255, 180, 0));
+                            end
+
+                            indicator:SetTooltip("Using " .. default_source);
+                        end
+                    
+                        local btn_copy = vgui.Create("DButton", panel);
+                        btn_copy:SetText("Copy");
+                        btn_copy:Dock(RIGHT);
+                        btn_copy:SetWide(45);
+                        btn_copy:DockMargin(5, 2, 0, 2);
+                        btn_copy:SetTextColor(THEME.text);
+                        btn_copy.Paint = function(s, w, h)
+                            local enabled = is_ammo_mode and selected_source or (selected_source and selected_source ~= class_name);
+                            local col = Color(60, 60, 60);
+                            if not enabled then
+                                col = Color(40, 40, 40);
+                            elseif s:IsHovered() then
+                                col = Color(80, 80, 80);
+                            end
+
+                            draw.RoundedBox(4, 0, 0, w, h, col);
+                        end
+
+                        btn_copy.DoClick = function()
+                            if not selected_source then
+                                LocalPlayer():ChatPrint("Select a source weapon on the left first.");
+                                return;
+                            end
+
+                            if is_ammo_mode then
+                                if not ammo_weapons or #ammo_weapons == 0 then
+                                    LocalPlayer():ChatPrint("No weapons found for this ammo type.");
+                                    return;
+                                end
+
+                                for _, wep_class in ipairs(ammo_weapons) do
+                                    RunConsoleCommand("pro_weapon_config_copy_single", cfg_type, selected_source, wep_class);
+                                end
+
+                                LocalPlayer():ChatPrint("Copied " .. label_text .. " from " .. selected_source .. " to " .. #ammo_weapons .. " weapons");
+                            else
+                                if selected_source == class_name then
+                                    LocalPlayer():ChatPrint("Cannot copy from itself.");
+                                    return;
+                                end
+
+                                RunConsoleCommand("pro_weapon_config_copy_single", cfg_type, selected_source, class_name);
+                                LocalPlayer():ChatPrint("Copied " .. label_text .. " from " .. selected_source);
+                                timer.Simple(0.1, function()
+                                    if IsValid(config_scroll) then
+                                        rebuild_config_panel(class_name);
+                                    end
+                                end);
+                            end
+                        end
+
+                        btn_copy:SetTooltip(is_ammo_mode and ("Copy " .. label_text .. " to all " .. selected_ammo .. " weapons") or ("Copy " .. label_text .. " from source weapon"));
+                    
+                        local btn_reset = vgui.Create("DButton", panel);
+                        btn_reset:SetText("Reset");
+                        btn_reset:Dock(RIGHT);
+                        btn_reset:SetWide(45);
+                        btn_reset:DockMargin(5, 2, 0, 2);
+                        btn_reset:SetTextColor(THEME.text);
+                        btn_reset.Paint = function(s, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, s:IsHovered() and Color(80, 80, 80) or Color(60, 60, 60))
+                        end
+
+                        btn_reset.DoClick = function()
+                            if is_ammo_mode then
+                                if not ammo_weapons or #ammo_weapons == 0 then
+                                    LocalPlayer():ChatPrint("No weapons found for this ammo type.");
+                                    return;
+                                end
+
+                                for _, wep_class in ipairs(ammo_weapons) do
+                                    RunConsoleCommand("pro_weapon_config_reset_single", cfg_type, wep_class);
+                                end
+
+                                LocalPlayer():ChatPrint("Reset " .. label_text .. " to default for " .. #ammo_weapons .. " weapons");
+                            else
+                                RunConsoleCommand("pro_weapon_config_reset_single", cfg_type, class_name);
+                                LocalPlayer():ChatPrint("Reset " .. label_text .. " to default");
+                                timer.Simple(0.1, function()
+                                    if IsValid(config_scroll) then
+                                        rebuild_config_panel(class_name);
+                                    end
+                                end);
+                            end
+                        end
+
+                        btn_reset:SetTooltip(is_ammo_mode and ("Reset " .. label_text .. " to default for all " .. selected_ammo .. " weapons") or ("Reset " .. label_text .. " to default"));
+                    
+                        local checkbox = vgui.Create("DCheckBoxLabel", panel);
+                        checkbox:Dock(FILL);
+                        checkbox:SetText("");
+                        checkbox:SetValue(actual_value);
+                        checkbox:DockMargin(5, 0, 5, 0);
+                        
+                        if is_using_default then
+                            checkbox:SetTooltip("Using " .. default_source .. ": " .. tostring(actual_value));
+                        end
+                    
+                        checkbox.OnChange = function(s, val)
+                            if is_ammo_mode then
+                                if not ammo_weapons or #ammo_weapons == 0 then
+                                    return;
+                                end
+
+                                for _, wep_class in ipairs(ammo_weapons) do
+                                    net.Start("projectile_weapon_config_update");
+                                    net.WriteString(cfg_type);
+                                    net.WriteString(wep_class);
+                                    net.WriteBool(true);
+                                    net.WriteBool(val);
+                                    net.SendToServer();
+                                end
+                            else
+                                net.Start("projectile_weapon_config_update");
+                                net.WriteString(cfg_type);
+                                net.WriteString(class_name);
+                                net.WriteBool(true);
+                                net.WriteBool(val);
+                                net.SendToServer();
+                                timer.Simple(0.1, function()
+                                    if IsValid(config_scroll) then
+                                        rebuild_config_panel(class_name);
+                                    end
+                                end);
+                            end
+                        end
+                    end
+
+                        create_checkbox_row("Disabled/Blacklisted", "blacklist", false);
+
+                    local div_blacklist = vgui.Create("DPanel", config_scroll);
+                    div_blacklist:SetTall(2);
+                    div_blacklist:Dock(TOP);
+                    div_blacklist:DockMargin(0, 5, 0, 10);
+                    div_blacklist.Paint = function(s, w, h) draw.RoundedBox(0, 0, 0, w, h, THEME.divider) end
+
                     create_slider_row("Speed (Units/s)", "speed", CONFIG_TYPES["speed"]["default"], 0, 50000, 0);
                     create_slider_row("Damage", "damage", CONFIG_TYPES["damage"]["default"], 0, 1000, 0);
                     create_slider_row("Penetration Power", "penetration_power", CONFIG_TYPES["penetration_power"]["default"], 0, 50, 2);
@@ -1093,7 +1292,7 @@ if CLIENT then
                     create_slider_row("Spread Bias", "spread_bias", CONFIG_TYPES["spread_bias"]["default"], -1.0, 1.0, 2);
                     create_slider_row("Dropoff Start Distance (Units)", "dropoff_start", CONFIG_TYPES["dropoff_start"]["default"], 0, 200000, 0);
                     create_slider_row("Dropoff End Distance (Units)", "dropoff_end", CONFIG_TYPES["dropoff_end"]["default"], 0, 200000, 0);
-                    create_slider_row("Dropoff Min Multiplier", "dropoff_min_multiplier", CONFIG_TYPES["dropoff_min_multiplier"]["default"], 0.0, 1.0, 2);
+                    create_slider_row("Dropoff Min Damage Multiplier", "dropoff_min_multiplier", CONFIG_TYPES["dropoff_min_multiplier"]["default"], 0.0, 1.0, 2);
 
                     local div = vgui.Create("DPanel", config_scroll);
                     div:SetTall(2);
@@ -2588,7 +2787,7 @@ if CLIENT then
 
     local function OpenConfigMenu()
         local frame = vgui.Create("DFrame");
-        frame:SetSize(870, 830);
+        frame:SetSize(870, 885);
         frame:Center();
         frame:SetTitle(""); 
         frame:MakePopup();

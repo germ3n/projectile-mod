@@ -15,6 +15,7 @@ local up = angle_meta.Up;
 
 local vector_meta = FindMetaTable("Vector");
 local angle = vector_meta.Angle;
+local vec_dot = vector_meta.Dot;
 
 local CONFIG_TYPES = CONFIG_TYPES;
 
@@ -58,24 +59,25 @@ local OTHER_TURRETS_FIX = {
     ["gmod_turret"] = true,
 };
 
+local broadcast_projectile = broadcast_projectile;
+local calculate_lean_pos = calculate_lean_pos;
+local get_weapon_speed = get_weapon_speed;
+local get_weapon_damage = get_weapon_damage;
+local get_weapon_spread = get_weapon_spread;
+local get_weapon_penetration_power = get_weapon_penetration_power;
+local get_weapon_penetration_count = get_weapon_penetration_count;
+local get_weapon_drag = get_weapon_drag;
+local get_weapon_mass = get_weapon_mass;
+local get_weapon_drop = get_weapon_drop;
+local get_weapon_min_speed = get_weapon_min_speed;
+local get_weapon_max_distance = get_weapon_max_distance;
+local get_weapon_tracer_colors = get_weapon_tracer_colors;
+local get_weapon_dropoff_start = get_weapon_dropoff_start;
+local get_weapon_dropoff_end = get_weapon_dropoff_end;
+local get_weapon_dropoff_min_multiplier = get_weapon_dropoff_min_multiplier;
+local is_weapon_blacklisted = is_weapon_blacklisted;
+
 if SERVER then
-    local broadcast_projectile = broadcast_projectile;
-    local calculate_lean_pos = calculate_lean_pos;
-    local get_weapon_speed = get_weapon_speed;
-    local get_weapon_damage = get_weapon_damage;
-    local get_weapon_spread = get_weapon_spread;
-    local get_weapon_penetration_power = get_weapon_penetration_power;
-    local get_weapon_penetration_count = get_weapon_penetration_count;
-    local get_weapon_drag = get_weapon_drag;
-    local get_weapon_mass = get_weapon_mass;
-    local get_weapon_drop = get_weapon_drop;
-    local get_weapon_min_speed = get_weapon_min_speed;
-    local get_weapon_max_distance = get_weapon_max_distance;
-    local get_weapon_tracer_colors = get_weapon_tracer_colors;
-    local get_weapon_dropoff_start = get_weapon_dropoff_start;
-    local get_weapon_dropoff_end = get_weapon_dropoff_end;
-    local get_weapon_dropoff_min_multiplier = get_weapon_dropoff_min_multiplier;
-    
     local player_meta = FindMetaTable("Player");
     local get_lean_amount = player_meta.GetLeanAmount;
     local player_get_active_weapon = player_meta.GetActiveWeapon;
@@ -142,6 +144,10 @@ if SERVER then
         end
 
         local inflictor_class = get_class(inflictor);
+        if is_weapon_blacklisted(inflictor, inflictor_class) then
+            return;
+        end
+
         local speed = get_weapon_speed(inflictor, inflictor_class) * projectiles["pro_speed_scale"];
         local damage = get_weapon_damage(inflictor, inflictor_class, data.Damage) * projectiles["pro_weapon_damage_scale"];
         local src = calculate_lean_pos and calculate_lean_pos(data.Src, angle(data.Dir), lean_amount, shooter) or data.Src;
@@ -180,15 +186,17 @@ if SERVER then
                     end
                 end
                 
-                local scale = projectiles["pro_inherit_shooter_velocity_scale"];
-                local combined_vel = vector(
-                    spread_dir.x * speed + inherited_vel.x * scale,
-                    spread_dir.y * speed + inherited_vel.y * scale,
-                    spread_dir.z * speed + inherited_vel.z * scale
-                );
-                
-                final_dir = get_normalized(combined_vel);
-                final_speed = vec_length(combined_vel);
+                if vec_dot(spread_dir, inherited_vel) > 0 then
+                    local scale = projectiles["pro_inherit_shooter_velocity_scale"];
+                    local combined_vel = vector(
+                        spread_dir.x * speed + inherited_vel.x * scale,
+                        spread_dir.y * speed + inherited_vel.y * scale,
+                        spread_dir.z * speed + inherited_vel.z * scale
+                    );
+                    
+                    final_dir = get_normalized(combined_vel);
+                    final_speed = vec_length(combined_vel);
+                end
             end
 
             broadcast_projectile(
@@ -359,6 +367,10 @@ if CLIENT then
         end
 
         local inflictor_class = get_class(inflictor);
+        if is_weapon_blacklisted(inflictor, inflictor_class) then
+            return;
+        end
+
         local speed = get_weapon_speed(inflictor, inflictor_class) * projectiles["pro_speed_scale"];
         local damage = get_weapon_damage(inflictor, inflictor_class, data.Damage) * projectiles["pro_weapon_damage_scale"];
         local lean_amount = get_lean_amount and get_lean_amount(shooter) or 0.0;
@@ -392,15 +404,17 @@ if CLIENT then
                     end
                 end
                 
-                local scale = projectiles["pro_inherit_shooter_velocity_scale"];
-                local combined_vel = vector(
-                    spread_dir.x * speed + inherited_vel.x * scale,
-                    spread_dir.y * speed + inherited_vel.y * scale,
-                    spread_dir.z * speed + inherited_vel.z * scale
-                );
-                
-                final_dir = get_normalized(combined_vel);
-                final_speed = vec_length(combined_vel);
+                if vec_dot(spread_dir, inherited_vel) > 0 then
+                    local scale = projectiles["pro_inherit_shooter_velocity_scale"];
+                    local combined_vel = vector(
+                        spread_dir.x * speed + inherited_vel.x * scale,
+                        spread_dir.y * speed + inherited_vel.y * scale,
+                        spread_dir.z * speed + inherited_vel.z * scale
+                    );
+                    
+                    final_dir = get_normalized(combined_vel);
+                    final_speed = vec_length(combined_vel);
+                end
             end
 
             create_local_projectile(
