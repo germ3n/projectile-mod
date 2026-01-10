@@ -23,6 +23,7 @@ limiter = Limiter(
 )
 
 DB_PATH = 'database.db'
+MAX_CONFIG_NAME_LENGTH = 100
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH, timeout=30.0)
@@ -274,7 +275,12 @@ def search_configs():
         steamid_filter = request.args.get('steamid', None)
         
         sort_map = {'date': 'created_at', 'rating': '(thumbs_up - thumbs_down)', 'name': 'config_name'}
-        column = sort_map.get(sort_by, 'created_at')
+        if sort_by not in sort_map:
+            sort_by = 'date'
+        if order not in ['asc', 'desc']:
+            order = 'desc'
+        
+        column = sort_map[sort_by]
         direction = 'ASC' if order == 'asc' else 'DESC'
 
         conn = get_db_connection()
@@ -360,6 +366,13 @@ def save_config():
         config_name = data['config_name']
         config_flags = data.get('flags', 0)
         version = data.get('version', '1.0.0')
+
+        if not isinstance(config_name, str) or len(config_name) == 0 or len(config_name) > MAX_CONFIG_NAME_LENGTH:
+            return jsonify({"error": f"Config name must be 1-{MAX_CONFIG_NAME_LENGTH} characters"}), 400
+
+        if not isinstance(config_flags, int) or config_flags < 0 or config_flags > 255:
+            return jsonify({"error": "Config flags must be an integer between 0-255"}), 400
+
         config_json = json.dumps(data['config'])
 
         conn = get_db_connection()
@@ -407,6 +420,11 @@ def update_config():
             return jsonify({"error": "Missing required fields"}), 400
 
         config_id = data['id']
+        flags = data.get('flags', 0)
+
+        if not isinstance(flags, int) or flags < 0 or flags > 255:
+            return jsonify({"error": "Config flags must be an integer between 0-255"}), 400
+
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -423,7 +441,6 @@ def update_config():
         old_version = current['config_version']
         new_version = data.get('version', old_version)
         config_json = json.dumps(data['config'])
-        flags = data.get('flags', 0)
         change_desc = f"Updated from {old_version}. Notes: {data.get('changes', 'No description provided')}"
 
         cursor.execute('''
