@@ -3,8 +3,6 @@ AddCSLuaFile();
 local projectiles = projectiles;
 local trace_to_exit = trace_to_exit;
 local get_surface_data = util.GetSurfaceData;
-local rand = math.Rand;
-local vector_rand = VectorRand;
 local MAT_GRATE = MAT_GRATE;
 local MAT_GLASS = MAT_GLASS;
 local MAT_FLESH = MAT_FLESH;
@@ -12,7 +10,6 @@ local MAT_WOOD = MAT_WOOD;
 local MAT_METAL = MAT_METAL;
 local MAT_PLASTIC = MAT_PLASTIC;
 local SURFACE_PROPS_PENETRATION = SURFACE_PROPS_PENETRATION;
-local random_seed = math.randomseed;
 local get_convar = GetConVar;
 local lower = string.lower;
 local debug_overlay = debugoverlay;
@@ -36,6 +33,13 @@ local distance = vector_meta.Distance;
 
 local tick_count = engine.TickCount;
 local max = math.max;
+local bxor = bit.bxor;
+local band = bit.band;
+
+local function seeded_random(seed, min_val, max_val)
+    seed = band(seed * 48271, 0x7FFFFFFF);
+    return min_val + (seed / 2147483647.0) * (max_val - min_val);
+end
 
 local function debug_ricochet(projectile_data, enter_trace, chance, reflect, spread)
     local dur = projectiles["pro_debug_duration"];
@@ -197,19 +201,21 @@ function handle_penetration(shooter, projectile_data, src, dir, penetration_powe
 
     local enter_surf_data = get_surface_data(enter_trace.SurfaceProps);
     if projectiles["pro_ricochet_enabled"] then
-        random_seed(projectile_data.random_seed + projectile_data.penetration_count);
-
         local enter_name = enter_surf_data and enter_surf_data.name and lower(enter_surf_data.name) or "unknown";
         local hit_normal = enter_trace.HitNormal;
         local dot_result = dot(dir, hit_normal);
     
-        local chance = rand(0, 1);
+        local seed_base = projectile_data.random_seed + projectile_data.penetration_count * 1000;
+        local chance = seeded_random(seed_base, 0, 1);
         local mat_chance = RICOCHET_MAT_CHANCE_MULTIPLIERS[enter_name];
         local angle_scale = 1.0 + dot_result;
         local chance_threshold = projectiles["pro_ricochet_chance"] * mat_chance * angle_scale;
         if chance < chance_threshold then
             local reflect = dir - (2 * dot_result * hit_normal);
-            local spread = vector_rand();
+            local spread_x = seeded_random(seed_base + 1, -1, 1);
+            local spread_y = seeded_random(seed_base + 2, -1, 1);
+            local spread_z = seeded_random(seed_base + 3, -1, 1);
+            local spread = vector(spread_x, spread_y, spread_z);    
             vec_mul(spread, projectiles["pro_ricochet_spread"]);
     
             projectile_data.dir = get_normalized(reflect + spread);

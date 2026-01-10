@@ -226,11 +226,22 @@ end
 if CLIENT then
     local local_player = LocalPlayer;
     local band = bit.band;
+    local bxor = bit.bxor;
     local cur_time = CurTime;
     local vector = Vector;
     local NULL = NULL;
     local projectile_store = projectile_store;
     local BUFFER_SIZE = 0x400;
+    local floor = math.floor;
+    
+    local function hash_projectile(px, py, pz, dx, dy, dz)
+        local h = floor(px * 0.1) * 73856093 + floor(py * 0.1) * 19349663 + floor(pz * 0.1) * 83492791;
+        h = h + floor(dx * 10000) * 2654435761 + floor(dy * 10000) * 2246822519 + floor(dz * 10000) * 3266489917;
+        h = band(h, 0xFFFFFFFF);
+        h = bxor(h, band(h / 8192, 0xFFFFFFFF));
+        h = band(h * 48271, 0xFFFFFFFF);
+        return band(h, 0x7FFFFFFF);
+    end
     
     local entity_meta = FindMetaTable("Entity");
     local get_class = entity_meta.GetClass;
@@ -246,59 +257,19 @@ if CLIENT then
     local get_normalized = vector_meta.GetNormalized;
     local vec_length = vector_meta.Length;
     
+    local create_new_projectile_store = create_new_projectile_store;
     local function create_local_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, dropoff_start, dropoff_end, dropoff_min_multiplier, ammo_type)
         if not projectile_store[shooter] then 
-            projectile_store[shooter] = {
-                received = 0,
-                last_received_idx = 0,
-                buffer = {},
-                active_projectiles = {},
-                buffer_size = BUFFER_SIZE,
-            };
-
-            for i = 1, BUFFER_SIZE do
-                projectile_store[shooter].buffer[i] = {
-                    hit = true,
-                    weapon = nil,
-                    time = nil,
-                    pos = vector(),
-                    dir = vector(),
-                    speed = nil,
-                    damage = nil,
-                    damage_initial = nil,
-                    drag = nil,
-                    penetration_power = nil,
-                    penetration_count = nil,
-                    last_hit_entity = nil,
-                    mass = nil,
-                    drop = nil,
-                    min_speed = nil,
-                    distance_traveled = nil,
-                    max_distance = nil,
-                    random_seed = nil,
-                    old_pos = vector(),
-                    trace_filter = {nil, nil, nil},
-                    tracer_colors = {nil, nil},
-                    is_gmod_turret = false,
-                    spawn_pos = vector(),
-                    spawn_time = nil,
-                    vel = vector(),
-                    old_vel = vector(),
-                    dropoff_start = nil,
-                    dropoff_end = nil,
-                    dropoff_min_multiplier = nil,
-                    ammo_type = nil,
-                };
-            end
-
-            projectile_store[shooter].active_projectiles = {};
+            create_new_projectile_store(shooter);
         end
 
         local time = cur_time();
-        projectile_store[shooter].last_received_idx = projectile_store[shooter].last_received_idx + 1;
-        local projectile_idx = band(projectile_store[shooter].last_received_idx - 1, projectile_store[shooter].buffer_size - 1) + 1;
+        local random_seed = hash_projectile(pos.x, pos.y, pos.z, dir.x, dir.y, dir.z);
+
+        local projectile_idx = band(projectile_store[shooter].received - 1, projectile_store[shooter].buffer_size - 1) + 1;
 
         local projectile = projectile_store[shooter].buffer[projectile_idx];
+        projectile_store[shooter].received = projectile_store[shooter].received + 1;
         projectile.weapon = weapon;
         projectile.time = time;
         projectile.pos.x = pos.x;
@@ -320,7 +291,7 @@ if CLIENT then
         projectile.min_speed = min_speed;
         projectile.distance_traveled = 0.0;
         projectile.max_distance = max_distance;
-        projectile.random_seed = 0;
+        projectile.random_seed = random_seed;
         projectile.old_pos.x = pos.x;
         projectile.old_pos.y = pos.y;
         projectile.old_pos.z = pos.z;
@@ -342,6 +313,8 @@ if CLIENT then
         projectile.dropoff_min_multiplier = dropoff_min_multiplier;
         projectile.ammo_type = ammo_type;
         projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
+
+        --print("random seed on client", random_seed);
     end
 
     local is_first_time_predicted = IsFirstTimePredicted;

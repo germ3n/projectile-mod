@@ -8,6 +8,7 @@ end
 
 local band = bit.band;
 local cur_time = CurTime;
+local vector = Vector;
 local tick_interval = engine.TickInterval();
 
 projectile_store = projectile_store or {};
@@ -15,9 +16,57 @@ local projectile_store = projectile_store;
 
 local BUFFER_SIZE = 0x400; -- must be power of 2
 
-if SERVER then
-    local seed_counter = 0;
+local zero_color = Color(0, 0, 0, 0);
 
+function create_new_projectile_store(shooter)
+    print("creating new projectile store for shooter", shooter);
+    projectile_store[shooter] = {
+        received = 0,
+        last_received_idx = 0,
+        buffer = {},
+        active_projectiles = {},
+        buffer_size = BUFFER_SIZE,
+    };
+
+    for i = 1, BUFFER_SIZE do
+        projectile_store[shooter].buffer[i] = {
+            hit = true,
+            weapon = NULL,
+            time = 0.0,
+            pos = vector(),
+            dir = vector(),
+            speed = 0.0,
+            damage = 0.0,
+            damage_initial = 0.0,
+            drag = 0.0,
+            penetration_power = 0.0,
+            penetration_count = 0,
+            last_hit_entity = NULL,
+            mass = 0.0,
+            drop = 0.0,
+            min_speed = 0.0,
+            distance_traveled = 0.0,
+            max_distance = 0.0,
+            random_seed = 0,
+            old_pos = vector(),
+            trace_filter = {NULL, NULL, NULL},
+            tracer_colors = {zero_color, zero_color},
+            is_gmod_turret = false,
+            spawn_pos = vector(),
+            spawn_time = 0.0,
+            vel = vector(),
+            old_vel = vector(),
+            dropoff_start = 0.0,
+            dropoff_end = 0.0,
+            dropoff_min_multiplier = 0.0,
+            ammo_type = "",
+        };
+    end
+
+    projectile_store[shooter].active_projectiles = {};
+end
+
+if SERVER then
     local entity_meta = FindMetaTable("Entity");
     local eye_pos = entity_meta.EyePos;
 
@@ -37,9 +86,8 @@ if SERVER then
     local send_pas = net.SendPAS;
     local broadcast = net.Broadcast;
 
-    local crc = util.CRC;
-    local tonumber = tonumber;
     local floor = math.floor;
+    local bxor = bit.bxor;
 
     local vector = Vector;
 
@@ -47,14 +95,22 @@ if SERVER then
 
     local cv_net_send_method = GetConVar("pro_net_send_method");
 
+    local function hash_projectile(px, py, pz, dx, dy, dz)
+        local h = floor(px * 0.1) * 73856093 + floor(py * 0.1) * 19349663 + floor(pz * 0.1) * 83492791;
+        h = h + floor(dx * 10000) * 2654435761 + floor(dy * 10000) * 2246822519 + floor(dz * 10000) * 3266489917;
+        h = band(h, 0xFFFFFFFF);
+        h = bxor(h, band(h / 8192, 0xFFFFFFFF));
+        h = band(h * 48271, 0xFFFFFFFF);
+        return band(h, 0x7FFFFFFF);
+    end
+
     function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, is_gmod_turret, dropoff_start, dropoff_end, dropoff_min_multiplier, ammo_type, reliable)
         weapon.bullet_idx = (weapon.bullet_idx or 0) + 1;
 
         local time = cur_time();
         local tick = floor(0.5 + time / tick_interval);
-        --local random_seed = tonumber(crc(tostring(pos) .. tostring(dir))); -- random seed for ricochet
-
-        seed_counter = band(seed_counter + 1, 0xFFFFFFFF);
+        
+        local seed_counter = hash_projectile(pos.x, pos.y, pos.z, dir.x, dir.y, dir.z);
 
         net_start("projectile", reliable and false or true);
         write_entity(shooter);
@@ -98,50 +154,7 @@ if SERVER then
         end
 
         if not projectile_store[shooter] then 
-            projectile_store[shooter] = {
-                received = 0,
-                last_received_idx = 0,
-                buffer = {},
-                active_projectiles = {},
-                buffer_size = BUFFER_SIZE, -- N projectiles
-            };
-
-            for i = 1, BUFFER_SIZE do
-                projectile_store[shooter].buffer[i] = {
-                    hit = true,
-                    weapon = nil,
-                    time = nil,
-                    pos = vector(),
-                    dir = vector(),
-                    speed = nil,
-                    damage = nil,
-                    damage_initial = nil,
-                    drag = nil,
-                    penetration_power = nil,
-                    penetration_count = nil,
-                    last_hit_entity = nil,
-                    mass = nil,
-                    drop = nil,
-                    min_speed = nil,
-                    distance_traveled = nil,
-                    max_distance = nil,
-                    random_seed = nil,
-                    old_pos = vector(),
-                    trace_filter = {nil, nil, nil},
-                    tracer_colors = {nil, nil},
-                    is_gmod_turret = false,
-                    spawn_pos = vector(),
-                    spawn_time = nil,
-                    vel = vector(),
-                    old_vel = vector(),
-                    dropoff_start = nil,
-                    dropoff_end = nil,
-                    dropoff_min_multiplier = nil,
-                    ammo_type = nil,
-                };
-            end
-
-            projectile_store[shooter].active_projectiles = {};
+            create_new_projectile_store(shooter);
         end
 
         projectile_store[shooter].last_received_idx = projectile_store[shooter].last_received_idx + 1;
@@ -191,6 +204,8 @@ if SERVER then
         projectile.dropoff_min_multiplier = dropoff_min_multiplier;
         projectile.ammo_type = ammo_type;
         projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
+
+        --print("random seed on server", seed_counter);
     end
 end
 
@@ -238,49 +253,7 @@ if CLIENT then
         local ammo_type = read_string();
 
         if not projectile_store[shooter] then 
-            projectile_store[shooter] = {
-                received = 0,
-                last_received_idx = 0,
-                buffer = {},
-                buffer_size = BUFFER_SIZE, -- N projectiles
-            };
-
-            for i = 1, BUFFER_SIZE do
-                projectile_store[shooter].buffer[i] = {
-                    hit = true,
-                    weapon = nil,
-                    time = nil,
-                    pos = vector(),
-                    dir = vector(),
-                    speed = nil,
-                    damage = nil,
-                    damage_initial = nil,
-                    drag = nil,
-                    penetration_power = nil,
-                    penetration_count = nil,
-                    last_hit_entity = nil,
-                    mass = nil,
-                    drop = nil,
-                    min_speed = nil,
-                    distance_traveled = nil,
-                    max_distance = nil,
-                    random_seed = nil,
-                    old_pos = vector(),
-                    trace_filter = {nil, nil, nil},
-                    tracer_colors = {nil, nil},
-                    is_gmod_turret = false,
-                    spawn_pos = vector(),
-                    spawn_time = nil,
-                    vel = vector(),
-                    old_vel = vector(),
-                    dropoff_start = nil,
-                    dropoff_end = nil,
-                    dropoff_min_multiplier = nil,
-                    ammo_type = nil,
-                };
-            end
-
-            projectile_store[shooter].active_projectiles = {};
+            create_new_projectile_store(shooter);
         end
 
         projectile_store[shooter].last_received_idx = projectile_store[shooter].last_received_idx + 1;
