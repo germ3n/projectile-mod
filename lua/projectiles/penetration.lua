@@ -37,7 +37,11 @@ local bxor = bit.bxor;
 local band = bit.band;
 
 local function seeded_random(seed, min_val, max_val)
-    seed = band(seed * 48271, 0x7FFFFFFF);
+    seed = band(seed, 0xFFFFFFFF);
+    seed = bxor(seed, band(seed / 8192, 0xFFFFFFFF));
+    seed = band(seed * 48271, 0xFFFFFFFF);
+    seed = bxor(seed, band(seed / 131072, 0xFFFFFFFF));
+    seed = band(seed, 0x7FFFFFFF);
     return min_val + (seed / 2147483647.0) * (max_val - min_val);
 end
 
@@ -212,9 +216,9 @@ function handle_penetration(shooter, projectile_data, src, dir, penetration_powe
         local chance_threshold = projectiles["pro_ricochet_chance"] * mat_chance * angle_scale;
         if chance < chance_threshold then
             local reflect = dir - (2 * dot_result * hit_normal);
-            local spread_x = seeded_random(seed_base + 1, -1, 1);
-            local spread_y = seeded_random(seed_base + 2, -1, 1);
-            local spread_z = seeded_random(seed_base + 3, -1, 1);
+            local spread_x = seeded_random(seed_base * 73856093, -1, 1);
+            local spread_y = seeded_random(seed_base * 19349663, -1, 1);
+            local spread_z = seeded_random(seed_base * 83492791, -1, 1);
             local spread = vector(spread_x, spread_y, spread_z);    
             vec_mul(spread, projectiles["pro_ricochet_spread"]);
     

@@ -19,7 +19,7 @@ local BUFFER_SIZE = 0x400; -- must be power of 2
 local zero_color = Color(0, 0, 0, 0);
 
 function create_new_projectile_store(shooter)
-    print("creating new projectile store for shooter", shooter);
+    --print("creating new projectile store for shooter", shooter);
     projectile_store[shooter] = {
         received = 0,
         last_received_idx = 0,
