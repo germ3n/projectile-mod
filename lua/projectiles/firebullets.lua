@@ -184,17 +184,13 @@ if SERVER then
                     end
                 end
                 
-                if vec_dot(dir, inherited_vel) > 0 then
+                --if vec_dot(dir, get_normalized(inherited_vel)) >= 0.0 then
                     local scale = projectiles["pro_inherit_shooter_velocity_scale"];
-                    local combined_vel = vector(
-                        spread_dir.x * speed + inherited_vel.x * scale,
-                        spread_dir.y * speed + inherited_vel.y * scale,
-                        spread_dir.z * speed + inherited_vel.z * scale
-                    );
+                    local combined_vel = spread_dir * speed + inherited_vel * scale;
                     
                     final_dir = get_normalized(combined_vel);
                     final_speed = vec_length(combined_vel);
-                end
+                --end
             end
 
             broadcast_projectile(
@@ -409,17 +405,16 @@ if CLIENT then
                     end
                 end
                 
-                if vec_dot(dir, inherited_vel) > 0 then
+                --if vec_dot(dir, get_normalized(inherited_vel)) >= 0.0 then
+                    --print("inheriting velocity", vec_dot(dir, get_normalized(inherited_vel)));
                     local scale = projectiles["pro_inherit_shooter_velocity_scale"];
-                    local combined_vel = vector(
-                        spread_dir.x * speed + inherited_vel.x * scale,
-                        spread_dir.y * speed + inherited_vel.y * scale,
-                        spread_dir.z * speed + inherited_vel.z * scale
-                    );
+                    local combined_vel = spread_dir * speed + inherited_vel * scale;
                     
                     final_dir = get_normalized(combined_vel);
                     final_speed = vec_length(combined_vel);
-                end
+                --else
+                --    print("not inheriting velocity", vec_dot(dir, get_normalized(inherited_vel)));
+                --end
             end
 
             create_local_projectile(
