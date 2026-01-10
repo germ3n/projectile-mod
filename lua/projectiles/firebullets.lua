@@ -139,7 +139,7 @@ if SERVER then
             end
         end
 
-        if not inflictor or inflictor == NULL then
+        if not inflictor or inflictor == NULL or shooter == NULL then
             return;
         end
 
@@ -169,24 +169,22 @@ if SERVER then
         local dropoff_start = get_weapon_dropoff_start(inflictor, inflictor_class);
         local dropoff_end = get_weapon_dropoff_end(inflictor, inflictor_class);
         local dropoff_min_multiplier = get_weapon_dropoff_min_multiplier(inflictor, inflictor_class);
+        local dir = data.Dir;
         for idx = 1, data.Num do
-            local spread_dir = get_weapon_spread(inflictor, inflictor_class, data.Dir, data.Spread, idx);
+            local spread_dir = get_weapon_spread(inflictor, inflictor_class, dir, data.Spread, idx);
             local final_dir = spread_dir;
             local final_speed = speed;
 
-            if projectiles["pro_inherit_shooter_velocity"] then
-                local inherited_vel = projectiles.shooter_velocities[shooter] or get_velocity(shooter);
+            if projectiles["pro_inherit_shooter_velocity"] then -- todo: fix other turrets, currently player-spawned npc_turrt_floor for example will inherit the player's velocity, we only need to inherit the ground entity's velocity
+                local inherited_vel = is_gmod_turret and zero_vec or projectiles.shooter_velocities[shooter] or get_velocity(shooter);
                 if projectiles["pro_inherit_ground_entity_velocity"] then
-                    local ground = get_ground_entity(shooter);
+                    local ground = get_ground_entity(shooter); -- should probably recurse through parents here
                     if ground and ground ~= NULL then
-                        local ground_vel = get_velocity(ground);
-                        if ground_vel then
-                            inherited_vel = vector(inherited_vel.x + ground_vel.x, inherited_vel.y + ground_vel.y, inherited_vel.z + ground_vel.z);
-                        end
+                        inherited_vel = inherited_vel + get_velocity(ground);
                     end
                 end
                 
-                if vec_dot(spread_dir, inherited_vel) > 0 then
+                if vec_dot(dir, inherited_vel) > 0 then
                     local scale = projectiles["pro_inherit_shooter_velocity_scale"];
                     local combined_vel = vector(
                         spread_dir.x * speed + inherited_vel.x * scale,
@@ -354,8 +352,17 @@ if CLIENT then
     hook.Add("EntityFireBullets", "projectiles", function(shooter, data)
         if not projectiles["pro_projectiles_enabled"] then return; end
         if projectiles.currently_using_firebullets then return; end
-        if shooter ~= local_player() then return false; end
         if not is_first_time_predicted() then return false; end
+        local local_ply = local_player();
+        if shooter ~= local_ply then
+            if shooter:IsWeapon() then
+                shooter = shooter:GetOwner();
+            end
+
+            if shooter ~= local_ply then
+                return false;
+            end
+        end
 
         local inflictor = data.Inflictor;
         if not inflictor or inflictor == NULL then
@@ -386,9 +393,10 @@ if CLIENT then
         local dropoff_start = get_weapon_dropoff_start(inflictor, inflictor_class);
         local dropoff_end = get_weapon_dropoff_end(inflictor, inflictor_class);
         local dropoff_min_multiplier = get_weapon_dropoff_min_multiplier(inflictor, inflictor_class);
+        local dir = data.Dir;
 
         for idx = 1, data.Num do
-            local spread_dir = get_weapon_spread(inflictor, inflictor_class, data.Dir, data.Spread, idx);
+            local spread_dir = get_weapon_spread(inflictor, inflictor_class, dir, data.Spread, idx);
             local final_dir = spread_dir;
             local final_speed = speed;
 
@@ -397,14 +405,11 @@ if CLIENT then
                 if projectiles["pro_inherit_ground_entity_velocity"] then
                     local ground = get_ground_entity(shooter);
                     if ground and ground ~= NULL then
-                        local ground_vel = get_velocity(ground);
-                        if ground_vel then
-                            inherited_vel = vector(inherited_vel.x + ground_vel.x, inherited_vel.y + ground_vel.y, inherited_vel.z + ground_vel.z);
-                        end
+                        inherited_vel = inherited_vel + get_velocity(ground);
                     end
                 end
                 
-                if vec_dot(spread_dir, inherited_vel) > 0 then
+                if vec_dot(dir, inherited_vel) > 0 then
                     local scale = projectiles["pro_inherit_shooter_velocity_scale"];
                     local combined_vel = vector(
                         spread_dir.x * speed + inherited_vel.x * scale,
