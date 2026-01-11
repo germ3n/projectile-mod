@@ -10,6 +10,7 @@ local band = bit.band;
 local cur_time = CurTime;
 local vector = Vector;
 local tick_interval = engine.TickInterval();
+local NULL = NULL;
 
 projectile_store = projectile_store or {};
 local projectile_store = projectile_store;

@@ -35,15 +35,17 @@ local WEAPON_SPEEDS = {
 };
 
 local WEAPON_DAMAGES = {
-    ["weapon_pistol"] = 10,
-    ["weapon_357"] = 80,
+    ["weapon_pistol"] = 5,
+    ["weapon_357"] = 40,
     ["weapon_shotgun"] = 8,
-    ["weapon_smg1"] = 20,
-    ["weapon_ar2"] = 30,
+    ["weapon_smg1"] = 4,
+    ["weapon_ar2"] = 8,
+    ["weapon_annabelle"] = 8,
+    ["weapon_alyxgun"] = 5,
     ["npc_turret_floor"] = 3,
     ["npc_turret_ceiling"] = 3,
     ["npc_turret_ground"] = 3,
-    ["prop_vehicle_airboat"] = 15,
+    ["prop_vehicle_airboat"] = 3,
     ["func_tank"] = 15,
     ["default"] = 10,
 };
@@ -76,6 +78,7 @@ local WEAPON_MIN_SPEED = {
 local WEAPON_MAX_DISTANCE = {
     ["default"] = 10000.0,
     ["weapon_shotgun"] = 1500.0,
+    ["weapon_annabelle"] = 2000.0,
 };
 
 local WEAPON_TRACER_COLORS = {
@@ -96,11 +99,13 @@ local WEAPON_SPREAD_BIAS = {
 local WEAPON_DROPOFF_START = {
     ["default"] = 5000.0,
     ["weapon_shotgun"] = 500.0,
+    ["weapon_annabelle"] = 700.0,
 };
 
 local WEAPON_DROPOFF_END = {
     ["default"] = 10000.0,
     ["weapon_shotgun"] = 1500.0,
+    ["weapon_annabelle"] = 2000.0,
 };
 
 local WEAPON_DROPOFF_MIN_MULTIPLIER = {
