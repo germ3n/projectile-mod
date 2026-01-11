@@ -148,8 +148,10 @@ if SERVER then
             return;
         end
 
-        local speed = get_weapon_speed(inflictor, inflictor_class) * projectiles["pro_speed_scale"];
-        local damage = get_weapon_damage(inflictor, inflictor_class, data.Damage) * projectiles["pro_weapon_damage_scale"];
+        local damage = get_weapon_damage(inflictor, inflictor_class, data.Damage);
+        local speed = get_weapon_speed(inflictor, inflictor_class, damage, data.AmmoType);
+        damage = damage * projectiles["pro_weapon_damage_scale"];
+        speed = speed * projectiles["pro_speed_scale"];
         local src = calculate_lean_pos and calculate_lean_pos(data.Src, angle(data.Dir), lean_amount, shooter) or data.Src;
         
         if is_npc then
@@ -347,8 +349,10 @@ if CLIENT then
             return;
         end
 
-        local speed = get_weapon_speed(inflictor, inflictor_class) * projectiles["pro_speed_scale"];
-        local damage = get_weapon_damage(inflictor, inflictor_class, data.Damage) * projectiles["pro_weapon_damage_scale"];
+        local damage = get_weapon_damage(inflictor, inflictor_class, data.Damage);
+        local speed = get_weapon_speed(inflictor, inflictor_class, damage, data.AmmoType);
+        damage = damage * projectiles["pro_weapon_damage_scale"];
+        speed = speed * projectiles["pro_speed_scale"];
         local lean_amount = get_lean_amount and get_lean_amount(shooter) or 0.0;
         local src = calculate_lean_pos and calculate_lean_pos(data.Src, angle(data.Dir), lean_amount, shooter) or data.Src;
         local penetration_power = get_weapon_penetration_power(inflictor, inflictor_class) * projectiles["pro_penetration_power_scale"];

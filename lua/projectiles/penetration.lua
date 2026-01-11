@@ -56,7 +56,6 @@ local function debug_ricochet(projectile_data, enter_trace, chance, reflect, spr
     debug_text(enter_trace.HitPos + vector(0, 0, 30), string_format("spread: %.2f %.2f %.2f", spread.x, spread.y, spread.z), dur, false);
 end
 
---todo: use surface props instead
 RICOCHET_MAT_CHANCE_MULTIPLIERS = SURFACE_PROPS_RICOCHET_CHANCE_MULTIPLIERS;
 
 if SERVER then

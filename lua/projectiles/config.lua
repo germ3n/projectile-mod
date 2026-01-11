@@ -264,6 +264,7 @@ if CLIENT then
                 { type = "bool", cvar = "pro_damage_dropoff_enabled", label = "Enable Damage Dropoff" },
                 { type = "bool", cvar = "pro_use_firebullets", label = "Use FireBullets (might help resolve issues with some mods)" },
                 { type = "bool", cvar = "pro_wind_enabled", label = "Enable Wind (Experimental)" },
+                { type = "bool", cvar = "pro_auto_calculate_speed", label = "Automatically Calculate Projectile Speed (Experimental)" },
                 { type = "bool", cvar = "pro_blood_splatter_enabled", label = "Enable Blood Splatters" },
                 { type = "float", cvar = "pro_speed_scale", label = "Speed Scale", min = 0.1, max = 5.0, decimals = 2 },
                 { type = "float", cvar = "pro_weapon_damage_scale", label = "Damage Scale", min = 0.1, max = 5.0, decimals = 2 },
@@ -272,8 +273,8 @@ if CLIENT then
                 { type = "float", cvar = "pro_npc_shootpos_forward", label = "NPC Shoot Position Forward Offset", min = 0.0, max = 200.0, decimals = 0 },
                 --{ type = "float", cvar = "pro_blood_splatter_scale", label = "Blood Splatter Scale", min = 0.0, max = 10.0, decimals = 2 },
                 { type = "bool", cvar = "pro_inherit_shooter_velocity", label = "Inherit Shooter Velocity" },
-                { type = "float", cvar = "pro_inherit_shooter_velocity_scale", label = "Velocity Inheritance Scale", min = 0.0, max = 2.0, decimals = 2 },
                 { type = "bool", cvar = "pro_inherit_ground_entity_velocity", label = "Inherit Ground Entity Velocity (moving platforms)" },
+                { type = "float", cvar = "pro_inherit_shooter_velocity_scale", label = "Velocity Inheritance Scale", min = 0.0, max = 2.0, decimals = 2 },
             }
         },
         {

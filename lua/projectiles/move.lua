@@ -350,7 +350,6 @@ local function move_projectile(shooter, projectile_data)
 
         local stop_bullet, exit_pos, exit_trace = handle_penetration(shooter, projectile_data, enter_trace.HitPos, projectile_data.dir, projectile_data.penetration_power, enter_trace);
 
-        -- todo: fix
         if projectiles["pro_debug_penetration"] and exit_pos then
             debug_penetration(projectile_data, current_hit_damage, current_penetration_power, exit_pos, enter_trace, exit_trace);
         end

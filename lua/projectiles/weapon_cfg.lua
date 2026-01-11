@@ -31,7 +31,7 @@ HL2_WEAPON_CLASSES = {
 };
 
 local WEAPON_SPEEDS = {
-    ["default"] = 3000,
+    ["default"] = 8000,
 };
 
 local WEAPON_DAMAGES = {
@@ -137,7 +137,31 @@ function is_weapon_blacklisted(weapon, class_name)
     return WEAPON_BLACKLIST[class_name] == true;
 end
 
-function get_weapon_speed(weapon, class_name)
+local AMMO_CHARACTERISTICS = { -- todo: make configurable? 
+    ["Pistol"] = { base_speed = 6000, mass = 1.0, caliber_factor = 0.9 },
+    ["357"] = { base_speed = 7500, mass = 1.2, caliber_factor = 1.1 },
+    ["SMG1"] = { base_speed = 6500, mass = 0.8, caliber_factor = 0.85 },
+    ["AR2"] = { base_speed = 9000, mass = 1.0, caliber_factor = 1.0 },
+    ["Buckshot"] = { base_speed = 5500, mass = 1.5, caliber_factor = 0.7 },
+    ["SniperRound"] = { base_speed = 12000, mass = 1.3, caliber_factor = 1.2 },
+    ["HelicopterGun"] = { base_speed = 9000, mass = 1.2, caliber_factor = 1.1 },
+    ["default"] = { base_speed = 8000, mass = 1.0, caliber_factor = 1.0 },
+};
+
+local clamp = math.Clamp;
+function get_weapon_speed(weapon, class_name, damage, ammo_type)
+    local has_speed_entry = WEAPON_SPEEDS[class_name] ~= nil;
+    local auto_calc_enabled = projectiles["pro_auto_calculate_speed"];
+
+    if not has_speed_entry and auto_calc_enabled then
+        local char = AMMO_CHARACTERISTICS[ammo_type] or AMMO_CHARACTERISTICS["default"];
+        local damage_influence = 1.0 + ((damage - 10) / 150);
+        damage_influence = clamp(damage_influence, 0.7, 2.5);
+        local calculated_speed = clamp(char.base_speed * char.caliber_factor * damage_influence, 50.0, 25000.0);
+        --print(CLIENT and "CLIENT" or "SERVER", "Calculated speed:", calculated_speed, class_name, ammo_type, damage, damage_influence);
+        return calculated_speed;
+    end
+
     return WEAPON_SPEEDS[class_name] or WEAPON_SPEEDS["default"];
 end
 
