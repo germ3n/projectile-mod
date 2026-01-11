@@ -11,11 +11,16 @@ local cur_time = CurTime;
 local vector = Vector;
 local tick_interval = engine.TickInterval();
 local NULL = NULL;
+local maxplayers = game.MaxPlayers();
+
+local entity_meta = FindMetaTable("Entity");
+local entindex = entity_meta.EntIndex;
 
 projectile_store = projectile_store or {};
 local projectile_store = projectile_store;
 
-local BUFFER_SIZE = 0x400; -- must be power of 2
+local BUFFER_SIZE_PLAYERS = 256; -- must be power of 2
+local BUFFER_SIZE_NPCS = 128; -- must be power of 2
 
 local zero_color = Color(0, 0, 0, 0);
 
@@ -26,10 +31,10 @@ function create_new_projectile_store(shooter)
         last_received_idx = 0,
         buffer = {},
         active_projectiles = {},
-        buffer_size = BUFFER_SIZE,
+        buffer_size = entindex(shooter) > maxplayers and BUFFER_SIZE_NPCS or BUFFER_SIZE_PLAYERS,
     };
 
-    for i = 1, BUFFER_SIZE do
+    for i = 1, projectile_store[shooter].buffer_size do
         projectile_store[shooter].buffer[i] = {
             hit = true,
             weapon = NULL,
@@ -116,10 +121,6 @@ if SERVER then
         net_start("projectile", not reliable);
         write_entity(shooter);
         write_entity(weapon);
-        --write_uint(band(weapon.bullet_idx, 255), 8);
-        write_float(time);
-        --write_vector(pos);
-        --write_vector(dir);
         write_float(pos.x); -- we write individual components to prevent precision issues
         write_float(pos.y);
         write_float(pos.z);
@@ -227,7 +228,6 @@ if CLIENT then
         if not is_singleplayer and shooter == local_player() then return; end -- todo: probably better way to handle singleplayer sessions
 
         local weapon = read_entity();
-        local time = read_float();
         local pos_x = read_float();
         local pos_y = read_float();
         local pos_z = read_float();
@@ -262,7 +262,7 @@ if CLIENT then
 
         local projectile = projectile_store[shooter].buffer[projectile_idx];
         projectile.weapon = weapon;
-        projectile.time = time;
+        projectile.time = tick * tick_interval;
         projectile.pos.x = pos_x;
         projectile.pos.y = pos_y;
         projectile.pos.z = pos_z;

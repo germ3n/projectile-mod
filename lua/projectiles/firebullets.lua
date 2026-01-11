@@ -172,9 +172,9 @@ if SERVER then
         local dropoff_end = get_weapon_dropoff_end(inflictor, inflictor_class);
         local dropoff_min_multiplier = get_weapon_dropoff_min_multiplier(inflictor, inflictor_class);
         local dir = data.Dir;
+        local spread = data.Spread;
         for idx = 1, data.Num do
-            local spread_dir = get_weapon_spread(inflictor, inflictor_class, dir, data.Spread, idx);
-            local final_dir = spread_dir;
+            local final_dir = get_weapon_spread(inflictor, inflictor_class, dir, spread, idx);
             local final_speed = speed;
 
             if projectiles["pro_inherit_shooter_velocity"] then -- todo: fix other turrets, currently player-spawned npc_turrt_floor for example will inherit the player's velocity, we only need to inherit the ground entity's velocity
@@ -188,7 +188,7 @@ if SERVER then
                 
                 --if vec_dot(dir, get_normalized(inherited_vel)) >= 0.0 then
                     local scale = projectiles["pro_inherit_shooter_velocity_scale"];
-                    local combined_vel = spread_dir * speed + inherited_vel * scale;
+                    local combined_vel = final_dir * speed + inherited_vel * scale;
                     
                     final_dir = get_normalized(combined_vel);
                     final_speed = vec_length(combined_vel);
@@ -367,10 +367,9 @@ if CLIENT then
         local dropoff_end = get_weapon_dropoff_end(inflictor, inflictor_class);
         local dropoff_min_multiplier = get_weapon_dropoff_min_multiplier(inflictor, inflictor_class);
         local dir = data.Dir;
-
+        local spread = data.Spread;
         for idx = 1, data.Num do
-            local spread_dir = get_weapon_spread(inflictor, inflictor_class, dir, data.Spread, idx);
-            local final_dir = spread_dir;
+            local final_dir = get_weapon_spread(inflictor, inflictor_class, dir, spread, idx);
             local final_speed = speed;
 
             if projectiles["pro_inherit_shooter_velocity"] then
@@ -385,7 +384,7 @@ if CLIENT then
                 --if vec_dot(dir, get_normalized(inherited_vel)) >= 0.0 then
                     --print("inheriting velocity", vec_dot(dir, get_normalized(inherited_vel)));
                     local scale = projectiles["pro_inherit_shooter_velocity_scale"];
-                    local combined_vel = spread_dir * speed + inherited_vel * scale;
+                    local combined_vel = final_dir * speed + inherited_vel * scale;
                     
                     final_dir = get_normalized(combined_vel);
                     final_speed = vec_length(combined_vel);
