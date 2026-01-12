@@ -1,5 +1,7 @@
 AddCSLuaFile();
 
+local SERVER = SERVER;
+local DEBUG_COLOR = SERVER and Color(0, 100, 255, 60) or Color(255, 140, 0, 60);
 local projectiles = projectiles;
 local trace_to_exit = trace_to_exit;
 local get_surface_data = util.GetSurfaceData;
@@ -46,9 +48,8 @@ local function seeded_random(seed, min_val, max_val)
 end
 
 local function debug_ricochet(projectile_data, enter_trace, chance, reflect, spread)
+    --print("debug_ricochet");
     local dur = projectiles["pro_debug_duration"];
-    local col_vec = string_split(projectiles["pro_debug_color"], " ");
-    local col = color(tonumber(col_vec[1]), tonumber(col_vec[2]), tonumber(col_vec[3]), col_vec[4] and tonumber(col_vec[4]) or 150);
 
     debug_text(enter_trace.HitPos, "ricochet", dur, false);
     debug_text(enter_trace.HitPos + vector(0, 0, 10), string_format("chance: %.2f", chance), dur, false);
@@ -211,6 +212,7 @@ function handle_penetration(shooter, projectile_data, src, dir, penetration_powe
         local seed_base = projectile_data.random_seed + projectile_data.penetration_count * 1000;
         local chance = seeded_random(seed_base, 0, 1);
         local mat_chance = RICOCHET_MAT_CHANCE_MULTIPLIERS[enter_name];
+        --print(SERVER and "server" or "client", "seed_base: " .. seed_base, "chance: " .. chance, "mat_chance: " .. mat_chance);
         local angle_scale = 1.0 + dot_result;
         local chance_threshold = projectiles["pro_ricochet_chance"] * mat_chance * angle_scale;
         if chance < chance_threshold then

@@ -104,7 +104,7 @@ if CLIENT then
             local label = vgui.Create("DLabel", panel);
             label:SetText(data.label);
             label:SetPos(25, 0);
-            label:SetSize(300, 30);
+            label:SetSize(650, 30);
             label:SetTextColor(THEME.text);
             
             return panel;
@@ -262,7 +262,7 @@ if CLIENT then
                 { type = "bool", cvar = "pro_gravity_enabled", label = "Enable Gravity" },
                 { type = "bool", cvar = "pro_damage_scaling", label = "Enable Damage Scaling" },
                 { type = "bool", cvar = "pro_damage_dropoff_enabled", label = "Enable Damage Dropoff" },
-                { type = "bool", cvar = "pro_use_firebullets", label = "Use FireBullets (might help resolve issues with some mods)" },
+                { type = "bool", cvar = "pro_use_firebullets", label = "Use FireBullets (might help resolve issues with some mods/missing decals)" },
                 { type = "bool", cvar = "pro_wind_enabled", label = "Enable Wind (Experimental)" },
                 { type = "bool", cvar = "pro_auto_calculate_speed", label = "Automatically Calculate Projectile Speed (Experimental)" },
                 { type = "bool", cvar = "pro_blood_splatter_enabled", label = "Enable Blood Splatters" },
@@ -288,10 +288,13 @@ if CLIENT then
                 { type = "float", cvar = "pro_spawn_fade_distance", label = "Trail Fade Distance", min = 0.0, max = 1000.0, decimals = 0, client = true },
                 { type = "float", cvar = "pro_spawn_fade_time", label = "Trail Fade Time", min = 0.0, max = 2.0, decimals = 2, client = true },
                 { type = "float", cvar = "pro_spawn_offset", label = "Spawn Trail Offset", min = 0.0, max = 200.0, decimals = 0, client = true },
+                { type = "float", cvar = "pro_spawn_offset_max_dist", label = "Spawn Offset Max Distance", min = 0.0, max = 500.0, decimals = 0, client = true },
                 { type = "float", cvar = "pro_min_trail_length", label = "Min Trail Length", min = 0.0, max = 100.0, decimals = 0, client = true },
                 { type = "float", cvar = "pro_distance_scale_start", label = "Scale Start Distance", min = 0.0, max = 10000.0, decimals = 0, client = true },
                 { type = "float", cvar = "pro_distance_scale_max", label = "Max Scale Multiplier", min = 1.0, max = 10.0, decimals = 2, client = true },
                 { type = "float", cvar = "pro_render_min_distance", label = "Min Render Distance", min = 0.0, max = 1000.0, decimals = 0, client = true },
+                { type = "float", cvar = "pro_max_interp_distance", label = "Max Interpolation Distance", min = 0.0, max = 10000.0, decimals = 0, client = true },
+                { type = "float", cvar = "pro_max_interp_camera_distance", label = "Max Distance to Camera to Interpolate", min = 0.0, max = 50000.0, decimals = 0, client = true },
             }
         },
         {

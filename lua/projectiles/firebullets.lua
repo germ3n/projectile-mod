@@ -6,6 +6,7 @@ local zero_vec = Vector(0, 0, 0);
 local rand = math.Rand;
 local abs = math.abs;
 local shared_random = util.SharedRandom;
+local band = bit.band;
 
 projectiles.shooter_velocities = projectiles.shooter_velocities or {};
 
@@ -32,10 +33,10 @@ local function get_weapon_spread(weapon, class_name, dir, spread, seed)
     local vec_right = right(angle_dir);
     local vec_up = up(angle_dir);
 
-    local attempt = 0;
+    local attempt = 1;
     repeat
-        final_spread_x = shared_random("spread_x_" .. seed .. "_" .. attempt, -1, 1) * flatness + shared_random("spread_x2_" .. seed .. "_" .. attempt, -1, 1) * (1.0 - flatness);
-        final_spread_y = shared_random("spread_y_" .. seed .. "_" .. attempt, -1, 1) * flatness + shared_random("spread_y2_" .. seed .. "_" .. attempt, -1, 1) * (1.0 - flatness);
+        final_spread_x = shared_random("spread_x1", -1, 1, band(seed + attempt, 0x7FFFFFFF)) * flatness + shared_random("spread_x2", -1, 1, band(seed + attempt * 1000, 0x7FFFFFFF)) * (1.0 - flatness);
+        final_spread_y = shared_random("spread_y1", -1, 1, band(seed + attempt * 2000, 0x7FFFFFFF)) * flatness + shared_random("spread_y2", -1, 1, band(seed + attempt * 3000, 0x7FFFFFFF)) * (1.0 - flatness);
         if bias < 0.0 then
             final_spread_x = final_spread_x >= 0.0 and 1.0 - final_spread_x or -1.0 -final_spread_x;
             final_spread_y = final_spread_y >= 0.0 and 1.0 - final_spread_y or -1.0 -final_spread_y;
@@ -174,7 +175,7 @@ if SERVER then
         local dir = data.Dir;
         local spread = data.Spread;
         for idx = 1, data.Num do
-            local final_dir = get_weapon_spread(inflictor, inflictor_class, dir, spread, idx);
+            local final_dir = get_weapon_spread(inflictor, inflictor_class, dir, spread, idx * 1000);
             local final_speed = speed;
 
             if projectiles["pro_inherit_shooter_velocity"] then -- todo: fix other turrets, currently player-spawned npc_turrt_floor for example will inherit the player's velocity, we only need to inherit the ground entity's velocity
@@ -215,7 +216,8 @@ if SERVER then
                 dropoff_end,
                 dropoff_min_multiplier,
                 data.AmmoType,
-                projectiles["pro_net_reliable"]
+                projectiles["pro_net_reliable"],
+                idx
             );
         end
 
@@ -235,6 +237,7 @@ if CLIENT then
     local projectile_store = projectile_store;
     local BUFFER_SIZE = 0x400;
     local floor = math.floor;
+    local tick_interval = engine.TickInterval();
     
     local function hash_projectile(px, py, pz, dx, dy, dz)
         local h = floor(px * 0.1) * 73856093 + floor(py * 0.1) * 19349663 + floor(pz * 0.1) * 83492791;
@@ -249,6 +252,7 @@ if CLIENT then
     local get_class = entity_meta.GetClass;
     local get_velocity = entity_meta.GetVelocity;
     local get_ground_entity = entity_meta.GetGroundEntity;
+    local entindex = entity_meta.EntIndex;
     
     local player_meta = FindMetaTable("Player");
     local get_lean_amount = player_meta.GetLeanAmount;
@@ -260,13 +264,14 @@ if CLIENT then
     local vec_length = vector_meta.Length;
     
     local create_new_projectile_store = create_new_projectile_store;
-    local function create_local_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, dropoff_start, dropoff_end, dropoff_min_multiplier, ammo_type)
+    local function create_local_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, dropoff_start, dropoff_end, dropoff_min_multiplier, ammo_type, bullet_idx)
         if not projectile_store[shooter] then 
             create_new_projectile_store(shooter);
         end
 
         local time = cur_time();
-        local random_seed = hash_projectile(pos.x, pos.y, pos.z, dir.x, dir.y, dir.z);
+        local tick = floor(0.5 + time / tick_interval);
+        local random_seed = band(tick * 73856093 + entindex(shooter) * 19349663 + (bullet_idx or 1) * 83492791, 0x7FFFFFFF);
 
         local projectile_idx = band(projectile_store[shooter].received - 1, projectile_store[shooter].buffer_size - 1) + 1;
 
@@ -369,7 +374,7 @@ if CLIENT then
         local dir = data.Dir;
         local spread = data.Spread;
         for idx = 1, data.Num do
-            local final_dir = get_weapon_spread(inflictor, inflictor_class, dir, spread, idx);
+            local final_dir = get_weapon_spread(inflictor, inflictor_class, dir, spread, idx * 1000);
             local final_speed = speed;
 
             if projectiles["pro_inherit_shooter_velocity"] then
@@ -411,7 +416,8 @@ if CLIENT then
                 dropoff_start,
                 dropoff_end,
                 dropoff_min_multiplier,
-                data.AmmoType
+                data.AmmoType,
+                idx
             );
         end
 

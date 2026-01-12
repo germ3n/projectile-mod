@@ -61,11 +61,14 @@ if SERVER then
         ["pro_spawn_fade_distance"] = true,
         ["pro_spawn_fade_time"] = true,
         ["pro_spawn_offset"] = true,
+        ["pro_spawn_offset_max_dist"] = true,
         ["pro_min_trail_length"] = true,
         ["pro_distance_scale_enabled"] = true,
         ["pro_distance_scale_start"] = true,
         ["pro_distance_scale_max"] = true,
         ["pro_render_wind_hud"] = true,
+        ["pro_max_interp_distance"] = true,
+        ["pro_max_interp_camera_distance"] = true,
     };
 
     for cvar_name, cvar_data in next, PROJECTILES_CVARS do

@@ -2,6 +2,7 @@ AddCSLuaFile();
 
 local CLIENT = CLIENT;
 local SERVER = SERVER;
+local DEBUG_COLOR = SERVER and Color(0, 100, 255, 60) or Color(255, 140, 0, 60);
 local next = next;
 local tick_interval = engine.TickInterval();
 local projectiles = projectiles;
@@ -174,10 +175,8 @@ local fire_bullets_config = {
 
 local function debug_projectile_course(projectile_data, enter_trace)
     local dur = projectiles["pro_debug_duration"];
-    local col_vec = string_split(projectiles["pro_debug_color"], " ");
-    local col = color(tonumber(col_vec[1]), tonumber(col_vec[2]), tonumber(col_vec[3]), col_vec[4] and tonumber(col_vec[4]) or 150);
 
-    debug_line(projectile_data.pos, enter_trace.HitPos, dur, col, true);
+    debug_line(projectile_data.pos, enter_trace.HitPos, dur, DEBUG_COLOR, true);
     
     if enter_trace.Hit then
         debug_box(enter_trace.HitPos, vector(-2, -2, -2), vector(2, 2, 2), dur, col, true);
@@ -186,8 +185,8 @@ end
 
 local function debug_penetration(projectile_data, current_hit_damage, current_penetration_power, exit_pos, enter_trace, exit_trace)
     local dur = projectiles["pro_debug_duration"];
-    debug_line(enter_trace.HitPos, exit_pos, dur, color(255, 0, 0, 150), true);
-    debug_box(exit_pos, vector(-1, -1, -1), vector(1, 1, 1), dur, color(255, 0, 0, 150), true);
+    debug_line(enter_trace.HitPos, exit_pos, dur, DEBUG_COLOR, true);
+    debug_box(exit_pos, vector(-1, -1, -1), vector(1, 1, 1), dur, DEBUG_COLOR, true);
 
     local dmg_lost = current_hit_damage - projectile_data.damage;
     local enter_map_props = enter_trace and enter_trace.SurfaceProps and get_surface_data(enter_trace.SurfaceProps);
@@ -460,10 +459,8 @@ end
 
 local function debug_final_pos(projectile_data)
     local dur = projectiles["pro_debug_duration"];
-    local col_vec = string_split(projectiles["pro_debug_color"], " ");
-    local col = color(tonumber(col_vec[1]), tonumber(col_vec[2]), tonumber(col_vec[3]), col_vec[4] and tonumber(col_vec[4]) or 150);
 
-    debug_box(projectile_data.pos, vector(-1, -1, -1), vector(1, 1, 1), dur, col, true);
+    debug_box(projectile_data.pos, vector(-1, -1, -1), vector(1, 1, 1), dur, DEBUG_COLOR, true);
 end
 
 local cur_time = CurTime;

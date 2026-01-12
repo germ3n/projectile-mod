@@ -93,7 +93,7 @@ local WEAPON_TRACER_COLORS = {
 
 local WEAPON_SPREAD_BIAS = {
     ["default"] = 1.0,
-    ["weapon_shotgun"] = -1.0,
+    ["weapon_shotgun"] = 0.0,
 };
 
 local WEAPON_DROPOFF_START = {

@@ -110,13 +110,13 @@ if SERVER then
         return band(h, 0x7FFFFFFF);
     end
 
-    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, is_gmod_turret, dropoff_start, dropoff_end, dropoff_min_multiplier, ammo_type, reliable)
+    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, is_gmod_turret, dropoff_start, dropoff_end, dropoff_min_multiplier, ammo_type, reliable, bullet_idx)
         weapon.bullet_idx = (weapon.bullet_idx or 0) + 1;
 
         local time = cur_time();
         local tick = floor(0.5 + time / tick_interval);
         
-        local seed_counter = hash_projectile(pos.x, pos.y, pos.z, dir.x, dir.y, dir.z);
+        local seed_counter = band(tick * 73856093 + entindex(shooter) * 19349663 + (bullet_idx or 1) * 83492791, 0x7FFFFFFF);
 
         net_start("projectile", not reliable);
         write_entity(shooter);

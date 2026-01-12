@@ -33,10 +33,13 @@ local cv_render_min_distance = GetConVar("pro_render_min_distance");
 local cv_spawn_fade_distance = GetConVar("pro_spawn_fade_distance");
 local cv_spawn_fade_time = GetConVar("pro_spawn_fade_time");
 local cv_spawn_offset = GetConVar("pro_spawn_offset");
+local cv_spawn_offset_max_dist = GetConVar("pro_spawn_offset_max_dist");
 local cv_min_trail_length = GetConVar("pro_min_trail_length");
 local cv_distance_scale_enabled = GetConVar("pro_distance_scale_enabled");
 local cv_distance_scale_start = GetConVar("pro_distance_scale_start");
 local cv_distance_scale_max = GetConVar("pro_distance_scale_max");
+local cv_max_interp_distance = GetConVar("pro_max_interp_distance");
+local cv_max_interp_camera_distance = GetConVar("pro_max_interp_camera_distance");
 
 local convar_meta = FindMetaTable("ConVar");
 local get_bool = convar_meta.GetBool;
@@ -47,27 +50,57 @@ local cached_render_min_distance = get_float(cv_render_min_distance);
 local cached_spawn_fade_distance = get_float(cv_spawn_fade_distance);
 local cached_spawn_fade_time = get_float(cv_spawn_fade_time);
 local cached_spawn_offset = get_float(cv_spawn_offset);
+local cached_spawn_offset_max_dist = get_float(cv_spawn_offset_max_dist);
 local cached_min_trail_length = get_float(cv_min_trail_length);
 local cached_distance_scale_enabled = get_bool(cv_distance_scale_enabled);
 local cached_distance_scale_start = get_float(cv_distance_scale_start);
 local cached_distance_scale_max = get_float(cv_distance_scale_max);
+local cached_max_interp_distance = get_float(cv_max_interp_distance);
+local cached_max_interp_camera_distance = get_float(cv_max_interp_camera_distance);
 
 cvars.AddChangeCallback("pro_render_enabled", function(_, _, new) cached_render_enabled = tobool(new); end);
 cvars.AddChangeCallback("pro_render_min_distance", function(_, _, new) cached_render_min_distance = tonumber(new); end);
 cvars.AddChangeCallback("pro_spawn_fade_distance", function(_, _, new) cached_spawn_fade_distance = tonumber(new); end);
 cvars.AddChangeCallback("pro_spawn_fade_time", function(_, _, new) cached_spawn_fade_time = tonumber(new); end);
 cvars.AddChangeCallback("pro_spawn_offset", function(_, _, new) cached_spawn_offset = tonumber(new); end);
+cvars.AddChangeCallback("pro_spawn_offset_max_dist", function(_, _, new) cached_spawn_offset_max_dist = tonumber(new); end);
 cvars.AddChangeCallback("pro_min_trail_length", function(_, _, new) cached_min_trail_length = tonumber(new); end);
 cvars.AddChangeCallback("pro_distance_scale_enabled", function(_, _, new) cached_distance_scale_enabled = tobool(new); end);
 cvars.AddChangeCallback("pro_distance_scale_start", function(_, _, new) cached_distance_scale_start = tonumber(new); end);
 cvars.AddChangeCallback("pro_distance_scale_max", function(_, _, new) cached_distance_scale_max = tonumber(new); end);
+cvars.AddChangeCallback("pro_max_interp_distance", function(_, _, new) cached_max_interp_distance = tonumber(new); end);
+cvars.AddChangeCallback("pro_max_interp_camera_distance", function(_, _, new) cached_max_interp_camera_distance = tonumber(new); end);
 
 local sprite_batch_core = {};
 local sprite_batch_glow = {};
 local sprite_batch_outer = {};
 local beam_batch = {};
 
+local last_cvar_update = 0;
+local cvar_update_interval = 1.0;
+
+local function update_cached_cvars()
+    cached_render_enabled = get_bool(cv_render_enabled);
+    cached_render_min_distance = get_float(cv_render_min_distance);
+    cached_spawn_fade_distance = get_float(cv_spawn_fade_distance);
+    cached_spawn_fade_time = get_float(cv_spawn_fade_time);
+    cached_spawn_offset = get_float(cv_spawn_offset);
+    cached_spawn_offset_max_dist = get_float(cv_spawn_offset_max_dist);
+    cached_min_trail_length = get_float(cv_min_trail_length);
+    cached_distance_scale_enabled = get_bool(cv_distance_scale_enabled);
+    cached_distance_scale_start = get_float(cv_distance_scale_start);
+    cached_distance_scale_max = get_float(cv_distance_scale_max);
+    cached_max_interp_distance = get_float(cv_max_interp_distance);
+    cached_max_interp_camera_distance = get_float(cv_max_interp_camera_distance);
+end
+
 local function render_projectiles()
+    local cur_real_time = unpredicted_cur_time();
+    if cur_real_time - last_cvar_update > cvar_update_interval then
+        update_cached_cvars();
+        last_cvar_update = cur_real_time;
+    end
+
     if not cached_render_enabled then return; end
     
     local cur_time_val = tick_count() * tick_interval;
@@ -83,6 +116,8 @@ local function render_projectiles()
     local spawn_fade_dist = cached_spawn_fade_distance;
     local spawn_fade_time = cached_spawn_fade_time;
     local spawn_offset = cached_spawn_offset;
+    local spawn_offset_max_dist = cached_spawn_offset_max_dist;
+    local spawn_offset_max_dist_sqr = spawn_offset_max_dist * spawn_offset_max_dist;
     local min_trail_length = cached_min_trail_length;
     local dist_scale_start = cached_distance_scale_start;
     local dist_scale_max = cached_distance_scale_max;
@@ -91,7 +126,10 @@ local function render_projectiles()
     local glow_idx = 0;
     local outer_idx = 0;
     local beam_idx = 0;
-    local max_interp_dist_sqr = 10000 * 10000;
+    local max_interp_dist = cached_max_interp_distance;
+    local max_interp_dist_sqr = max_interp_dist * max_interp_dist;
+    local max_interp_cam_dist = cached_max_interp_camera_distance;
+    local max_interp_cam_dist_sqr = max_interp_cam_dist * max_interp_cam_dist;
     
     for shooter, projs in next, projectile_store do
         if not is_valid(shooter) then continue; end
@@ -103,10 +141,15 @@ local function render_projectiles()
             local p_data = projectile_store[shooter].active_projectiles[idx];
             
             local render_pos = p_data.pos;
+            local safe_interp = false;
             
             if p_data.old_pos and p_data.vel then
-                local safe_interp = true;
+                safe_interp = true;
                 if distance_to_sqr(p_data.pos, p_data.old_pos) > max_interp_dist_sqr then
+                    safe_interp = false;
+                end
+
+                if distance_to_sqr(p_data.pos, cam_pos) > max_interp_cam_dist_sqr then
                     safe_interp = false;
                 end
                 
@@ -158,11 +201,34 @@ local function render_projectiles()
 
             local tail_start = render_pos;
             local tail_end = p_data.old_pos or render_pos;
+            local tail_end_interpolated = tail_end;
+
+            if p_data.old_pos and p_data.old_vel and safe_interp then
+                if interp_fraction <= 1.0 then
+                    local prev_old_pos = p_data.old_pos - (p_data.old_vel * tick_interval);
+                    local t = interp_fraction;
+                    local t2 = t * t;
+                    local t3 = t2 * t;
+
+                    local h1 = 2*t3 - 3*t2 + 1;
+                    local h2 = -2*t3 + 3*t2;
+                    local h3 = t3 - 2*t2 + t;
+                    local h4 = t3 - t2;
+
+                    tail_end_interpolated = (prev_old_pos * h1) + (p_data.old_pos * h2) + 
+                                            (p_data.old_vel * h3 * tick_interval) + (p_data.old_vel * h4 * tick_interval);
+                    tail_end = tail_end_interpolated;
+                else
+                    local over_time = (interp_fraction - 1.0) * tick_interval;
+                    tail_end_interpolated = p_data.old_pos + (p_data.vel * over_time);
+                    tail_end = tail_end_interpolated;
+                end
+            end
             
             local visual_spawn_pos = p_data.spawn_pos;
-            if is_local_shooter and visual_spawn_pos and spawn_offset > 0 then
+            if visual_spawn_pos and spawn_offset > 0 then
                 local spawn_to_cam_dist = distance_to_sqr(visual_spawn_pos, cam_pos);
-                if spawn_to_cam_dist < 1600 then
+                if spawn_to_cam_dist < spawn_offset_max_dist_sqr then
                     if p_data.vel then
                         local vel_len_sqr = length_sqr(p_data.vel);
                         if vel_len_sqr > 1 then
@@ -191,7 +257,7 @@ local function render_projectiles()
                 local motion_influence = fade_alpha;
                 
                 if p_data.old_pos then
-                    tail_end = (visual_spawn_pos * spawn_influence) + (p_data.old_pos * motion_influence);
+                    tail_end = (visual_spawn_pos * spawn_influence) + (tail_end_interpolated * motion_influence);
                 else
                     tail_end = visual_spawn_pos;
                 end
