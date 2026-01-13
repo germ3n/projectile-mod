@@ -1,3 +1,5 @@
+--todo: maybe quantize position and direction to prevent precision issues
+
 AddCSLuaFile();
 
 local projectiles = projectiles;
