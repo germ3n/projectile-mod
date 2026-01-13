@@ -4,6 +4,7 @@ local is_function = isfunction;
 local tonumber = tonumber;
 local tostring = tostring;
 local NULL = NULL;
+local player_iterator = player.Iterator;
 
 local TRACER_TYPE_TO_INDEX = {
     ["core"] = 1,
@@ -227,6 +228,8 @@ end
 
 if SERVER then
     util.AddNetworkString("projectile_weapon_config_sync");
+    util.AddNetworkString("projectile_weapon_config_sync_start");
+    util.AddNetworkString("projectile_weapon_config_sync_chunk");
     util.AddNetworkString("projectile_weapon_config_update");
     util.AddNetworkString("projectile_weapon_config_reset");
 
@@ -368,8 +371,65 @@ if SERVER then
         print("reset weapon config: " .. class_name .. " to defaults");
     end, nil, "Reset a weapon to defaults");
 
+    local function send_weapon_config_chunked(ply)
+        if not IsValid(ply) then return; end
+        local config_data = {
+            WEAPON_BLACKLIST,
+            WEAPON_SPEEDS,
+            WEAPON_DAMAGES,
+            WEAPON_PENETRATION_POWERS,
+            WEAPON_PENETRATION_COUNTS,
+            WEAPON_DRAG,
+            WEAPON_MASS,
+            WEAPON_DROP,
+            WEAPON_MIN_SPEED,
+            WEAPON_MAX_DISTANCE,
+            WEAPON_TRACER_COLORS,
+            WEAPON_SPREAD_BIAS,
+            WEAPON_DROPOFF_START,
+            WEAPON_DROPOFF_END,
+            WEAPON_DROPOFF_MIN_MULTIPLIER,
+        };
+
+        local compressed_data = util.Compress(util.TableToJSON(config_data));
+        local compressed_size = string.len(compressed_data);
+        local chunk_size = 60000;
+        local total_chunks = math.ceil(compressed_size / chunk_size);
+
+        net.Start("projectile_weapon_config_sync_start");
+        net.WriteUInt(total_chunks, 16);
+        net.WriteUInt(compressed_size, 32);
+        net.Send(ply);
+
+        local chunk_idx = 0;
+        local function send_next_chunk()
+            chunk_idx = chunk_idx + 1;
+
+            if chunk_idx > total_chunks then
+                return;
+            end
+
+            if not IsValid(ply) then return; end
+
+            local start_pos = (chunk_idx - 1) * chunk_size + 1;
+            local end_pos = math.min(start_pos + chunk_size - 1, compressed_size);
+            local chunk = string.sub(compressed_data, start_pos, end_pos);
+
+            net.Start("projectile_weapon_config_sync_chunk");
+            net.WriteUInt(chunk_idx, 16);
+            net.WriteUInt(string.len(chunk), 32);
+            net.WriteData(chunk, string.len(chunk));
+            net.Send(ply);
+
+            timer.Simple(0.1, send_next_chunk);
+        end
+
+        send_next_chunk();
+    end 
+
     concommand.Add("pro_weapon_config_reset_all", function(ply, cmd, args)
         if ply ~= NULL and (not is_superadmin(ply)) then return; end
+
         sql.Query("DELETE FROM projectile_weapon_data");
 
         table.CopyFromTo(ORIGINAL_TABLES["blacklist"], WEAPON_BLACKLIST);
@@ -402,23 +462,10 @@ if SERVER then
         CONFIG_TYPES["dropoff_start"] = WEAPON_DROPOFF_START;
         CONFIG_TYPES["dropoff_end"] = WEAPON_DROPOFF_END;
         CONFIG_TYPES["dropoff_min_multiplier"] = WEAPON_DROPOFF_MIN_MULTIPLIER;
-        net.Start("projectile_weapon_config_sync");
-        net.WriteTable(WEAPON_BLACKLIST);
-        net.WriteTable(WEAPON_SPEEDS);
-        net.WriteTable(WEAPON_DAMAGES);
-        net.WriteTable(WEAPON_PENETRATION_POWERS);
-        net.WriteTable(WEAPON_PENETRATION_COUNTS);
-        net.WriteTable(WEAPON_DRAG);
-        net.WriteTable(WEAPON_MASS);
-        net.WriteTable(WEAPON_DROP);
-        net.WriteTable(WEAPON_MIN_SPEED);
-        net.WriteTable(WEAPON_MAX_DISTANCE);
-        net.WriteTable(WEAPON_TRACER_COLORS);
-        net.WriteTable(WEAPON_SPREAD_BIAS);
-        net.WriteTable(WEAPON_DROPOFF_START);
-        net.WriteTable(WEAPON_DROPOFF_END);
-        net.WriteTable(WEAPON_DROPOFF_MIN_MULTIPLIER);
-        net.Broadcast();
+
+        for k, v in player_iterator() do
+            send_weapon_config_chunked(v);
+        end
 
         print("reset all weapon configs");
     end, nil, "Reset all weapon configs");
@@ -512,24 +559,7 @@ if SERVER then
 
     hook.Add("PlayerInitialSpawn", "projectile_config_full_sync", function(ply)
         timer.Simple(1, function()
-            if not IsValid(ply) then return end
-            net.Start("projectile_weapon_config_sync");
-            net.WriteTable(WEAPON_BLACKLIST);
-            net.WriteTable(WEAPON_SPEEDS);
-            net.WriteTable(WEAPON_DAMAGES);
-            net.WriteTable(WEAPON_PENETRATION_POWERS);
-            net.WriteTable(WEAPON_PENETRATION_COUNTS);
-            net.WriteTable(WEAPON_DRAG);
-            net.WriteTable(WEAPON_MASS);
-            net.WriteTable(WEAPON_DROP);
-            net.WriteTable(WEAPON_MIN_SPEED);
-            net.WriteTable(WEAPON_MAX_DISTANCE);
-            net.WriteTable(WEAPON_TRACER_COLORS);
-            net.WriteTable(WEAPON_SPREAD_BIAS);
-            net.WriteTable(WEAPON_DROPOFF_START);
-            net.WriteTable(WEAPON_DROPOFF_END);
-            net.WriteTable(WEAPON_DROPOFF_MIN_MULTIPLIER);
-            net.Send(ply);
+            send_weapon_config_chunked(ply);
         end);
     end)
 
@@ -632,38 +662,81 @@ if SERVER then
 end
 
 if CLIENT then
-    net.Receive("projectile_weapon_config_sync", function()
-        WEAPON_BLACKLIST = net.ReadTable();
-        WEAPON_SPEEDS = net.ReadTable();
-        WEAPON_DAMAGES = net.ReadTable();
-        WEAPON_PENETRATION_POWERS = net.ReadTable();
-        WEAPON_PENETRATION_COUNTS = net.ReadTable();
-        WEAPON_DRAG = net.ReadTable();
-        WEAPON_MASS = net.ReadTable();
-        WEAPON_DROP = net.ReadTable();
-        WEAPON_MIN_SPEED = net.ReadTable();
-        WEAPON_MAX_DISTANCE = net.ReadTable();
-        WEAPON_TRACER_COLORS = net.ReadTable();
-        WEAPON_SPREAD_BIAS = net.ReadTable();
-        WEAPON_DROPOFF_START = net.ReadTable();
-        WEAPON_DROPOFF_END = net.ReadTable();
-        WEAPON_DROPOFF_MIN_MULTIPLIER = net.ReadTable();
-        CONFIG_TYPES["blacklist"] = WEAPON_BLACKLIST;
-        CONFIG_TYPES["speed"] = WEAPON_SPEEDS;
-        CONFIG_TYPES["damage"] = WEAPON_DAMAGES;
-        CONFIG_TYPES["penetration_power"] = WEAPON_PENETRATION_POWERS;
-        CONFIG_TYPES["penetration_count"] = WEAPON_PENETRATION_COUNTS;
-        CONFIG_TYPES["drag"] = WEAPON_DRAG;
-        CONFIG_TYPES["mass"] = WEAPON_MASS;
-        CONFIG_TYPES["drop"] = WEAPON_DROP;
-        CONFIG_TYPES["min_speed"] = WEAPON_MIN_SPEED;
-        CONFIG_TYPES["max_distance"] = WEAPON_MAX_DISTANCE;
-        CONFIG_TYPES["tracer_colors"] = WEAPON_TRACER_COLORS;
-        CONFIG_TYPES["spread_bias"] = WEAPON_SPREAD_BIAS;
-        CONFIG_TYPES["dropoff_start"] = WEAPON_DROPOFF_START;
-        CONFIG_TYPES["dropoff_end"] = WEAPON_DROPOFF_END;
-        CONFIG_TYPES["dropoff_min_multiplier"] = WEAPON_DROPOFF_MIN_MULTIPLIER;
-        print("received full weapon config sync");
+    local weapon_config_chunks = {};
+    local weapon_config_expected_chunks = 0;
+    local weapon_config_total_size = 0;
+
+    net.Receive("projectile_weapon_config_sync_start", function()
+        weapon_config_expected_chunks = net.ReadUInt(16);
+        weapon_config_total_size = net.ReadUInt(32);
+        weapon_config_chunks = {};
+
+        print("weapon config sync: expecting " .. weapon_config_expected_chunks .. " chunks (" .. weapon_config_total_size .. " bytes)");
+    end);
+
+    net.Receive("projectile_weapon_config_sync_chunk", function()
+        local chunk_idx = net.ReadUInt(16);
+        local chunk_size = net.ReadUInt(32);
+        local chunk_data = net.ReadData(chunk_size);
+
+        weapon_config_chunks[chunk_idx] = chunk_data;
+
+        if #weapon_config_chunks == weapon_config_expected_chunks then
+            local compressed_data = table.concat(weapon_config_chunks);
+            local json_data = util.Decompress(compressed_data);
+
+            if not json_data then
+                print("weapon config sync: failed to decompress data");
+
+                return;
+            end
+
+            local config_data = util.JSONToTable(json_data);
+
+            if not config_data or #config_data ~= 15 then
+                print("weapon config sync: failed to parse config data");
+
+                return;
+            end
+
+            WEAPON_BLACKLIST = config_data[1];
+            WEAPON_SPEEDS = config_data[2];
+            WEAPON_DAMAGES = config_data[3];
+            WEAPON_PENETRATION_POWERS = config_data[4];
+            WEAPON_PENETRATION_COUNTS = config_data[5];
+            WEAPON_DRAG = config_data[6];
+            WEAPON_MASS = config_data[7];
+            WEAPON_DROP = config_data[8];
+            WEAPON_MIN_SPEED = config_data[9];
+            WEAPON_MAX_DISTANCE = config_data[10];
+            WEAPON_TRACER_COLORS = config_data[11];
+            WEAPON_SPREAD_BIAS = config_data[12];
+            WEAPON_DROPOFF_START = config_data[13];
+            WEAPON_DROPOFF_END = config_data[14];
+            WEAPON_DROPOFF_MIN_MULTIPLIER = config_data[15];
+
+            CONFIG_TYPES["blacklist"] = WEAPON_BLACKLIST;
+            CONFIG_TYPES["speed"] = WEAPON_SPEEDS;
+            CONFIG_TYPES["damage"] = WEAPON_DAMAGES;
+            CONFIG_TYPES["penetration_power"] = WEAPON_PENETRATION_POWERS;
+            CONFIG_TYPES["penetration_count"] = WEAPON_PENETRATION_COUNTS;
+            CONFIG_TYPES["drag"] = WEAPON_DRAG;
+            CONFIG_TYPES["mass"] = WEAPON_MASS;
+            CONFIG_TYPES["drop"] = WEAPON_DROP;
+            CONFIG_TYPES["min_speed"] = WEAPON_MIN_SPEED;
+            CONFIG_TYPES["max_distance"] = WEAPON_MAX_DISTANCE;
+            CONFIG_TYPES["tracer_colors"] = WEAPON_TRACER_COLORS;
+            CONFIG_TYPES["spread_bias"] = WEAPON_SPREAD_BIAS;
+            CONFIG_TYPES["dropoff_start"] = WEAPON_DROPOFF_START;
+            CONFIG_TYPES["dropoff_end"] = WEAPON_DROPOFF_END;
+            CONFIG_TYPES["dropoff_min_multiplier"] = WEAPON_DROPOFF_MIN_MULTIPLIER;
+
+            weapon_config_chunks = {};
+            weapon_config_expected_chunks = 0;
+            weapon_config_total_size = 0;
+
+            print("received full weapon config sync (" .. chunk_idx .. " chunks)");
+        end
     end);
 
     net.Receive("projectile_weapon_config_update", function()
