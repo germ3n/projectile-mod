@@ -17,6 +17,7 @@ local up = angle_meta.Up;
 local vector_meta = FindMetaTable("Vector");
 local angle = vector_meta.Angle;
 local vec_dot = vector_meta.Dot;
+local get_normalized = vector_meta.GetNormalized;
 
 local CONFIG_TYPES = CONFIG_TYPES;
 
@@ -45,7 +46,7 @@ local function get_weapon_spread(weapon, class_name, dir, spread, seed)
     until (final_spread_x * final_spread_x + final_spread_y * final_spread_y) <= 1.0;
 
     local final_dir = dir + (final_spread_x * spread.x * vec_right) + (final_spread_y * spread.y * vec_up);
-    return final_dir;
+    return get_normalized(final_dir);
 end
 
 local TURRET_AND_MOUNTED_WEAPONS_WHITELIST = {
