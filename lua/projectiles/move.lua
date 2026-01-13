@@ -42,6 +42,8 @@ local sqrt = math.sqrt;
 local _is_valid = IsValid;
 local clamp = math.Clamp;
 local util_decal = util.Decal;
+local ents_iterator = ents.Iterator;
+local MAX_PLAYERS = game.MaxPlayers();
 
 local entity_meta = FindMetaTable("Entity");
 local is_valid = entity_meta.IsValid;
@@ -50,6 +52,7 @@ local dispatch_trace_attack = entity_meta.DispatchTraceAttack;
 local fire_bullets = entity_meta.FireBullets;
 local get_class = entity_meta.GetClass;
 local get_physics_object = entity_meta.GetPhysicsObject;
+local entindex = entity_meta.EntIndex;
 
 local player_meta = FindMetaTable("Player");
 local toggle_lag_compensation = player_meta.LagCompensation;
@@ -163,6 +166,8 @@ local gravity_vector = vector(0, 0, 0);
 local wind_vector = vector(0, 0, 0);
 local wind_target_vector = vector(0, 0, 0);
 
+local WORLD = game.GetWorld();
+
 local fire_bullets_config = {
     Attacker = nil,
     Damage = 0,
@@ -242,11 +247,9 @@ local function apply_drag(projectile_data)
         projectile_data.speed = projectile_data.speed - projectile_data.speed * drag_factor;
     end
 
-    if projectile_data.vel then
-        projectile_data.old_vel.x = projectile_data.vel.x;
-        projectile_data.old_vel.y = projectile_data.vel.y;
-        projectile_data.old_vel.z = projectile_data.vel.z;
-    end
+    projectile_data.old_vel.x = projectile_data.vel.x;
+    projectile_data.old_vel.y = projectile_data.vel.y;
+    projectile_data.old_vel.z = projectile_data.vel.z;
 end
 
 local function apply_damage_info(projectile_data, enter_trace, final_damage, shooter, hit_entity)
@@ -256,7 +259,9 @@ local function apply_damage_info(projectile_data, enter_trace, final_damage, sho
         set_inflictor(dmg_info, projectile_data.weapon); 
         set_weapon(dmg_info, projectile_data.weapon);
     end
-    set_attacker(dmg_info, shooter);
+    if shooter ~= NULL then
+        set_attacker(dmg_info, shooter);
+    end
     dmg_set_damage_type(dmg_info, DMG_BULLET);
     set_damage_position(dmg_info, enter_trace.HitPos);
     set_damage_force(dmg_info, projectile_data.dir * final_damage * projectiles["pro_damage_force_multiplier"]);
@@ -272,17 +277,16 @@ local function move_projectile(shooter, projectile_data)
         return true;
     end
 
+    --if shooter == NULL then
+    --    shooter = WORLD;
+    --end
+
     if calculate_damage_dropoff(projectile_data) then
         projectile_data.hit = true;
         return true;
     end
 
     apply_drag(projectile_data);
-
-    if projectile_data.speed <= projectile_data.min_speed then
-        projectile_data.hit = true;
-        return true;
-    end
 
     local current_velocity = projectile_data.dir * projectile_data.speed;
     if projectiles["pro_gravity_enabled"] then
@@ -304,24 +308,27 @@ local function move_projectile(shooter, projectile_data)
         projectile_data.dir = get_normalized(current_velocity);
         projectile_data.speed = vec_len(current_velocity);
     end
-    
-    if projectile_data.vel then
-        projectile_data.vel.x = current_velocity.x;
-        projectile_data.vel.y = current_velocity.y;
-        projectile_data.vel.z = current_velocity.z;
+
+    if projectile_data.speed <= projectile_data.min_speed then
+        projectile_data.hit = true;
+        return true;
     end
+    
+    projectile_data.vel.x = current_velocity.x;
+    projectile_data.vel.y = current_velocity.y;        
+    projectile_data.vel.z = current_velocity.z;
     
     vec_mul(current_velocity, tick_interval);
     local current_pos = projectile_data.pos;
     local new_pos = projectile_data.pos + current_velocity;
     
-    trace_filter[1] = not projectile_data.is_gmod_turret and shooter or projectile_data.weapon;
-    trace_filter[2] = projectile_data.weapon;
     if projectile_data.last_hit_entity and should_filter_entity(projectile_data.last_hit_entity) then
         trace_filter[3] = projectile_data.last_hit_entity;
     else
         trace_filter[3] = nil;
     end
+    trace_filter[2] = (_is_valid(projectile_data.weapon) and projectile_data.weapon) or nil;
+    trace_filter[1] = (not projectile_data.is_gmod_turret and shooter ~= NULL and shooter) or trace_filter[3];
     if CLIENT then do_water_trace(projectile_data, new_pos, trace_filter); end -- had to move to seperate funcs cuz i hit more than 60 upvalues
     
     local enter_trace = projectile_move_trace(projectile_data.pos, new_pos, trace_filter);
@@ -369,12 +376,12 @@ local function move_projectile(shooter, projectile_data)
         local final_damage = current_hit_damage * get_damage_multiplier(enter_trace.HitGroup);
 
         if hit_entity and hit_entity ~= NULL then
-            if not use_firebullets then
+            if not use_firebullets or shooter == NULL then
                 if SERVER then
-                    if BREAKABLE_CLASSES[get_class(hit_entity)] then
+                    if BREAKABLE_CLASSES[get_class(hit_entity)] and shooter ~= NULL then
                         projectiles.disable_fire_bullets = true;
                         fire_bullets_config.Attacker = shooter;
-                        fire_bullets_config.Inflictor = projectile_data.weapon;
+                        fire_bullets_config.Inflictor = _is_valid(projectile_data.weapon) and projectile_data.weapon or shooter;
                         fire_bullets_config.Damage = final_damage;
                         fire_bullets_config.Force = final_damage * projectiles["pro_damage_force_multiplier"];
                         fire_bullets_config.Distance = 2;
@@ -409,7 +416,7 @@ local function move_projectile(shooter, projectile_data)
                 projectiles.disable_fire_bullets = true;
                 fx_patch_all(true);
                 fire_bullets_config.Attacker = shooter;
-                fire_bullets_config.Inflictor = projectile_data.weapon;
+                fire_bullets_config.Inflictor = _is_valid(projectile_data.weapon) and projectile_data.weapon or shooter;
                 fire_bullets_config.Damage = final_damage;
                 fire_bullets_config.Force = final_damage * projectiles["pro_damage_force_multiplier"];
                 fire_bullets_config.Distance = 2;
@@ -427,7 +434,7 @@ local function move_projectile(shooter, projectile_data)
             projectile_data.hit = true;
             projectile_data.pos = enter_trace.HitPos;
 
-            if SERVER then
+            if SERVER and shooter ~= NULL then
                 do_shellshock(shooter, current_pos, enter_trace.HitPos, projectile_data.damage);
             end
 
@@ -477,7 +484,6 @@ local wind_angle = 0;
 local wind_start_tick = 0;
 local wind_end_tick = 0;
 local wind_start_vector = vector(0, 0, 0);
-local wind_seed = 0;
 local wind_update_counter = 0;
 local pending_gust = false;
 local pending_gust_angle = 0;
@@ -633,14 +639,16 @@ local function initialize_wind()
     --print("wind system initialized (map: " .. game.GetMap() .. ", seed: " .. wind_seed .. ")");
 end
 
-local function move_projectiles(ply, mv, cmd)
-    local projectiles = projectile_store[ply];
+local function move_projectiles(ply, mv, cmd, entindex)
+    local projectiles = projectile_store[entindex];
     if not projectiles then return; end
 
-    local active_projectile_count = #projectiles.active_projectiles;
+    local active_projectiles = projectiles.active_projectiles;
+    local active_projectile_count = #active_projectiles;
     if active_projectile_count == 0 then return; end
 
-    if SERVER and ply:IsPlayer() then 
+    local enable_lagcomp = SERVER and ply ~= NULL and entindex <= MAX_PLAYERS;
+    if enable_lagcomp then 
         if projectiles["pro_wind_enabled"] and cmd then
             if not wind_initialized then
                 initialize_wind();
@@ -660,28 +668,30 @@ local function move_projectiles(ply, mv, cmd)
     
     local idx = 1;
     while idx <= active_projectile_count do
-        local hit = move_projectile(ply, projectiles.active_projectiles[idx]);
+        local hit = move_projectile(ply, active_projectiles[idx]);
         if hit then
-            if projectiles["pro_debug_projectiles"] then debug_final_pos(projectiles.active_projectiles[idx]); end
-            projectiles.active_projectiles[idx] = projectiles.active_projectiles[active_projectile_count];
-            projectiles.active_projectiles[active_projectile_count] = nil;
+            if projectiles["pro_debug_projectiles"] then debug_final_pos(active_projectiles[idx]); end
+            active_projectiles[idx] = active_projectiles[active_projectile_count];
+            active_projectiles[active_projectile_count] = nil;
             active_projectile_count = active_projectile_count - 1;
         else
             idx = idx + 1;
         end
     end
 
-    if SERVER and ply:IsPlayer() then toggle_lag_compensation(ply, false); end
+    if enable_lagcomp then toggle_lag_compensation(ply, false); end
 end
 
 if SERVER then
+    local entity = Entity;
     local entity_meta = FindMetaTable("Entity");
     local get_velocity = entity_meta.GetVelocity;
+    local entindex = entity_meta.EntIndex;
 
     hook.Add("SetupMove", "projectiles_tick", function(ply, mv, cmd)
         projectiles.shooter_velocities[ply] = get_velocity(ply);
 
-        move_projectiles(ply, mv, cmd);
+        move_projectiles(ply, mv, cmd, entindex(ply));
     end);
     
     hook.Add("Tick", "projectiles_tick", function()
@@ -699,9 +709,9 @@ if SERVER then
             wind_vector = get_wind_at_tick(tick_count);
         end
         
-        for shooter, _ in next, projectile_store do
-            if is_valid(shooter) and shooter:IsNPC() then 
-                move_projectiles(shooter, nil, nil);
+        for entindex, _ in next, projectile_store do
+            if entindex > MAX_PLAYERS then 
+                move_projectiles(entity(entindex), nil, nil, entindex);
             end
         end
         
@@ -712,7 +722,7 @@ if SERVER then
                 wind_start_vector.x = 0.0;
                 wind_start_vector.y = 0.0;
                 wind_initialized = false;
-                wind_seed = 0;
+                --wind_seed = 0;
                 wind_update_counter = 0;
                 gust_end_tick = 0;
                 pending_gust = false;
@@ -721,14 +731,16 @@ if SERVER then
     end);
 
     hook.Add("EntityRemoved", "projectiles_cleanup", function(ent)
-        projectile_store[ent] = nil;
-        projectiles.shooter_velocities[ent] = nil;
+        --local entindex = entindex(ent);
+        --projectile_store[entindex] = nil;
+        projectiles.shooter_velocities[ent] = nil; -- todo: also switch to entindex
     end);
 else
     local is_first_time_predicted = IsFirstTimePredicted;
     local local_player = LocalPlayer;
     local is_singleplayer = game.SinglePlayer();
     local last_tick_count = engine_tick_count();
+    local entity = Entity;
 
     local entity_meta = FindMetaTable("Entity");
     local get_velocity = entity_meta.GetVelocity;
@@ -758,27 +770,30 @@ else
                     wind_start_vector.x = 0.0;
                     wind_start_vector.y = 0.0;
                     wind_initialized = false;
-                    wind_seed = 0;
+                    --wind_seed = 0;
                     wind_update_counter = 0;
                     gust_end_tick = 0;
                     pending_gust = false;
                 end
             end
 
-            for shooter, _ in next, projectile_store do
-                if not is_valid(shooter) then continue; end
-                move_projectiles(shooter, nil, nil);
+            for entindex, _ in next, projectile_store do
+                --if not _is_valid(ent) then continue; end
+                move_projectiles(entity(entindex), nil, nil, entindex);
             end
 
             last_tick_count = tick;
         end
     end);
 
+    local entity = Entity;
     timer.Create("projectiles_cleanup", 120.0, 0, function()
-        for ent, _ in next, projectile_store do
-            if is_valid(ent) then continue; end
-            projectile_store[ent] = nil;
-            projectiles.shooter_velocities[ent] = nil;
+        for entindex, _ in next, projectile_store do
+            local ent = entity(entindex);
+            if ent ~= NULL then continue; end
+            
+            --projectile_store[entindex] = nil;
+            projectiles.shooter_velocities[ent] = nil; -- todo: also switch to entindex
         end
     end);
 end

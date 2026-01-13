@@ -16,5 +16,6 @@ include("firebullets.lua");
 include("props.lua");
 include("config.lua");
 include("backup.lua");
+include("debug.lua");
 
-print("loaded projectiles system");
+print("ProjectileMod+ loaded");

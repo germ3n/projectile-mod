@@ -255,7 +255,7 @@ function handle_penetration(shooter, projectile_data, src, dir, penetration_powe
     
     local entry_cost_mult = projectiles["pro_penetration_entry_cost_multiplier"];
     local entry_cost = enter_pen * entry_cost_mult;
-    local exit_cost = exit_pen * (entry_cost_mult * projectiles["pro_penetration_exit_cost_multiplier"]);
+    local exit_cost = exit_pen * (entry_cost_mult * projectiles["pro_penetration_exit_cost_multiplier"]); -- wtf did i do here?
 
     local dist = distance(exit_trace.HitPos, enter_trace.HitPos);
     

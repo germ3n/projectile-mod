@@ -92,6 +92,7 @@ if SERVER then
     local NULL = NULL;
     local entity_meta = FindMetaTable("Entity");
     local get_class = entity_meta.GetClass;
+    local entindex = entity_meta.EntIndex;
 
     local npc_meta = FindMetaTable("NPC");
     local is_npc = npc_meta.IsNPC;
@@ -225,6 +226,17 @@ if SERVER then
 
         return false;
     end);
+
+    local MAX_PLAYERS = game.MaxPlayers();
+    hook.Add("OnEntityCreated", "projectiles_cleanup_players", function(ent)
+        local entindex = entindex(ent);
+        local store = projectile_store[entindex];
+        if entindex <= MAX_PLAYERS and store then
+            store.received = 0;
+            store.last_received_idx = 0;
+            store.active_projectiles = {};
+        end
+    end);
 end
 
 if CLIENT then
@@ -265,18 +277,19 @@ if CLIENT then
     
     local create_new_projectile_store = create_new_projectile_store;
     local function create_local_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, dropoff_start, dropoff_end, dropoff_min_multiplier, ammo_type, bullet_idx)
-        if not projectile_store[shooter] then 
-            create_new_projectile_store(shooter);
+        local entindex = entindex(shooter);
+        if not projectile_store[entindex] then 
+            create_new_projectile_store(entindex);
         end
 
         local time = cur_time();
         local tick = floor(0.5 + time / tick_interval);
-        local random_seed = band(tick * 73856093 + entindex(shooter) * 19349663 + (bullet_idx or 1) * 83492791, 0x7FFFFFFF);
+        local random_seed = band(tick * 73856093 + entindex * 19349663 + (bullet_idx or 1) * 83492791, 0x7FFFFFFF);
 
-        local projectile_idx = band(projectile_store[shooter].received - 1, projectile_store[shooter].buffer_size - 1) + 1;
+        local projectile_idx = band(projectile_store[entindex].received - 1, projectile_store[entindex].buffer_size - 1) + 1;
 
-        local projectile = projectile_store[shooter].buffer[projectile_idx];
-        projectile_store[shooter].received = projectile_store[shooter].received + 1;
+        local projectile = projectile_store[entindex].buffer[projectile_idx];
+        projectile_store[entindex].received = projectile_store[entindex].received + 1;
         projectile.weapon = weapon;
         projectile.time = time;
         projectile.pos.x = pos.x;
@@ -319,7 +332,7 @@ if CLIENT then
         projectile.dropoff_end = dropoff_end;
         projectile.dropoff_min_multiplier = dropoff_min_multiplier;
         projectile.ammo_type = ammo_type;
-        projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
+        projectile_store[entindex].active_projectiles[#projectile_store[entindex].active_projectiles + 1] = projectile;
 
         --print("random seed on client", random_seed);
     end

@@ -28,6 +28,9 @@ local vector_meta = FindMetaTable("Vector");
 local distance_to_sqr = vector_meta.DistToSqr;
 local length_sqr = vector_meta.LengthSqr;
 
+local entity_meta = FindMetaTable("Entity");
+local entindex = entity_meta.EntIndex;
+
 local cv_render_enabled = GetConVar("pro_render_enabled");
 local cv_render_min_distance = GetConVar("pro_render_min_distance");
 local cv_spawn_fade_distance = GetConVar("pro_spawn_fade_distance");
@@ -110,6 +113,7 @@ local function render_projectiles()
     if interp_fraction > 3.0 then interp_fraction = 3.0; end
 
     local ply = local_player();
+    local local_entindex = entindex(ply);
     local cam_pos = eye_pos();
     local min_dist_sqr = cached_render_min_distance;
     min_dist_sqr = min_dist_sqr * min_dist_sqr;
@@ -131,14 +135,15 @@ local function render_projectiles()
     local max_interp_cam_dist = cached_max_interp_camera_distance;
     local max_interp_cam_dist_sqr = max_interp_cam_dist * max_interp_cam_dist;
     
-    for shooter, projs in next, projectile_store do
-        if not is_valid(shooter) then continue; end
+    for entindex, projs in next, projectile_store do
+        --if not is_valid(entindex) then continue; end
         
-        local is_local_shooter = shooter == ply;
-        local active_projectile_count = #projectile_store[shooter].active_projectiles;
+        local is_local_shooter = entindex == local_entindex;
+        local active_projectiles = projectile_store[entindex].active_projectiles;
+        local active_projectile_count = #active_projectiles;
 
         for idx = 1, active_projectile_count do
-            local p_data = projectile_store[shooter].active_projectiles[idx];
+            local p_data = active_projectiles[idx];
             
             local render_pos = p_data.pos;
             local safe_interp = false;

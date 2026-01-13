@@ -24,18 +24,20 @@ local BUFFER_SIZE_NPCS = 128; -- must be power of 2
 
 local zero_color = Color(0, 0, 0, 0);
 
-function create_new_projectile_store(shooter)
+function create_new_projectile_store(entindex)
     --print("creating new projectile store for shooter", shooter);
-    projectile_store[shooter] = {
+    projectile_store[entindex] = {
         received = 0,
         last_received_idx = 0,
         buffer = {},
         active_projectiles = {},
-        buffer_size = entindex(shooter) > maxplayers and BUFFER_SIZE_NPCS or BUFFER_SIZE_PLAYERS,
+        buffer_size = entindex > maxplayers and BUFFER_SIZE_NPCS or BUFFER_SIZE_PLAYERS,
     };
 
-    for i = 1, projectile_store[shooter].buffer_size do
-        projectile_store[shooter].buffer[i] = {
+    local buffer = projectile_store[entindex].buffer;
+    local buffer_size = projectile_store[entindex].buffer_size;
+    for i = 1, buffer_size do
+        buffer[i] = {
             hit = true,
             weapon = NULL,
             time = 0.0,
@@ -69,8 +71,14 @@ function create_new_projectile_store(shooter)
         };
     end
 
-    projectile_store[shooter].active_projectiles = {};
+    projectile_store[entindex].active_projectiles = {};
 end
+
+for idx = 1, game.MaxPlayers() do
+    create_new_projectile_store(idx);
+end
+
+print("preallocated projectile stores for " .. game.MaxPlayers() .. " players");
 
 if SERVER then
     local entity_meta = FindMetaTable("Entity");
@@ -110,8 +118,8 @@ if SERVER then
         return band(h, 0x7FFFFFFF);
     end
 
-    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, is_gmod_turret, dropoff_start, dropoff_end, dropoff_min_multiplier, ammo_type, reliable, bullet_idx)
-        weapon.bullet_idx = (weapon.bullet_idx or 0) + 1;
+    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, is_gmod_turret, dropoff_start, dropoff_end, dropoff_min_multiplier, ammo_type, reliable, bullet_idx, is_debug)
+        --weapon.bullet_idx = (weapon.bullet_idx or 0) + 1;
 
         local time = cur_time();
         local tick = floor(0.5 + time / tick_interval);
@@ -119,6 +127,7 @@ if SERVER then
         local seed_counter = band(tick * 73856093 + entindex(shooter) * 19349663 + (bullet_idx or 1) * 83492791, 0x7FFFFFFF);
 
         net_start("projectile", not reliable);
+        write_bool(is_debug); -- is_debug
         write_entity(shooter);
         write_entity(weapon);
         write_float(pos.x); -- we write individual components to prevent precision issues
@@ -155,14 +164,15 @@ if SERVER then
             broadcast();
         end
 
-        if not projectile_store[shooter] then 
-            create_new_projectile_store(shooter);
+        local entindex = entindex(shooter);
+        if not projectile_store[entindex] then 
+            create_new_projectile_store(entindex);
         end
 
-        projectile_store[shooter].last_received_idx = projectile_store[shooter].last_received_idx + 1;
-        local projectile_idx = band(projectile_store[shooter].last_received_idx - 1, projectile_store[shooter].buffer_size - 1) + 1;
+        projectile_store[entindex].last_received_idx = projectile_store[entindex].last_received_idx + 1;
+        local projectile_idx = band(projectile_store[entindex].last_received_idx - 1, projectile_store[entindex].buffer_size - 1) + 1;
 
-        local projectile = projectile_store[shooter].buffer[projectile_idx];
+        local projectile = projectile_store[entindex].buffer[projectile_idx];
         projectile.weapon = weapon;
         projectile.time = time;
         projectile.pos.x = pos.x;
@@ -205,7 +215,7 @@ if SERVER then
         projectile.dropoff_end = dropoff_end;
         projectile.dropoff_min_multiplier = dropoff_min_multiplier;
         projectile.ammo_type = ammo_type;
-        projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
+        projectile_store[entindex].active_projectiles[#projectile_store[entindex].active_projectiles + 1] = projectile;
 
         --print("random seed on server", seed_counter);
     end
@@ -224,8 +234,9 @@ if CLIENT then
     local is_singleplayer = game.SinglePlayer();
 
     net.Receive("projectile", function()
+        local is_debug = read_bool();
         local shooter = read_entity();
-        if not is_singleplayer and shooter == local_player() then return; end -- todo: probably better way to handle singleplayer sessions
+        if not is_debug and not is_singleplayer and shooter == local_player() then return; end -- todo: probably better way to handle singleplayer sessions
 
         local weapon = read_entity();
         local pos_x = read_float();
@@ -253,14 +264,15 @@ if CLIENT then
         local tick = read_uint(32);
         local ammo_type = read_string();
 
-        if not projectile_store[shooter] then 
-            create_new_projectile_store(shooter);
+        local entindex = entindex(shooter);
+        if not projectile_store[entindex] then 
+            create_new_projectile_store(entindex);
         end
 
-        projectile_store[shooter].last_received_idx = projectile_store[shooter].last_received_idx + 1;
-        local projectile_idx = band(projectile_store[shooter].last_received_idx - 1, projectile_store[shooter].buffer_size - 1) + 1;
+        projectile_store[entindex].last_received_idx = projectile_store[entindex].last_received_idx + 1;
+        local projectile_idx = band(projectile_store[entindex].last_received_idx - 1, projectile_store[entindex].buffer_size - 1) + 1;
 
-        local projectile = projectile_store[shooter].buffer[projectile_idx];
+        local projectile = projectile_store[entindex].buffer[projectile_idx];
         projectile.weapon = weapon;
         projectile.time = tick * tick_interval;
         projectile.pos.x = pos_x;
@@ -303,7 +315,7 @@ if CLIENT then
         projectile.dropoff_end = dropoff_end;
         projectile.dropoff_min_multiplier = dropoff_min_multiplier;
         projectile.ammo_type = ammo_type;
-        projectile_store[shooter].active_projectiles[#projectile_store[shooter].active_projectiles + 1] = projectile;
+        projectile_store[entindex].active_projectiles[#projectile_store[entindex].active_projectiles + 1] = projectile;
     end)
 end
 
