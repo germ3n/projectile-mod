@@ -71,4 +71,5 @@ PROJECTILES_CVARS = {
     ["pro_auto_calculate_speed"] = { CreateConVar("pro_auto_calculate_speed", "0", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Automatically calculate speed from damage and ammo type", 0, 1), "bool" },
     ["pro_disable_clientside_prediction"] = { CreateConVar("pro_disable_clientside_prediction", "0", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Disable clientside prediction", 0, 1), "bool" },
     ["pro_render_disable_tracers"] = { CreateConVar("pro_render_disable_tracers", "0", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Disable tracers", 0, 1), "bool" },
+    ["pro_debug_hud"] = { CreateConVar("pro_debug_hud", "0", bit.bor(FCVAR_ARCHIVE), "Show projectile debug HUD", 0, 1), "bool" },
 };

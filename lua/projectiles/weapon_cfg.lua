@@ -4,6 +4,7 @@ local is_function = isfunction;
 local tonumber = tonumber;
 local tostring = tostring;
 local NULL = NULL;
+local Color = Color;
 local player_iterator = player.Iterator;
 
 local TRACER_TYPE_TO_INDEX = {
@@ -207,7 +208,9 @@ function get_weapon_max_distance(weapon, class_name)
 end
 
 function get_weapon_tracer_colors(weapon, class_name)
-    return WEAPON_TRACER_COLORS[class_name] or WEAPON_TRACER_COLORS["default"];
+    local colors = WEAPON_TRACER_COLORS[class_name] or WEAPON_TRACER_COLORS["default"];
+
+    return { Color(colors[1].r, colors[1].g, colors[1].b, colors[1].a), Color(colors[2].r, colors[2].g, colors[2].b, colors[2].a) };
 end
 
 function get_weapon_spread_bias(weapon, class_name)
@@ -232,6 +235,7 @@ if SERVER then
     util.AddNetworkString("projectile_weapon_config_sync_chunk");
     util.AddNetworkString("projectile_weapon_config_update");
     util.AddNetworkString("projectile_weapon_config_reset");
+    util.AddNetworkString("projectile_weapon_tracer_colors_update");
 
     local function initialize_db()
         if not sql.TableExists("projectile_weapon_data") then
@@ -259,6 +263,7 @@ if SERVER then
     
                         if target_table then
                             if cfg_type == "tracer_colors" then
+                                local has_old_suffix = false;
                                 for suffix, map in next, color_map do
                                     if string.EndsWith(raw_name, suffix) then
                                         local class_name = string.sub(raw_name, 1, #raw_name - #suffix);
@@ -272,7 +277,24 @@ if SERVER then
                                         end
     
                                         target_table[class_name][map[1]][map[2]] = val;
+                                        has_old_suffix = true;
                                         break;
+                                    end
+                                end
+                                
+                                if not has_old_suffix then
+                                    local color_str = tostring(row.value);
+                                    local colors = string.Explode("|", color_str);
+                                    if #colors == 2 then
+                                        local c1_parts = string.Explode(",", colors[1]);
+                                        local c2_parts = string.Explode(",", colors[2]);
+                                        
+                                        if #c1_parts == 4 and #c2_parts == 4 then
+                                            target_table[raw_name] = {
+                                                Color(tonumber(c1_parts[1]) or 255, tonumber(c1_parts[2]) or 200, tonumber(c1_parts[3]) or 100, tonumber(c1_parts[4]) or 255),
+                                                Color(tonumber(c2_parts[1]) or 255, tonumber(c2_parts[2]) or 140, tonumber(c2_parts[3]) or 0, tonumber(c2_parts[4]) or 150)
+                                            };
+                                        end
                                     end
                                 end
                             else
@@ -555,6 +577,47 @@ if SERVER then
         end
     end, nil, "Copy all weapon configs");
 
+    concommand.Add("pro_weapon_config_set_tracer_colors", function(ply, cmd, args)
+        if ply ~= NULL and (not is_superadmin(ply)) then return; end
+        
+        local class_name = args[1];
+        local r1 = tonumber(args[2]) or 255;
+        local g1 = tonumber(args[3]) or 200;
+        local b1 = tonumber(args[4]) or 100;
+        local a1 = tonumber(args[5]) or 255;
+        local r2 = tonumber(args[6]) or 255;
+        local g2 = tonumber(args[7]) or 140;
+        local b2 = tonumber(args[8]) or 0;
+        local a2 = tonumber(args[9]) or 150;
+        
+        CONFIG_TYPES["tracer_colors"][class_name] = { Color(r1, g1, b1, a1), Color(r2, g2, b2, a2) };
+        
+        local color_str = string.format("%d,%d,%d,%d|%d,%d,%d,%d", r1, g1, b1, a1, r2, g2, b2, a2);
+        local key = "tracer_colors|" .. class_name;
+        local safe_key = sql.SQLStr(key);
+        local safe_val = sql.SQLStr(color_str);
+        local query = "REPLACE INTO projectile_weapon_data (key, value) VALUES(" .. safe_key .. ", " .. safe_val .. ")";
+        local res = sql.Query(query);
+        
+        if res == false then
+            print("sql error saving tracer colors: " .. key .. ": " .. sql.LastError());
+        end
+        
+        net.Start("projectile_weapon_tracer_colors_update");
+        net.WriteString(class_name);
+        net.WriteUInt(r1, 8);
+        net.WriteUInt(g1, 8);
+        net.WriteUInt(b1, 8);
+        net.WriteUInt(a1, 8);
+        net.WriteUInt(r2, 8);
+        net.WriteUInt(g2, 8);
+        net.WriteUInt(b2, 8);
+        net.WriteUInt(a2, 8);
+        net.Broadcast();
+        
+        print("set tracer colors for " .. class_name);
+    end, nil, "Set tracer colors for a weapon");
+
     initialize_db();
 
     hook.Add("PlayerInitialSpawn", "projectile_config_full_sync", function(ply)
@@ -578,7 +641,7 @@ if SERVER then
                 local class_name = net.ReadString();
                 local tracer_colors = { net.ReadColor(), net.ReadColor() };
                 if target_table then
-                    print("updated weapon config: " .. cfg_type .. " for " .. class_name .. " -> " .. val);
+                    print("updated weapon config: " .. cfg_type .. " for " .. class_name);
                     
                     target_table[class_name] = tracer_colors;
                     -- this is so stupid lmao
@@ -775,6 +838,20 @@ if CLIENT then
             target_table[class_name] = nil;
             LocalPlayer():ChatPrint("Reset " .. cfg_type .. " for " .. class_name .. " to default");
         end
+    end);
+
+    net.Receive("projectile_weapon_tracer_colors_update", function()
+        local class_name = net.ReadString();
+        local r1 = net.ReadUInt(8);
+        local g1 = net.ReadUInt(8);
+        local b1 = net.ReadUInt(8);
+        local a1 = net.ReadUInt(8);
+        local r2 = net.ReadUInt(8);
+        local g2 = net.ReadUInt(8);
+        local b2 = net.ReadUInt(8);
+        local a2 = net.ReadUInt(8);
+        
+        CONFIG_TYPES["tracer_colors"][class_name] = { Color(r1, g1, b1, a1), Color(r2, g2, b2, a2) };
     end);
 end
 

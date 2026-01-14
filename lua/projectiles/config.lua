@@ -1300,6 +1300,184 @@ if CLIENT then
                     create_slider_row("Dropoff End Distance (Units)", "dropoff_end", CONFIG_TYPES["dropoff_end"]["default"], 0, 200000, 0);
                     create_slider_row("Dropoff Min Damage Multiplier", "dropoff_min_multiplier", CONFIG_TYPES["dropoff_min_multiplier"]["default"], 0.0, 1.0, 2);
 
+                    local tracer_panel = vgui.Create("DPanel", config_scroll);
+                    tracer_panel:Dock(TOP);
+                    tracer_panel:SetTall(35);
+                    tracer_panel:DockMargin(0, 5, 0, 5);
+                    tracer_panel.Paint = function() end
+
+                    local tracer_label = vgui.Create("DLabel", tracer_panel);
+                    tracer_label:SetText("Tracer Colors");
+                    tracer_label:Dock(LEFT);
+                    tracer_label:SetWide(140);
+                    tracer_label:SetTextColor(THEME.text_dim);
+
+                    local current_tracer_colors = CONFIG_TYPES["tracer_colors"][is_ammo_mode and "default" or class_name] or CONFIG_TYPES["tracer_colors"]["default"];
+
+                    local tracer_btn = vgui.Create("DButton", tracer_panel);
+                    tracer_btn:SetText("Edit Colors");
+                    tracer_btn:Dock(FILL);
+                    tracer_btn:DockMargin(0, 2, 0, 2);
+                    tracer_btn:SetTextColor(THEME.text);
+                    tracer_btn.Paint = function(s, w, h)
+                        local col = Color(60, 60, 60);
+                        if s:IsHovered() then
+                            col = Color(80, 80, 80);
+                        end
+
+                        draw.RoundedBox(4, 0, 0, w, h, col);
+
+                        local preview_w = 20;
+                        local preview_h = h - 8;
+                        local preview_x = w - preview_w * 2 - 15;
+                        local preview_y = 4;
+
+                        draw.RoundedBox(2, preview_x, preview_y, preview_w, preview_h, current_tracer_colors[1]);
+                        draw.RoundedBox(2, preview_x + preview_w + 5, preview_y, preview_w, preview_h, current_tracer_colors[2]);
+                    end
+
+                    tracer_btn.DoClick = function()
+                        local popup = vgui.Create("DFrame");
+                        popup:SetSize(480, 320);
+                        popup:Center();
+                        popup:SetTitle("Tracer Colors - " .. (is_ammo_mode and ("Ammo: " .. selected_ammo) or class_name));
+                        popup:MakePopup();
+                        popup:SetDeleteOnClose(true);
+                        popup.Paint = function(s, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, THEME.bg_dark);
+                        end
+
+                        local color1 = table.Copy(current_tracer_colors[1]);
+                        local color2 = table.Copy(current_tracer_colors[2]);
+
+                        local left_panel = vgui.Create("DPanel", popup);
+                        left_panel:Dock(LEFT);
+                        left_panel:SetWide(230);
+                        left_panel:DockMargin(5, 30, 2, 5);
+                        left_panel.Paint = function(s, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
+                        end
+
+                        local label1 = vgui.Create("DLabel", left_panel);
+                        label1:SetText("Core Color");
+                        label1:SetTextColor(THEME.text);
+                        label1:Dock(TOP);
+                        label1:DockMargin(10, 5, 0, 0);
+                        label1:SetFont("DermaDefaultBold");
+
+                        local mixer1 = vgui.Create("DColorMixer", left_panel);
+                        mixer1:Dock(FILL);
+                        mixer1:DockMargin(10, 5, 10, 10);
+                        mixer1:SetPalette(false);
+                        mixer1:SetAlphaBar(true);
+                        mixer1:SetWangs(true);
+                        mixer1:SetColor(color1);
+
+                        mixer1.ValueChanged = function(s, col)
+                            color1 = col;
+                        end
+
+                        local right_panel = vgui.Create("DPanel", popup);
+                        right_panel:Dock(FILL);
+                        right_panel:DockMargin(2, 30, 5, 5);
+                        right_panel.Paint = function(s, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
+                        end
+
+                        local label2 = vgui.Create("DLabel", right_panel);
+                        label2:SetText("Glow Color");
+                        label2:SetTextColor(THEME.text);
+                        label2:Dock(TOP);
+                        label2:DockMargin(10, 5, 0, 0);
+                        label2:SetFont("DermaDefaultBold");
+
+                        local mixer2 = vgui.Create("DColorMixer", right_panel);
+                        mixer2:Dock(FILL);
+                        mixer2:DockMargin(10, 5, 10, 10);
+                        mixer2:SetPalette(false);
+                        mixer2:SetAlphaBar(true);
+                        mixer2:SetWangs(true);
+                        mixer2:SetColor(color2);
+
+                        mixer2.ValueChanged = function(s, col)
+                            color2 = col;
+                        end
+
+                        local bottom_panel = vgui.Create("DPanel", popup);
+                        bottom_panel:Dock(BOTTOM);
+                        bottom_panel:SetTall(40);
+                        bottom_panel:DockMargin(5, 0, 5, 5);
+                        bottom_panel.Paint = function() end
+
+                        local btn_save = vgui.Create("DButton", bottom_panel);
+                        btn_save:SetText("Save");
+                        btn_save:Dock(RIGHT);
+                        btn_save:SetWide(100);
+                        btn_save:DockMargin(5, 5, 0, 5);
+                        btn_save:SetTextColor(Color(255, 255, 255));
+                        btn_save.Paint = function(s, w, h)
+                            local col = THEME.accent;
+                            if s:IsHovered() then
+                                col = Color(THEME.accent.r + 20, THEME.accent.g + 20, THEME.accent.b + 20);
+                            end
+
+                            draw.RoundedBox(4, 0, 0, w, h, col);
+                        end
+
+                        btn_save.DoClick = function()
+                            if is_ammo_mode then
+                                if not ammo_weapons or #ammo_weapons == 0 then
+                                    LocalPlayer():ChatPrint("No weapons found for this ammo type.");
+                                    return;
+                                end
+
+                                for _, wep_class in ipairs(ammo_weapons) do
+                                    RunConsoleCommand("pro_weapon_config_set_tracer_colors", wep_class, 
+                                        color1.r, color1.g, color1.b, color1.a,
+                                        color2.r, color2.g, color2.b, color2.a);
+                                end
+
+                                LocalPlayer():ChatPrint("Set tracer colors for " .. #ammo_weapons .. " weapons");
+                            else
+                                RunConsoleCommand("pro_weapon_config_set_tracer_colors", class_name,
+                                    color1.r, color1.g, color1.b, color1.a,
+                                    color2.r, color2.g, color2.b, color2.a);
+
+                                LocalPlayer():ChatPrint("Set tracer colors for " .. class_name);
+                            end
+
+                            current_tracer_colors[1] = Color(color1.r, color1.g, color1.b, color1.a);
+                            current_tracer_colors[2] = Color(color2.r, color2.g, color2.b, color2.a);
+                            
+                            popup:Close();
+                            
+                            timer.Simple(0.1, function()
+                                if IsValid(config_scroll) then
+                                    rebuild_config_panel(class_name, is_ammo_mode, ammo_weapons);
+                                end
+                            end);
+                        end
+
+                        local btn_cancel = vgui.Create("DButton", bottom_panel);
+                        btn_cancel:SetText("Cancel");
+                        btn_cancel:Dock(RIGHT);
+                        btn_cancel:SetWide(100);
+                        btn_cancel:DockMargin(5, 5, 0, 5);
+                        btn_cancel:SetTextColor(THEME.text);
+                        btn_cancel.Paint = function(s, w, h)
+                            local col = Color(60, 60, 60);
+                            if s:IsHovered() then
+                                col = Color(80, 80, 80);
+                            end
+
+                            draw.RoundedBox(4, 0, 0, w, h, col);
+                        end
+
+                        btn_cancel.DoClick = function()
+                            popup:Close();
+                        end
+                    end
+
                     local div = vgui.Create("DPanel", config_scroll);
                     div:SetTall(2);
                     div:Dock(TOP);
@@ -2787,13 +2965,14 @@ if CLIENT then
                 { type = "bool", cvar = "pro_debug_ricochet", label = "Draw Ricochet (Cheat)" },
                 { type = "float", cvar = "pro_debug_duration", label = "Debug Draw Duration", min = 0.1, max = 10.0, decimals = 1 },
                 { type = "color", cvar = "pro_debug_color", label = "Debug Color" },
+                { type = "bool", cvar = "pro_debug_hud", label = "Show Debug HUD", client = true },
             }
         },
     };
 
     local function OpenConfigMenu()
         local frame = vgui.Create("DFrame");
-        frame:SetSize(870, 885);
+        frame:SetSize(870, 925);
         frame:Center();
         frame:SetTitle(""); 
         frame:MakePopup();

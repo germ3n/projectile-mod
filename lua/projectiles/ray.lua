@@ -36,6 +36,9 @@ function trace_to_exit(enter_trace, start_pos, dir, mins, maxs, shooter)
     local step_size = projectiles["pro_penetration_trace_to_exit_step_size"];
     for dist = step_size, max_distance, step_size do
         local check_pos = start_pos + (dir * dist);
+        if first_contents == 0 then
+            first_contents = point_contents(check_pos);
+        end
         local current_contents = point_contents(check_pos);
         if (band(current_contents, MASK_SHOT_HULL) == 0) or (band(current_contents, CONTENTS_HITBOX) ~= 0 and current_contents ~= first_contents) then
             local exit_trace = trace_line_ex({
