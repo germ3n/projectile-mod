@@ -1872,7 +1872,56 @@ if CLIENT then
                     end
             
                     btn_restore.DoClick = function()
-                        Derma_Query("Are you sure you want to restore this backup? This will overwrite your current settings.", "Confirm Restore", "Yes", function()
+                        local restore_frame = vgui.Create("DFrame");
+                        restore_frame:SetSize(380, 220);
+                        restore_frame:Center();
+                        restore_frame:SetTitle("Restore Configuration");
+                        restore_frame:MakePopup();
+                        restore_frame.Paint = function(self, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
+                            draw.RoundedBox(4, 0, 0, w, 24, THEME.bg_dark);
+                        end
+                        
+                        local lbl = vgui.Create("DLabel", restore_frame);
+                        lbl:SetText("Select restore mode:");
+                        lbl:SetPos(10, 35);
+                        lbl:SetSize(360, 20);
+                        lbl:SetTextColor(THEME.text);
+                        lbl:SetFont("DermaDefaultBold");
+                        
+                        local radio_replace = vgui.Create("DCheckBoxLabel", restore_frame);
+                        radio_replace:SetPos(20, 65);
+                        radio_replace:SetText("Replace Mode (Clear and overwrite all settings)");
+                        radio_replace:SetTextColor(THEME.text);
+                        radio_replace:SetValue(true);
+                        radio_replace:SizeToContents();
+                        
+                        local radio_merge = vgui.Create("DCheckBoxLabel", restore_frame);
+                        radio_merge:SetPos(20, 95);
+                        radio_merge:SetText("Merge Mode (Add/update without removing existing)");
+                        radio_merge:SetTextColor(THEME.text);
+                        radio_merge:SetValue(false);
+                        radio_merge:SizeToContents();
+                        
+                        radio_replace.OnChange = function(s, val)
+                            if val then radio_merge:SetValue(false); end
+                        end
+                        
+                        radio_merge.OnChange = function(s, val)
+                            if val then radio_replace:SetValue(false); end
+                        end
+                        
+                        local btn_restore = vgui.Create("DButton", restore_frame);
+                        btn_restore:SetText("Restore Backup");
+                        btn_restore:SetPos(10, 145);
+                        btn_restore:SetSize(180, 40);
+                        btn_restore:SetTextColor(THEME.text);
+                        btn_restore.Paint = function(me, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, me:IsHovered() and Color(46, 139, 87) or Color(60, 179, 113));
+                        end
+                        btn_restore.DoClick = function()
+                            local merge_mode = radio_merge:GetChecked();
+                            
                             if backup_data then
                                 local compressed_data = util.Compress(util.TableToJSON(backup_data));
                                 local compressed_size = string.len(compressed_data);
@@ -1882,13 +1931,14 @@ if CLIENT then
                                 net.Start("projectiles_restore_config_start");
                                 net.WriteUInt(total_chunks, 16);
                                 net.WriteUInt(compressed_size, 32);
+                                net.WriteBool(merge_mode);
                                 net.SendToServer();
                                 
                                 local chunk_index = 0;
                                 local function SendNextChunk()
                                     chunk_index = chunk_index + 1;
                                     if chunk_index > total_chunks then
-                                        chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 255, 255), "Backup '" .. display_name .. "' sent to server (" .. total_chunks .. " chunks)");
+                                        chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 255, 255), "Backup '" .. display_name .. "' sent to server (" .. total_chunks .. " chunks, " .. (merge_mode and "merge" or "replace") .. " mode)");
                                         return;
                                     end
                                     
@@ -1911,7 +1961,20 @@ if CLIENT then
                             else
                                 chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 100, 100), "Failed to parse backup file!");
                             end
-                        end, "No");
+                            restore_frame:Close();
+                        end
+                        
+                        local btn_cancel = vgui.Create("DButton", restore_frame);
+                        btn_cancel:SetText("Cancel");
+                        btn_cancel:SetPos(200, 145);
+                        btn_cancel:SetSize(170, 40);
+                        btn_cancel:SetTextColor(THEME.text);
+                        btn_cancel.Paint = function(me, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, me:IsHovered() and THEME.divider or THEME.bg_dark);
+                        end
+                        btn_cancel.DoClick = function()
+                            restore_frame:Close();
+                        end
                     end
             
                     btn_delete.DoClick = function()
@@ -2355,7 +2418,7 @@ if CLIENT then
                             
                                 btn_install.DoClick = function()
                                 local confirm_frame = vgui.Create("DFrame");
-                                confirm_frame:SetSize(350, 200);
+                                confirm_frame:SetSize(380, 280);
                                 confirm_frame:Center();
                                 confirm_frame:SetTitle("Confirm Installation");
                                 confirm_frame:MakePopup();
@@ -2368,27 +2431,58 @@ if CLIENT then
                                 lbl:SetText("Apply configuration: " .. cfg.name);
                                 lbl:SetFont("DermaDefaultBold");
                                 lbl:SetPos(10, 35);
-                                lbl:SetSize(330, 20);
+                                lbl:SetSize(360, 20);
                                 lbl:SetTextColor(THEME.text);
 
                                 local includes_text = "This will apply:\n\n" .. includes_text;
                                 local includes_lbl = vgui.Create("DLabel", confirm_frame);
                                 includes_lbl:SetText(includes_text);
                                 includes_lbl:SetPos(10, 65);
-                                includes_lbl:SetSize(330, 60);
+                                includes_lbl:SetSize(360, 60);
                                 includes_lbl:SetTextColor(Color(100, 200, 255));
                                 includes_lbl:SetWrap(true);
                                 includes_lbl:SetAutoStretchVertical(true);
+                                
+                                local mode_lbl = vgui.Create("DLabel", confirm_frame);
+                                mode_lbl:SetText("Select installation mode:");
+                                mode_lbl:SetPos(10, 140);
+                                mode_lbl:SetSize(360, 20);
+                                mode_lbl:SetTextColor(THEME.text);
+                                mode_lbl:SetFont("DermaDefaultBold");
+                                
+                                local radio_replace = vgui.Create("DCheckBoxLabel", confirm_frame);
+                                radio_replace:SetPos(20, 165);
+                                radio_replace:SetText("Replace Mode (Clear and overwrite all settings)");
+                                radio_replace:SetTextColor(THEME.text);
+                                radio_replace:SetValue(true);
+                                radio_replace:SizeToContents();
+                                
+                                local radio_merge = vgui.Create("DCheckBoxLabel", confirm_frame);
+                                radio_merge:SetPos(20, 190);
+                                radio_merge:SetText("Merge Mode (Add/update without removing existing)");
+                                radio_merge:SetTextColor(THEME.text);
+                                radio_merge:SetValue(false);
+                                radio_merge:SizeToContents();
+                                
+                                radio_replace.OnChange = function(s, val)
+                                    if val then radio_merge:SetValue(false); end
+                                end
+                                
+                                radio_merge.OnChange = function(s, val)
+                                    if val then radio_replace:SetValue(false); end
+                                end
 
                                 local btn_yes = vgui.Create("DButton", confirm_frame);
                                 btn_yes:SetText("Apply Config");
-                                btn_yes:SetPos(10, 140);
-                                btn_yes:SetSize(160, 40);
+                                btn_yes:SetPos(10, 225);
+                                btn_yes:SetSize(180, 40);
                                 btn_yes:SetTextColor(THEME.text);
                                 btn_yes.Paint = function(me, w, h)
                                     draw.RoundedBox(4, 0, 0, w, h, me:IsHovered() and Color(46, 139, 87) or Color(60, 179, 113));
                                 end
                                 btn_yes.DoClick = function()
+                                    local merge_mode = radio_merge:GetChecked();
+                                    
                                     if cfg.config then
                                         local compressed_data = util.Compress(util.TableToJSON(cfg.config));
                                         local compressed_size = string.len(compressed_data);
@@ -2398,13 +2492,14 @@ if CLIENT then
                                         net.Start("projectiles_restore_config_start");
                                         net.WriteUInt(total_chunks, 16);
                                         net.WriteUInt(compressed_size, 32);
+                                        net.WriteBool(merge_mode);
                                         net.SendToServer();
                                         
                                         local chunk_index = 0;
                                         local function SendNextChunk()
                                             chunk_index = chunk_index + 1;
                                             if chunk_index > total_chunks then
-                                                chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 255, 255), "Config '" .. cfg.name .. "' sent to server (" .. total_chunks .. " chunks)");
+                                                chat.AddText(THEME.accent, "[ProjectileMod] ", Color(255, 255, 255), "Config '" .. cfg.name .. "' installed (" .. total_chunks .. " chunks, " .. (merge_mode and "merge" or "replace") .. " mode)");
                                                 return;
                                             end
                                             
@@ -2428,8 +2523,8 @@ if CLIENT then
 
                                 local btn_no = vgui.Create("DButton", confirm_frame);
                                 btn_no:SetText("Cancel");
-                                btn_no:SetPos(180, 140);
-                                btn_no:SetSize(160, 40);
+                                btn_no:SetPos(200, 225);
+                                btn_no:SetSize(170, 40);
                                 btn_no:SetTextColor(THEME.text);
                                 btn_no.Paint = function(me, w, h)
                                     draw.RoundedBox(4, 0, 0, w, h, me:IsHovered() and THEME.divider or THEME.bg_dark);

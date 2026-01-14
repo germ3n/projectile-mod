@@ -393,8 +393,8 @@ if SERVER then
         print("reset weapon config: " .. class_name .. " to defaults");
     end, nil, "Reset a weapon to defaults");
 
-    local function send_weapon_config_chunked(ply)
-        if not IsValid(ply) then return; end
+    function send_weapon_config_chunked(ply, broadcast)
+        if not broadcast and not IsValid(ply) then return; end
         local config_data = {
             WEAPON_BLACKLIST,
             WEAPON_SPEEDS,
@@ -421,7 +421,11 @@ if SERVER then
         net.Start("projectile_weapon_config_sync_start");
         net.WriteUInt(total_chunks, 16);
         net.WriteUInt(compressed_size, 32);
-        net.Send(ply);
+        if broadcast then
+            net.Broadcast();
+        else
+            net.Send(ply);
+        end
 
         local chunk_idx = 0;
         local function send_next_chunk()
@@ -431,7 +435,7 @@ if SERVER then
                 return;
             end
 
-            if not IsValid(ply) then return; end
+            if not broadcast and not IsValid(ply) then return; end
 
             local start_pos = (chunk_idx - 1) * chunk_size + 1;
             local end_pos = math.min(start_pos + chunk_size - 1, compressed_size);
@@ -441,7 +445,11 @@ if SERVER then
             net.WriteUInt(chunk_idx, 16);
             net.WriteUInt(string.len(chunk), 32);
             net.WriteData(chunk, string.len(chunk));
-            net.Send(ply);
+            if broadcast then
+                net.Broadcast();
+            else
+                net.Send(ply);
+            end
 
             timer.Simple(0.1, send_next_chunk);
         end
@@ -485,9 +493,7 @@ if SERVER then
         CONFIG_TYPES["dropoff_end"] = WEAPON_DROPOFF_END;
         CONFIG_TYPES["dropoff_min_multiplier"] = WEAPON_DROPOFF_MIN_MULTIPLIER;
 
-        for k, v in player_iterator() do
-            send_weapon_config_chunked(v);
-        end
+        send_weapon_config_chunked(nil, true);
 
         print("reset all weapon configs");
     end, nil, "Reset all weapon configs");
@@ -622,7 +628,7 @@ if SERVER then
 
     hook.Add("PlayerInitialSpawn", "projectile_config_full_sync", function(ply)
         timer.Simple(1, function()
-            send_weapon_config_chunked(ply);
+            send_weapon_config_chunked(ply, false);
         end);
     end)
 

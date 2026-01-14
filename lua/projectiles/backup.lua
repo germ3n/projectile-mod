@@ -50,14 +50,26 @@ end
 
 if CLIENT then return; end
 
-function projectiles_restore_config(data)
+function projectiles_restore_config(data, merge)
     if data["surfaceprops"] then
-        table.Merge(SURFACE_PROPS_PENETRATION, data["surfaceprops"]);
+        if merge then
+            table.Merge(SURFACE_PROPS_PENETRATION, data["surfaceprops"]);
+        else
+            table.CopyFromTo(data["surfaceprops"], SURFACE_PROPS_PENETRATION);
+        end
         print("restored surfaceprops");
     end
 
     if data["weapon_config"] then
-        table.Merge(CONFIG_TYPES, data["weapon_config"]);
+        if merge then
+            for cfg_type, cfg_table in next, data["weapon_config"] do
+                table.Merge(CONFIG_TYPES[cfg_type], cfg_table);
+            end
+        else
+            for cfg_type, cfg_table in next, data["weapon_config"] do
+                table.CopyFromTo(cfg_table, CONFIG_TYPES[cfg_type]);
+            end
+        end
         print("restored weapon config");
     end
     
@@ -71,15 +83,34 @@ function projectiles_restore_config(data)
     end
 
     if data["ricochet_mat_chance_multipliers"] then
-        table.Merge(SURFACE_PROPS_RICOCHET_CHANCE_MULTIPLIERS, data["ricochet_mat_chance_multipliers"]);
+        if merge then
+            table.Merge(SURFACE_PROPS_RICOCHET_CHANCE_MULTIPLIERS, data["ricochet_mat_chance_multipliers"]);
+        else
+            table.CopyFromTo(data["ricochet_mat_chance_multipliers"], SURFACE_PROPS_RICOCHET_CHANCE_MULTIPLIERS);
+        end
 
         print("restored ricochet mat chance multipliers");
     end
 
     print("restored projectiles config");
 
-    --PrintTable(data);
-    --todo: add syncing to clients
+    if data["weapon_config"] then
+        send_weapon_config_chunked(nil, true);
+    end
+
+    if data["surfaceprops"] then
+        net.Start("projectile_surfaceprop_sync");
+        net.WriteTable(SURFACE_PROPS_PENETRATION);
+        net.Broadcast();
+    end
+
+    if data["ricochet_mat_chance_multipliers"] then
+        net.Start("projectile_ricochet_mat_chance_multipliers_sync");
+        net.WriteTable(SURFACE_PROPS_RICOCHET_CHANCE_MULTIPLIERS);
+        net.Broadcast();
+    end
+
+    print("sent projectiles config to all players");
 end
 
 local PROJECTILES_BACKUP_ALL = PROJECTILES_BACKUP_ALL;
@@ -152,15 +183,17 @@ net.Receive("projectiles_restore_config_start", function(len, ply)
     
     local total_chunks = net.ReadUInt(16);
     local compressed_size = net.ReadUInt(32);
+    local merge_mode = net.ReadBool();
     
     restore_buffers[ply] = {
         chunks = {},
         total_chunks = total_chunks,
         compressed_size = compressed_size,
-        received = 0
+        received = 0,
+        merge = merge_mode
     };
     
-    print(string.format("[ProjectileMod] Starting config restore by player %s: %d chunks, %d bytes compressed", ply:Nick(), total_chunks, compressed_size));
+    print(string.format("[ProjectileMod] Starting config restore by player %s: %d chunks, %d bytes compressed, mode: %s", ply:Nick(), total_chunks, compressed_size, merge_mode and "merge" or "replace"));
 end);
 
 net.Receive("projectiles_restore_config_chunk", function(len, ply)
@@ -200,7 +233,7 @@ net.Receive("projectiles_restore_config_chunk", function(len, ply)
         
         local data = util.JSONToTable(json_data);
         if data then
-            projectiles_restore_config(data);
+            projectiles_restore_config(data, buffer.merge);
             print("[ProjectileMod] Config restored successfully");
         else
             print("[ProjectileMod] Error: Failed to parse JSON data");
