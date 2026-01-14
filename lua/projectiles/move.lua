@@ -534,6 +534,10 @@ end
 
 local wind_seed = get_wind_seed();
 
+function get_current_wind_seed()
+    return wind_seed;
+end
+
 local function get_turbulence(val, offset)
     local n = 0;
     n = n + sin(val * 1.0 + offset) * 1.0;

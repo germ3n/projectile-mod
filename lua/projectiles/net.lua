@@ -236,7 +236,7 @@ if CLIENT then
     net.Receive("projectile", function()
         local is_debug = read_bool();
         local shooter = read_entity();
-        if not is_debug and not is_singleplayer and shooter == local_player() then return; end -- todo: probably better way to handle singleplayer sessions
+        if not projectiles["pro_disable_clientside_prediction"] and (not is_debug and not is_singleplayer and shooter == local_player()) then return; end -- todo: probably better way to handle singleplayer sessions
 
         local weapon = read_entity();
         local pos_x = read_float();

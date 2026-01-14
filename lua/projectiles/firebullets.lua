@@ -183,6 +183,8 @@ if SERVER then
             local final_dir = get_weapon_spread(inflictor, inflictor_class, dir, spread, idx * 1000);
             local final_speed = speed;
 
+            --print("SERVER, before", final_dir, final_speed, dir, data.Src, data.Damage);
+
             if projectiles["pro_inherit_shooter_velocity"] then -- todo: fix other turrets, currently player-spawned npc_turrt_floor for example will inherit the player's velocity, we only need to inherit the ground entity's velocity
                 local inherited_vel = is_gmod_turret and zero_vec or projectiles.shooter_velocities[shooter] or get_velocity(shooter);
                 if projectiles["pro_inherit_ground_entity_velocity"] then
@@ -198,6 +200,8 @@ if SERVER then
                     
                     final_dir = get_normalized(combined_vel);
                     final_speed = vec_length(combined_vel);
+
+                    --print("SERVER, after", final_dir, final_speed);
                 --end
             end
 
@@ -345,6 +349,7 @@ if CLIENT then
     hook.Add("EntityFireBullets", "projectiles", function(shooter, data)
         if not projectiles["pro_projectiles_enabled"] then return; end
         if projectiles.currently_using_firebullets then return; end
+        if projectiles["pro_disable_clientside_prediction"] then return false; end
         if not is_first_time_predicted() then return false; end
         local local_ply = local_player();
         if shooter ~= local_ply then
@@ -394,6 +399,8 @@ if CLIENT then
             local final_dir = get_weapon_spread(inflictor, inflictor_class, dir, spread, idx * 1000);
             local final_speed = speed;
 
+            --print("CLIENT, before", final_dir, final_speed, dir, data.Src, data.Damage);
+
             if projectiles["pro_inherit_shooter_velocity"] then
                 local inherited_vel = projectiles.shooter_velocities[shooter] or get_velocity(shooter);
                 if projectiles["pro_inherit_ground_entity_velocity"] then
@@ -410,6 +417,8 @@ if CLIENT then
                     
                     final_dir = get_normalized(combined_vel);
                     final_speed = vec_length(combined_vel);
+
+                    --print("CLIENT, after", final_dir, final_speed);
                 --else
                 --    print("not inheriting velocity", vec_dot(dir, get_normalized(inherited_vel)));
                 --end

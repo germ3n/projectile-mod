@@ -16,6 +16,7 @@ local get_weapon_tracer_colors = get_weapon_tracer_colors;
 local get_weapon_dropoff_start = get_weapon_dropoff_start;
 local get_weapon_dropoff_end = get_weapon_dropoff_end;
 local get_weapon_dropoff_min_multiplier = get_weapon_dropoff_min_multiplier;
+local get_current_wind_seed = get_current_wind_seed;
 local IsValid = IsValid;
 local vector = Vector;
 local angle = Angle;
@@ -354,6 +355,10 @@ if CLIENT then
 		
 		local ping = get_ping(local_player());
 		draw_simple_text(string_format("Ping: %dms", ping), "DermaDefault", x, y, color_white, TEXT_ALIGN_LEFT);
+		y = y + 15;
+		
+		local wind_seed = get_current_wind_seed();
+		draw_simple_text(string_format("Wind Seed: %d", wind_seed), "DermaDefault", x, y, color_white, TEXT_ALIGN_LEFT);
 	end);
 end
 

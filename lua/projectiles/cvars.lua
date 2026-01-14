@@ -69,4 +69,5 @@ PROJECTILES_CVARS = {
     ["pro_inherit_shooter_velocity_scale"] = { CreateConVar("pro_inherit_shooter_velocity_scale", "1.0", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Shooter velocity inheritance scale", 0.0, 2.0), "float" },
     ["pro_inherit_ground_entity_velocity"] = { CreateConVar("pro_inherit_ground_entity_velocity", "1", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Inherit ground entity velocity (moving platforms/vehicles)", 0, 1), "bool" },
     ["pro_auto_calculate_speed"] = { CreateConVar("pro_auto_calculate_speed", "0", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Automatically calculate speed from damage and ammo type", 0, 1), "bool" },
+    ["pro_disable_clientside_prediction"] = { CreateConVar("pro_disable_clientside_prediction", "0", bit.bor(FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_ARCHIVE), "Disable clientside prediction", 0, 1), "bool" },
 };

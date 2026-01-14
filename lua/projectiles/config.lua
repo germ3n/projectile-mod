@@ -262,6 +262,7 @@ if CLIENT then
                 { type = "bool", cvar = "pro_gravity_enabled", label = "Enable Gravity" },
                 { type = "bool", cvar = "pro_damage_scaling", label = "Enable Damage Scaling" },
                 { type = "bool", cvar = "pro_damage_dropoff_enabled", label = "Enable Damage Dropoff" },
+                { type = "bool", cvar = "pro_disable_clientside_prediction", label = "Disable Clientside FireBullets Prediction (for debug)" },
                 { type = "bool", cvar = "pro_use_firebullets", label = "Use FireBullets (might help resolve issues with some mods/missing decals)" },
                 { type = "bool", cvar = "pro_wind_enabled", label = "Enable Wind (Experimental)" },
                 { type = "bool", cvar = "pro_auto_calculate_speed", label = "Automatically Calculate Projectile Speed (Experimental)" },
