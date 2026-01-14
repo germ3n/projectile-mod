@@ -69,6 +69,7 @@ if SERVER then
         ["pro_render_wind_hud"] = true,
         ["pro_max_interp_distance"] = true,
         ["pro_max_interp_camera_distance"] = true,
+        ["pro_render_disable_tracers"] = true,
     };
 
     for cvar_name, cvar_data in next, PROJECTILES_CVARS do

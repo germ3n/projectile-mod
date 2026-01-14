@@ -284,6 +284,7 @@ if CLIENT then
             vars = {
                 { type = "header", label = "Render Settings" },
                 { type = "bool", cvar = "pro_render_enabled", label = "Enable Projectile Rendering", client = true },
+                { type = "bool", cvar = "pro_render_disable_tracers", label = "Disable Tracers", client = true },
                 { type = "bool", cvar = "pro_distance_scale_enabled", label = "Enable Distance Scaling", client = true },
                 { type = "bool", cvar = "pro_render_wind_hud", label = "Enable Wind HUD", client = true },
                 { type = "float", cvar = "pro_spawn_fade_distance", label = "Trail Fade Distance", min = 0.0, max = 1000.0, decimals = 0, client = true },
