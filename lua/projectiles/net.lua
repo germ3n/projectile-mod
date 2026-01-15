@@ -59,6 +59,7 @@ function create_new_projectile_store(entindex)
             old_pos = vector(),
             trace_filter = {NULL, NULL, NULL},
             tracer_colors = {zero_color, zero_color},
+            tracer_flags = 0,
             is_gmod_turret = false,
             spawn_pos = vector(),
             spawn_time = 0.0,
@@ -118,7 +119,7 @@ if SERVER then
         return band(h, 0x7FFFFFFF);
     end
 
-    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, is_gmod_turret, dropoff_start, dropoff_end, dropoff_min_multiplier, ammo_type, reliable, bullet_idx, is_debug)
+    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, tracer_flags, is_gmod_turret, dropoff_start, dropoff_end, dropoff_min_multiplier, ammo_type, reliable, bullet_idx, is_debug)
         --weapon.bullet_idx = (weapon.bullet_idx or 0) + 1;
 
         local time = cur_time();
@@ -148,6 +149,7 @@ if SERVER then
         write_uint(seed_counter, 32); -- random seed for ricochet
         write_color(tracer_colors[1]);
         write_color(tracer_colors[2]);
+        write_uint(tracer_flags, 8);
         write_bool(is_gmod_turret);
         write_float(dropoff_start);
         write_float(dropoff_end);
@@ -200,6 +202,7 @@ if SERVER then
         projectile.old_pos.z = pos.z;
         projectile.tracer_colors[1] = tracer_colors[1];
         projectile.tracer_colors[2] = tracer_colors[2];
+        projectile.tracer_flags = tracer_flags;
         projectile.is_gmod_turret = is_gmod_turret;
         projectile.spawn_pos.x = pos.x;
         projectile.spawn_pos.y = pos.y;
@@ -257,6 +260,7 @@ if CLIENT then
         local random_seed = read_uint(32);
         local tracer_color_core = read_color();
         local tracer_color_glow = read_color();
+        local tracer_flags = read_uint(8);
         local is_gmod_turret = read_bool();
         local dropoff_start = read_float();
         local dropoff_end = read_float();
@@ -300,6 +304,7 @@ if CLIENT then
         projectile.old_pos.z = pos_z;
         projectile.tracer_colors[1] = tracer_color_core;
         projectile.tracer_colors[2] = tracer_color_glow;
+        projectile.tracer_flags = tracer_flags;
         projectile.is_gmod_turret = is_gmod_turret;
         projectile.spawn_pos.x = pos_x;
         projectile.spawn_pos.y = pos_y;

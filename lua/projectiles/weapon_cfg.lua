@@ -93,6 +93,10 @@ local WEAPON_TRACER_COLORS = {
     ["func_tank"] = { Color(255, 255, 255, 255), Color(60, 120, 255, 185) },
 };
 
+local WEAPON_TRACER_FLAGS = {
+    ["default"] = 0,
+};
+
 local WEAPON_SPREAD_BIAS = {
     ["default"] = 1.0,
     ["weapon_shotgun"] = 0.0,
@@ -126,6 +130,7 @@ CONFIG_TYPES = {
     ["min_speed"] = WEAPON_MIN_SPEED,
     ["max_distance"] = WEAPON_MAX_DISTANCE,
     ["tracer_colors"] = WEAPON_TRACER_COLORS,
+    ["tracer_flags"] = WEAPON_TRACER_FLAGS,
     ["spread_bias"] = WEAPON_SPREAD_BIAS,
     ["dropoff_start"] = WEAPON_DROPOFF_START,
     ["dropoff_end"] = WEAPON_DROPOFF_END,
@@ -211,6 +216,10 @@ function get_weapon_tracer_colors(weapon, class_name)
     local colors = WEAPON_TRACER_COLORS[class_name] or WEAPON_TRACER_COLORS["default"];
 
     return { Color(colors[1].r, colors[1].g, colors[1].b, colors[1].a), Color(colors[2].r, colors[2].g, colors[2].b, colors[2].a) };
+end
+
+function get_weapon_tracer_flags(weapon, class_name)
+    return WEAPON_TRACER_FLAGS[class_name] or WEAPON_TRACER_FLAGS["default"];
 end
 
 function get_weapon_spread_bias(weapon, class_name)
@@ -337,6 +346,7 @@ if SERVER then
         ["min_speed"] = table.Copy(WEAPON_MIN_SPEED),
         ["max_distance"] = table.Copy(WEAPON_MAX_DISTANCE),
         ["tracer_colors"] = table.Copy(WEAPON_TRACER_COLORS),
+        ["tracer_flags"] = table.Copy(WEAPON_TRACER_FLAGS),
         ["spread_bias"] = table.Copy(WEAPON_SPREAD_BIAS),
         ["dropoff_start"] = table.Copy(WEAPON_DROPOFF_START),
         ["dropoff_end"] = table.Copy(WEAPON_DROPOFF_END),
@@ -411,6 +421,7 @@ if SERVER then
             WEAPON_DROPOFF_START,
             WEAPON_DROPOFF_END,
             WEAPON_DROPOFF_MIN_MULTIPLIER,
+            WEAPON_TRACER_FLAGS,
         };
 
         local compressed_data = util.Compress(util.TableToJSON(config_data));
@@ -473,6 +484,7 @@ if SERVER then
         table.CopyFromTo(ORIGINAL_TABLES["min_speed"], WEAPON_MIN_SPEED);
         table.CopyFromTo(ORIGINAL_TABLES["max_distance"], WEAPON_MAX_DISTANCE);
         table.CopyFromTo(ORIGINAL_TABLES["tracer_colors"], WEAPON_TRACER_COLORS);
+        table.CopyFromTo(ORIGINAL_TABLES["tracer_flags"], WEAPON_TRACER_FLAGS);
         table.CopyFromTo(ORIGINAL_TABLES["spread_bias"], WEAPON_SPREAD_BIAS);
         table.CopyFromTo(ORIGINAL_TABLES["dropoff_start"], WEAPON_DROPOFF_START);
         table.CopyFromTo(ORIGINAL_TABLES["dropoff_end"], WEAPON_DROPOFF_END);
@@ -488,6 +500,7 @@ if SERVER then
         CONFIG_TYPES["min_speed"] = WEAPON_MIN_SPEED;
         CONFIG_TYPES["max_distance"] = WEAPON_MAX_DISTANCE;
         CONFIG_TYPES["tracer_colors"] = WEAPON_TRACER_COLORS;
+        CONFIG_TYPES["tracer_flags"] = WEAPON_TRACER_FLAGS;
         CONFIG_TYPES["spread_bias"] = WEAPON_SPREAD_BIAS;
         CONFIG_TYPES["dropoff_start"] = WEAPON_DROPOFF_START;
         CONFIG_TYPES["dropoff_end"] = WEAPON_DROPOFF_END;
@@ -681,6 +694,11 @@ if SERVER then
                     net.Broadcast();
                 else
                     local val = net.ReadFloat();
+                    
+                    if cfg_type == "tracer_flags" then
+                        val = math.floor(val + 0.5);
+                    end
+                    
                     print("updated weapon config: " .. cfg_type .. " for " .. class_name .. " -> " .. val);
                     
                     target_table[class_name] = val;
@@ -762,7 +780,7 @@ if CLIENT then
 
             local config_data = util.JSONToTable(json_data);
 
-            if not config_data or #config_data ~= 15 then
+            if not config_data or #config_data < 15 then
                 print("weapon config sync: failed to parse config data");
 
                 return;
@@ -783,6 +801,10 @@ if CLIENT then
             WEAPON_DROPOFF_START = config_data[13];
             WEAPON_DROPOFF_END = config_data[14];
             WEAPON_DROPOFF_MIN_MULTIPLIER = config_data[15];
+            WEAPON_TRACER_FLAGS = config_data[16] or {};
+            if not WEAPON_TRACER_FLAGS["default"] then
+                WEAPON_TRACER_FLAGS["default"] = 0;
+            end
 
             CONFIG_TYPES["blacklist"] = WEAPON_BLACKLIST;
             CONFIG_TYPES["speed"] = WEAPON_SPEEDS;
@@ -795,6 +817,7 @@ if CLIENT then
             CONFIG_TYPES["min_speed"] = WEAPON_MIN_SPEED;
             CONFIG_TYPES["max_distance"] = WEAPON_MAX_DISTANCE;
             CONFIG_TYPES["tracer_colors"] = WEAPON_TRACER_COLORS;
+            CONFIG_TYPES["tracer_flags"] = WEAPON_TRACER_FLAGS;
             CONFIG_TYPES["spread_bias"] = WEAPON_SPREAD_BIAS;
             CONFIG_TYPES["dropoff_start"] = WEAPON_DROPOFF_START;
             CONFIG_TYPES["dropoff_end"] = WEAPON_DROPOFF_END;
@@ -829,6 +852,11 @@ if CLIENT then
                     LocalPlayer():ChatPrint("Updated " .. cfg_type .. " for " .. class_name .. " to " .. tostring(val));
                 else
                     local val = net.ReadFloat();
+                    
+                    if cfg_type == "tracer_flags" then
+                        val = math.floor(val + 0.5);
+                    end
+                    
                     target_table[class_name] = val;
                     LocalPlayer():ChatPrint("Updated " .. cfg_type .. " for " .. class_name .. " to " .. val);
                 end

@@ -70,6 +70,13 @@ function projectiles_restore_config(data, merge)
                 table.CopyFromTo(cfg_table, CONFIG_TYPES[cfg_type]);
             end
         end
+        
+        if not CONFIG_TYPES["tracer_flags"] then
+            CONFIG_TYPES["tracer_flags"] = { ["default"] = 0 };
+        elseif not CONFIG_TYPES["tracer_flags"]["default"] then
+            CONFIG_TYPES["tracer_flags"]["default"] = 0;
+        end
+        
         print("restored weapon config");
     end
     

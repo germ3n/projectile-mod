@@ -1338,7 +1338,7 @@ if CLIENT then
 
                     tracer_btn.DoClick = function()
                         local popup = vgui.Create("DFrame");
-                        popup:SetSize(480, 320);
+                        popup:SetSize(480, 420);
                         popup:Center();
                         popup:SetTitle("Tracer Colors - " .. (is_ammo_mode and ("Ammo: " .. selected_ammo) or class_name));
                         popup:MakePopup();
@@ -1349,6 +1349,8 @@ if CLIENT then
 
                         local color1 = table.Copy(current_tracer_colors[1]);
                         local color2 = table.Copy(current_tracer_colors[2]);
+                        
+                        local current_flags = CONFIG_TYPES["tracer_flags"][is_ammo_mode and "default" or class_name] or 0;
 
                         local left_panel = vgui.Create("DPanel", popup);
                         left_panel:Dock(LEFT);
@@ -1403,10 +1405,53 @@ if CLIENT then
                             color2 = col;
                         end
 
+                        local flags_panel = vgui.Create("DPanel", popup);
+                        flags_panel:Dock(BOTTOM);
+                        flags_panel:SetTall(70);
+                        flags_panel:DockMargin(5, 0, 5, 0);
+                        flags_panel.Paint = function(s, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, THEME.bg_lighter);
+                        end
+
+                        local flags_label = vgui.Create("DLabel", flags_panel);
+                        flags_label:SetText("Tracer Options");
+                        flags_label:Dock(TOP);
+                        flags_label:DockMargin(10, 5, 0, 5);
+                        flags_label:SetFont("DermaDefaultBold");
+                        flags_label:SetTextColor(THEME.text);
+
+                        local check_no_trail = vgui.Create("DCheckBoxLabel", flags_panel);
+                        check_no_trail:SetText("No Tracer Trail (sprites only)");
+                        check_no_trail:Dock(TOP);
+                        check_no_trail:DockMargin(10, 0, 0, 0);
+                        check_no_trail:SetTextColor(THEME.text);
+                        check_no_trail:SetChecked(bit.band(current_flags, 0x1) ~= 0);
+
+                        local check_disable_completely = vgui.Create("DCheckBoxLabel", flags_panel);
+                        check_disable_completely:SetText("Disable Completely (no visuals)");
+                        check_disable_completely:Dock(TOP);
+                        check_disable_completely:DockMargin(10, 0, 0, 5);
+                        check_disable_completely:SetTextColor(THEME.text);
+                        check_disable_completely:SetChecked(bit.band(current_flags, 0x2) ~= 0);
+
+                        check_no_trail.OnChange = function(s, val)
+                            local flags = 0;
+                            if val then flags = bit.bor(flags, 0x1); end
+                            if check_disable_completely:GetChecked() then flags = bit.bor(flags, 0x2); end
+                            current_flags = flags;
+                        end
+
+                        check_disable_completely.OnChange = function(s, val)
+                            local flags = 0;
+                            if check_no_trail:GetChecked() then flags = bit.bor(flags, 0x1); end
+                            if val then flags = bit.bor(flags, 0x2); end
+                            current_flags = flags;
+                        end
+
                         local bottom_panel = vgui.Create("DPanel", popup);
                         bottom_panel:Dock(BOTTOM);
                         bottom_panel:SetTall(40);
-                        bottom_panel:DockMargin(5, 0, 5, 5);
+                        bottom_panel:DockMargin(5, 5, 5, 5);
                         bottom_panel.Paint = function() end
 
                         local btn_save = vgui.Create("DButton", bottom_panel);
@@ -1435,6 +1480,13 @@ if CLIENT then
                                     RunConsoleCommand("pro_weapon_config_set_tracer_colors", wep_class, 
                                         color1.r, color1.g, color1.b, color1.a,
                                         color2.r, color2.g, color2.b, color2.a);
+                                    
+                                    net.Start("projectile_weapon_config_update");
+                                    net.WriteString("tracer_flags");
+                                    net.WriteString(wep_class);
+                                    net.WriteBool(false);
+                                    net.WriteFloat(current_flags);
+                                    net.SendToServer();
                                 end
 
                                 LocalPlayer():ChatPrint("Set tracer colors for " .. #ammo_weapons .. " weapons");
@@ -1442,6 +1494,13 @@ if CLIENT then
                                 RunConsoleCommand("pro_weapon_config_set_tracer_colors", class_name,
                                     color1.r, color1.g, color1.b, color1.a,
                                     color2.r, color2.g, color2.b, color2.a);
+                                
+                                net.Start("projectile_weapon_config_update");
+                                net.WriteString("tracer_flags");
+                                net.WriteString(class_name);
+                                net.WriteBool(false);
+                                net.WriteFloat(current_flags);
+                                net.SendToServer();
 
                                 LocalPlayer():ChatPrint("Set tracer colors for " .. class_name);
                             end

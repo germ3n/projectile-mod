@@ -13,6 +13,7 @@ local get_weapon_drop = get_weapon_drop;
 local get_weapon_min_speed = get_weapon_min_speed;
 local get_weapon_max_distance = get_weapon_max_distance;
 local get_weapon_tracer_colors = get_weapon_tracer_colors;
+local get_weapon_tracer_flags = get_weapon_tracer_flags;
 local get_weapon_dropoff_start = get_weapon_dropoff_start;
 local get_weapon_dropoff_end = get_weapon_dropoff_end;
 local get_weapon_dropoff_min_multiplier = get_weapon_dropoff_min_multiplier;
@@ -97,6 +98,7 @@ if SERVER then
 		local min_speed = get_weapon_min_speed(weapon, weapon_class);
 		local max_distance = get_weapon_max_distance(weapon, weapon_class);
 		local tracer_colors = get_weapon_tracer_colors(weapon, weapon_class);
+		local tracer_flags = get_weapon_tracer_flags(weapon, weapon_class);
 		local dropoff_start = get_weapon_dropoff_start(weapon, weapon_class);
 		local dropoff_end = get_weapon_dropoff_end(weapon, weapon_class);
 		local dropoff_min_multiplier = get_weapon_dropoff_min_multiplier(weapon, weapon_class);
@@ -153,6 +155,7 @@ if SERVER then
 				min_speed,
 				max_distance,
 				tracer_colors,
+				tracer_flags,
 				false,
 				dropoff_start,
 				dropoff_end,

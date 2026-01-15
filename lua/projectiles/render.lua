@@ -18,6 +18,7 @@ local draw_sprite = render.DrawSprite;
 local draw_beam = render.DrawBeam;
 local local_player = LocalPlayer;
 local eye_pos = EyePos;
+local band = bit.band;
 
 local mat_glow = Material("sprites/light_glow02_add");
 local mat_beam = Material("effects/laser1");
@@ -199,16 +200,22 @@ local function render_projectiles()
             local base_size = clamp(sqrt(p_data.damage) * 0.8, 4, 18);
             local final_size = base_size * scale_mod;
 
-            core_idx = core_idx + 1;
-            sprite_batch_core[core_idx] = {render_pos, final_size * 0.4, p_data.tracer_colors[1]};
-            
-            glow_idx = glow_idx + 1;
-            sprite_batch_glow[glow_idx] = {render_pos, final_size, p_data.tracer_colors[1]};
-            
-            outer_idx = outer_idx + 1;
-            sprite_batch_outer[outer_idx] = {render_pos, final_size * 1.8, p_data.tracer_colors[2]};
+            local tracer_flags = p_data.tracer_flags;
+            local disable_completely = band(tracer_flags, 0x2) ~= 0;
+            local no_tracer = band(tracer_flags, 0x1) ~= 0;
 
-            if not cached_render_disable_tracers then
+            if not disable_completely then
+                core_idx = core_idx + 1;
+                sprite_batch_core[core_idx] = {render_pos, final_size * 0.4, p_data.tracer_colors[1]};
+                
+                glow_idx = glow_idx + 1;
+                sprite_batch_glow[glow_idx] = {render_pos, final_size, p_data.tracer_colors[1]};
+                
+                outer_idx = outer_idx + 1;
+                sprite_batch_outer[outer_idx] = {render_pos, final_size * 1.8, p_data.tracer_colors[2]};
+            end
+
+            if not disable_completely and not no_tracer and not cached_render_disable_tracers then
                 local tail_start = render_pos;
                 local tail_end = p_data.old_pos or render_pos;
                 local tail_end_interpolated = tail_end;
