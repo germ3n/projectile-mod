@@ -522,13 +522,12 @@ local function hash_string(str)
     return h;
 end
 
+local cv_wind_seed_random = CreateConVar("pro_wind_seed_random", "0", bit.bor(FCVAR_REPLICATED), "Random wind seed component", 0, 2147483647);
 local map_hash = hash_string(game.GetMap());
-if SERVER then
-    PROJECTILES_CVARS["pro_wind_seed_random"][1]:SetInt(math.random(1, 2147483647));
-end
+if SERVER then cv_wind_seed_random:SetInt(math.random(1, 2147483647)); end
 
 local function get_wind_seed()
-    local random_seed = PROJECTILES_CVARS["pro_wind_seed_random"][1]:GetInt();--projectiles["pro_wind_seed_random"];
+    local random_seed = cv_wind_seed_random:GetInt();
     return bxor(map_hash, random_seed);
 end
 

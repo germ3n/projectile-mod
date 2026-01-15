@@ -75,7 +75,7 @@ function projectiles_restore_config(data, merge)
     
     if data["cvars"] then
         for cvar, value in next, data["cvars"] do
-            if not PROJECTILES_CVARS[cvar] then continue; end
+            if not PROJECTILES_CVARS[cvar] or cvar == "pro_wind_seed_random" then continue; end
             RunConsoleCommand(cvar, value);
         end
 
