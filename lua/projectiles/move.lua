@@ -541,12 +541,12 @@ if SERVER then
     util.AddNetworkString("projectiles_wind_seed_sync");
     
     hook.Add("PlayerInitialSpawn", "projectiles_wind_seed_sync", function(ply)
-        timer.Simple(1, function()
-            if not _is_valid(ply) then return; end
+        --timer.Simple(1, function()
+            --if not _is_valid(ply) then return; end
             net.Start("projectiles_wind_seed_sync");
             net.WriteInt(wind_seed, 32);
             net.Send(ply);
-        end);
+        --end);
     end);
 else
     wind_seed = 0;
