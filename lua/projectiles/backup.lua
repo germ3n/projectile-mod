@@ -172,9 +172,9 @@ concommand.Add("pro_config_restore_json", function(ply, cmd, args)
         print("backup file not found");
         return;
     end
-    projectiles_restore_config(util.JSONToTable(backup));
-    print("backup restored from " .. file_name);
-end, nil, "Restore projectiles config from a file");
+    projectiles_restore_config(util.JSONToTable(backup), args[2] == "merge");
+    print("backup restored from " .. file_name .. (args[2] == "merge" and " in merge mode" or " in replace mode"));
+end, nil, "Restore projectiles config from a file (replace or merge mode)");
 
 local restore_buffers = {};
 
