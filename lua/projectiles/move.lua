@@ -524,17 +524,41 @@ end
 
 local cv_wind_seed_random = CreateConVar("pro_wind_seed_random", "0", bit.bor(FCVAR_REPLICATED), "Random wind seed component", 0, 2147483647);
 local map_hash = hash_string(game.GetMap());
-if SERVER then cv_wind_seed_random:SetInt(math.random(1, 2147483647)); end
 
 local function get_wind_seed()
     local random_seed = cv_wind_seed_random:GetInt();
     return bxor(map_hash, random_seed);
 end
 
-local wind_seed = get_wind_seed();
+local wind_seed;
+local wind_seed_synced = false;
+
+if SERVER then
+    cv_wind_seed_random:SetInt(math.random(1, 2147483647));
+    wind_seed = get_wind_seed();
+    wind_seed_synced = true;
+    
+    util.AddNetworkString("projectiles_wind_seed_sync");
+    
+    hook.Add("PlayerInitialSpawn", "projectiles_wind_seed_sync", function(ply)
+        timer.Simple(1, function()
+            if not _is_valid(ply) then return; end
+            net.Start("projectiles_wind_seed_sync");
+            net.WriteInt(wind_seed, 32);
+            net.Send(ply);
+        end);
+    end);
+else
+    wind_seed = 0;
+    
+    net.Receive("projectiles_wind_seed_sync", function()
+        wind_seed = net.ReadInt(32);
+        wind_seed_synced = true;
+    end);
+end
 
 function get_current_wind_seed()
-    return wind_seed;
+    return wind_seed_synced and wind_seed or 0;
 end
 
 local function get_turbulence(val, offset)
@@ -621,6 +645,7 @@ end
 local wind_initialized = false;
 local function initialize_wind()
     if wind_initialized then return; end
+    if not wind_seed_synced then return; end
     wind_initialized = true;
     
     local base_strength = projectiles["pro_wind_strength"];
