@@ -52,15 +52,25 @@ if CLIENT then return; end
 
 function projectiles_restore_config(data, merge)
     if data["surfaceprops"] then
+        if not merge then
+            surfaceprops_clear_db();
+        end
+
         if merge then
             table.Merge(SURFACE_PROPS_PENETRATION, data["surfaceprops"]);
         else
             table.CopyFromTo(data["surfaceprops"], SURFACE_PROPS_PENETRATION);
         end
+
+        surfaceprops_save_all_to_db();
         print("restored surfaceprops");
     end
 
     if data["weapon_config"] then
+        if not merge then
+            weapon_cfg_clear_db();
+        end
+
         if merge then
             for cfg_type, cfg_table in next, data["weapon_config"] do
                 table.Merge(CONFIG_TYPES[cfg_type], cfg_table);
@@ -76,7 +86,8 @@ function projectiles_restore_config(data, merge)
         elseif not CONFIG_TYPES["tracer_flags"]["default"] then
             CONFIG_TYPES["tracer_flags"]["default"] = 0;
         end
-        
+
+        weapon_cfg_save_all_to_db();
         print("restored weapon config");
     end
     
@@ -90,12 +101,17 @@ function projectiles_restore_config(data, merge)
     end
 
     if data["ricochet_mat_chance_multipliers"] then
+        if not merge then
+            ricochet_clear_db();
+        end
+
         if merge then
             table.Merge(SURFACE_PROPS_RICOCHET_CHANCE_MULTIPLIERS, data["ricochet_mat_chance_multipliers"]);
         else
             table.CopyFromTo(data["ricochet_mat_chance_multipliers"], SURFACE_PROPS_RICOCHET_CHANCE_MULTIPLIERS);
         end
 
+        ricochet_save_all_to_db();
         print("restored ricochet mat chance multipliers");
     end
 

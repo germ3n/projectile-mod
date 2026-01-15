@@ -345,6 +345,19 @@ if SERVER then
         end
     end
 
+    function surfaceprops_clear_db()
+        sql.Query("DELETE FROM surface_props_data");
+        print("cleared surface_props_data table");
+    end
+
+    function surfaceprops_save_all_to_db()
+        for key, val in next, SURFACE_PROPS_PENETRATION do
+            save_surface_prop_to_db(key, val);
+        end
+
+        print("saved all surface props to database");
+    end
+
     hook.Add("PlayerInitialSpawn", "projectile_surfaceprop_full_sync", function(ply)
         timer.Simple(1, function()
             if not IsValid(ply) then return end

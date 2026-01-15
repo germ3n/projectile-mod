@@ -373,6 +373,40 @@ if SERVER then
         end
     end
 
+    function weapon_cfg_clear_db()
+        sql.Query("DELETE FROM projectile_weapon_data");
+        print("cleared projectile_weapon_data table");
+    end
+
+    function weapon_cfg_save_all_to_db()
+        for cfg_type, cfg_table in next, CONFIG_TYPES do
+            for class_name, val in next, cfg_table do
+                if cfg_type == "tracer_colors" then
+                    local color_str = string.format("%d,%d,%d,%d|%d,%d,%d,%d", val[1].r, val[1].g, val[1].b, val[1].a, val[2].r, val[2].g, val[2].b, val[2].a);
+                    local key = "tracer_colors|" .. class_name;
+                    local safe_key = sql.SQLStr(key);
+                    local safe_val = sql.SQLStr(color_str);
+                    local query = "REPLACE INTO projectile_weapon_data (key, value) VALUES(" .. safe_key .. ", " .. safe_val .. ")";
+                    local res = sql.Query(query);
+                    
+                    if res == false then
+                        print("sql error saving tracer colors: " .. key .. ": " .. sql.LastError());
+                    end
+                else
+                    local is_bool = type(val) == "boolean";
+                    
+                    if is_bool then
+                        save_config_to_db(cfg_type, class_name, val and 1 or 0);
+                    else
+                        save_config_to_db(cfg_type, class_name, val);
+                    end
+                end
+            end
+        end
+
+        print("saved all weapon configs to database");
+    end
+
     concommand.Add("pro_weapon_config_reset_single", function(ply, cmd, args)
         if ply ~= NULL and (not is_superadmin(ply)) then return; end
         local cfg_type = args[1];

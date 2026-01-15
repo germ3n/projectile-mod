@@ -131,6 +131,19 @@ if SERVER then
         broadcast();
     end
 
+    function ricochet_clear_db()
+        sql.Query("DELETE FROM ricochet_mat_chance_multipliers");
+        print("cleared ricochet_mat_chance_multipliers table");
+    end
+
+    function ricochet_save_all_to_db()
+        for surface_prop, chance in next, RICOCHET_MAT_CHANCE_MULTIPLIERS do
+            save_ricochet_mat_multiplier_to_db(surface_prop, chance);
+        end
+
+        print("saved all ricochet mat chance multipliers to database");
+    end
+
     hook.Add("PlayerInitialSpawn", "ProjectilesRicochetMatChanceMultipliers", function(player)
         timer.Simple(1, function()
             if not IsValid(player) then return; end
