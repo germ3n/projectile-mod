@@ -86,7 +86,7 @@ function projectiles_restore_config(data, merge)
         elseif not CONFIG_TYPES["tracer_flags"]["default"] then
             CONFIG_TYPES["tracer_flags"]["default"] = 0;
         end
-
+        
         weapon_cfg_save_all_to_db();
         print("restored weapon config");
     end

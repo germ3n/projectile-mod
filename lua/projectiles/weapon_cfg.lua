@@ -382,15 +382,17 @@ if SERVER then
         for cfg_type, cfg_table in next, CONFIG_TYPES do
             for class_name, val in next, cfg_table do
                 if cfg_type == "tracer_colors" then
-                    local color_str = string.format("%d,%d,%d,%d|%d,%d,%d,%d", val[1].r, val[1].g, val[1].b, val[1].a, val[2].r, val[2].g, val[2].b, val[2].a);
-                    local key = "tracer_colors|" .. class_name;
-                    local safe_key = sql.SQLStr(key);
-                    local safe_val = sql.SQLStr(color_str);
-                    local query = "REPLACE INTO projectile_weapon_data (key, value) VALUES(" .. safe_key .. ", " .. safe_val .. ")";
-                    local res = sql.Query(query);
-                    
-                    if res == false then
-                        print("sql error saving tracer colors: " .. key .. ": " .. sql.LastError());
+                    if type(val) == "table" and val[1] and val[2] then
+                        local color_str = string.format("%d,%d,%d,%d|%d,%d,%d,%d", val[1].r, val[1].g, val[1].b, val[1].a, val[2].r, val[2].g, val[2].b, val[2].a);
+                        local key = "tracer_colors|" .. class_name;
+                        local safe_key = sql.SQLStr(key);
+                        local safe_val = sql.SQLStr(color_str);
+                        local query = "REPLACE INTO projectile_weapon_data (key, value) VALUES(" .. safe_key .. ", " .. safe_val .. ")";
+                        local res = sql.Query(query);
+                        
+                        if res == false then
+                            print("sql error saving tracer colors: " .. key .. ": " .. sql.LastError());
+                        end
                     end
                 else
                     local is_bool = type(val) == "boolean";
