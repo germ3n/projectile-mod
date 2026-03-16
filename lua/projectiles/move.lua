@@ -94,6 +94,10 @@ local vec_len = vector_meta.Length;
 local vec_mul = vector_meta.Mul;
 local vec_add = vector_meta.Add;
 local to_screen = vector_meta.ToScreen;
+local cross = vector_meta.Cross;
+local len_sqr = vector_meta.LengthSqr;
+local vec_sqrt = math.sqrt;
+
 
 local BREAKABLE_CLASSES = {
     ["func_breakable_surf"] = true,
@@ -214,7 +218,7 @@ local function calculate_damage_dropoff(projectile_data)
         return false;
     end
 
-    if projectile_data.distance_traveled < projectile_data.dropoff_start then
+    if projectile_data.distance_traveled < projectile_data.dropoff_start and not projectiles["pro_damage_speed_dropoff_enabled"] then
         return false;
     end
     
@@ -228,6 +232,10 @@ local function calculate_damage_dropoff(projectile_data)
         multiplier = 1.0 - (progress * (1.0 - projectile_data.dropoff_min_multiplier));
     end
     
+    if projectiles["pro_damage_speed_dropoff_enabled"] then
+        multiplier =  projectile_data.speed / projectile_data.speed_initial;
+    end
+
     local target_damage = projectile_data.damage_initial * multiplier;
     
     if target_damage < projectile_data.damage then
@@ -238,19 +246,128 @@ local function calculate_damage_dropoff(projectile_data)
 end
 
 local function apply_drag(projectile_data)
+    
+    local speed = projectile_data.speed
+    local dir = projectile_data.dir
+    
+    local v_rel = dir * speed - (projectiles["pro_wind_enabled"] and wind_vector or vector(0,0,0))
+    local v_rel_speed = v_rel:Length()
+    local in_water = band(point_contents(projectile_data.pos), CONTENTS_WATER_AND_SLIME) ~= 0
+    
     if projectiles["pro_drag_enabled"] then
-        local drag_factor = projectile_data.drag * tick_interval * projectiles["pro_drag_multiplier"];
-        if band(point_contents(projectile_data.pos), CONTENTS_WATER_AND_SLIME) ~= 0 then
-            drag_factor = drag_factor * projectiles["pro_drag_water_multiplier"];
+        
+        local drag_factor = 0
+        
+        if projectiles["pro_drag_quadratic"] then
+            local REF_CD_BY_SHAPE = {
+                [1] = 0.2629,   -- G1
+                [2] = 0.1198,   -- G7
+                [3] = 0.4662    -- GS
+            }
+            local ref_cd = REF_CD_BY_SHAPE[projectile_data.shape] or 1
+            local BC = 0.2629 / (projectile_data.coefficient * 703.07)
+            local rho = 1.225
+            
+            -- Use relative air speed in air, ground speed in water
+            local speed_for_drag = in_water and speed or v_rel_speed
+            drag_factor = 0.0254 * BC  * (rho) / 2 * speed_for_drag * tick_interval * projectiles["pro_drag_multiplier"] * 0.75 -- 0.75 because hammer units or smth
+            
+            if in_water then
+                drag_factor = drag_factor * projectiles["pro_drag_water_multiplier"]
+            end
+            
+            if projectiles["pro_ballistic_tables"] then
+                local sound_speed = projectiles["pro_sound_speed"] or (343.0 / 0.0254)
+                local mach = v_rel_speed / sound_speed
+                
+                local shape = projectile_data.shape or 1
+                local selected_table = projectiles.DRAG_TABLES[shape] or DRAG_TABLES[1]
+                
+                local cd_mult = projectiles.interpolate_mach(selected_table, mach) / ref_cd 
+                drag_factor = drag_factor * cd_mult
+                
+                -- Transonic wobble
+                local function seeded_random(seed, min_val, max_val)
+                    seed = band(seed, 0xFFFFFFFF)
+                    seed = bxor(seed, band(seed / 8192, 0xFFFFFFFF))
+                    seed = band(seed * 48271, 0xFFFFFFFF)
+                    seed = bxor(seed, band(seed / 131072, 0xFFFFFFFF))
+                    seed = band(seed, 0x7FFFFFFF)
+                    return min_val + (seed / 2147483647.0) * (max_val - min_val)
+                end
+
+                if (mach > 0.8 and mach < 1.2 and projectile_data.shape ~= 3) or in_water then
+                    local wobble_strength = projectiles["pro_transonic_turbulence_strenght"] * (cd_mult-1) * (1.0 - math.abs(mach - 1.0) / 0.2)
+                    local perturb_x = seeded_random(projectile_data.random_seed + 450, -0.5, 0.5) * wobble_strength
+                    local perturb_y = seeded_random(projectile_data.random_seed + 456, -0.5, 0.5) * wobble_strength
+                    local perturb_z = seeded_random(projectile_data.random_seed + 454, -0.5, 0.5) * wobble_strength
+                    
+                    dir.x = dir.x + perturb_x * 0.001
+                    dir.y = dir.y + perturb_y * 0.001
+                    dir.z = dir.z + perturb_z * 0.001
+                    dir:Normalize()
+                end
+                
+                --print("  └─ Mach: " .. string.format("%.3f", mach) .. "  |  Cd mult: " .. string.format("%.3f", cd_mult) .. "  |  Drag: " .. string.format("%.3f", drag_factor * v_rel_speed * 0.0254))
+            end    
+
+            -- Apply drag
+            if in_water then
+                speed = speed / (1 + drag_factor)  --stable in water
+            else
+                -- Realistic wind drag in air: deflect dir slightly
+
+                    local drag_dir = v_rel:GetNormalized()
+                    local drag_amount = drag_factor * v_rel_speed
+                    
+                    -- Deflect direction (small vector adjustment)
+                    local deflection = drag_dir * drag_amount
+                    local new_vel = dir * speed - deflection
+                    
+                    -- Update dir and speed from new direction
+                    local new_speed = new_vel:Length()
+                        dir = new_vel:GetNormalized()
+                        speed = new_speed
+            end
+            
+        else  -- Linear drag
+            drag_factor = projectile_data.drag * tick_interval * projectiles["pro_drag_multiplier"]
+            
+            if in_water then
+                drag_factor = drag_factor * projectiles["pro_drag_water_multiplier"]^0.5
+            end
+            
+            if in_water then 
+                speed = speed - speed * drag_factor
+            else
+                -- Realistic linear in air
+                    local drag_accel = v_rel:GetNormalized() * (v_rel_speed * drag_factor)
+                    local new_vel = dir * speed - drag_accel
+                    local new_speed = new_vel:Length()
+                    if new_speed > 0.001 then
+                        dir = new_vel:GetNormalized()
+                        speed = new_speed
+                    end
+            end
         end
-
-        projectile_data.speed = projectile_data.speed - projectile_data.speed * drag_factor;
     end
+    
 
-    projectile_data.old_vel.x = projectile_data.vel.x;
-    projectile_data.old_vel.y = projectile_data.vel.y;
-    projectile_data.old_vel.z = projectile_data.vel.z;
+    projectile_data.speed = speed
+    projectile_data.dir = dir
+    
+    projectile_data.old_vel.x = projectile_data.vel.x
+    projectile_data.old_vel.y = projectile_data.vel.y
+    projectile_data.old_vel.z = projectile_data.vel.z
+    
+    projectile_data.vel = dir * speed
+    
+
+--print("  └─ Speed m/s: " .. string.format("%.3f", projectile_data.speed*0.0254) .. "  |  Distance m: " .. string.format("%.3f", projectile_data.distance_traveled*0.0254))
+--print("  └─ Pen. power : " .. string.format("%.3f", projectile_data.penetration_power) .. "  └─ Damage : " .. string.format("%.3f", projectile_data.damage) .. "  |  Damage %: " .. string.format("%.3f", (projectile_data.damage / projectile_data.damage_initial)))
 end
+
+
 
 local function apply_damage_info(projectile_data, enter_trace, final_damage, shooter, hit_entity)
     local dmg_info = damage_info();
@@ -273,6 +390,8 @@ local function apply_damage_info(projectile_data, enter_trace, final_damage, sho
 end
 
 local function move_projectile(shooter, projectile_data)
+    projectile_data.penetration_power = projectile_data.penetration_power_initial * (projectile_data.speed / projectile_data.speed_initial)^1.43;
+
     if projectile_data.hit or projectile_data.penetration_count <= 0 or projectile_data.damage < 1.0 or projectile_data.distance_traveled >= projectile_data.max_distance then 
         return true;
     end
@@ -300,8 +419,10 @@ local function move_projectile(shooter, projectile_data)
     end
 
     if projectiles["pro_wind_enabled"] then
-        current_velocity.x = current_velocity.x + wind_vector.x * tick_interval;
-        current_velocity.y = current_velocity.y + wind_vector.y * tick_interval;
+        --current_velocity.x = current_velocity.x + wind_vector.x * tick_interval;
+        --current_velocity.y = current_velocity.y + wind_vector.y * tick_interval;
+
+        projectile_data.wind = wind_vector --for use in render
     end
 
     if projectiles["pro_gravity_enabled"] or projectiles["pro_wind_enabled"] then
@@ -383,7 +504,7 @@ local function move_projectile(shooter, projectile_data)
                         fire_bullets_config.Attacker = shooter;
                         fire_bullets_config.Inflictor = _is_valid(projectile_data.weapon) and projectile_data.weapon or shooter;
                         fire_bullets_config.Damage = final_damage;
-                        fire_bullets_config.Force = final_damage * projectiles["pro_damage_force_multiplier"];
+                        fire_bullets_config.Force = current_hit_damage * projectiles["pro_damage_force_multiplier"]; --headshots dont increase force
                         fire_bullets_config.Distance = 2;
                         fire_bullets_config.Dir = projectile_data.dir;
                         fire_bullets_config.Src = enter_trace.HitPos - projectile_data.dir;
@@ -418,7 +539,8 @@ local function move_projectile(shooter, projectile_data)
                 fire_bullets_config.Attacker = shooter;
                 fire_bullets_config.Inflictor = _is_valid(projectile_data.weapon) and projectile_data.weapon or shooter;
                 fire_bullets_config.Damage = final_damage;
-                fire_bullets_config.Force = final_damage * projectiles["pro_damage_force_multiplier"];
+                fire_bullets_config.Force = current_hit_damage * projectiles["pro_damage_force_multiplier"];
+                --fire_bullets_config.Force = projectile_data.speed * 0.0254 * projectile_data.mass * 0.001 * projectiles["pro_damage_force_multiplier"] * 10;
                 fire_bullets_config.Distance = 2;
                 fire_bullets_config.Dir = projectile_data.dir;
                 fire_bullets_config.Src = enter_trace.HitPos - projectile_data.dir;
@@ -890,8 +1012,9 @@ if CLIENT then
             draw_poly(cur_poly)
         end
     
-        simple_text(
-            string_format("Wind: %.1fu/s", speed), 
+        if projectiles["pro_speed_unit"] == 1  then
+            simple_text(string_format("Wind: %.1fmph", speed*0.0254*2.237136), 
+            
             "DermaDefaultBold",
             cx, 
             cy + arrow_size + 10, 
@@ -899,6 +1022,17 @@ if CLIENT then
             TEXT_ALIGN_CENTER, 
             TEXT_ALIGN_TOP
         );
+        else
+            simple_text(string_format("Wind: %.1fm/s", speed*0.0254), 
+                
+            "DermaDefaultBold",
+            cx, 
+            cy + arrow_size + 10, 
+            color_white, 
+            TEXT_ALIGN_CENTER, 
+            TEXT_ALIGN_TOP
+        );
+        end
     end);
 end
 

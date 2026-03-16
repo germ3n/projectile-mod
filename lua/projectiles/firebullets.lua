@@ -9,6 +9,7 @@ local rand = math.Rand;
 local abs = math.abs;
 local shared_random = util.SharedRandom;
 local band = bit.band;
+local cv_sv_gravity = GetConVar("sv_gravity");
 
 projectiles.shooter_velocities = projectiles.shooter_velocities or {};
 
@@ -71,9 +72,13 @@ local get_weapon_damage = get_weapon_damage;
 local get_weapon_spread = get_weapon_spread;
 local get_weapon_penetration_power = get_weapon_penetration_power;
 local get_weapon_penetration_count = get_weapon_penetration_count;
+local get_weapon_shape = get_weapon_shape;
+local get_weapon_coefficient = get_weapon_coefficient;
 local get_weapon_drag = get_weapon_drag;
 local get_weapon_mass = get_weapon_mass;
+local get_weapon_caliber = get_weapon_caliber;
 local get_weapon_drop = get_weapon_drop;
+local get_weapon_zero_range = get_weapon_zero_range;
 local get_weapon_min_speed = get_weapon_min_speed;
 local get_weapon_max_distance = get_weapon_max_distance;
 local get_weapon_tracer_colors = get_weapon_tracer_colors;
@@ -82,6 +87,53 @@ local get_weapon_dropoff_start = get_weapon_dropoff_start;
 local get_weapon_dropoff_end = get_weapon_dropoff_end;
 local get_weapon_dropoff_min_multiplier = get_weapon_dropoff_min_multiplier;
 local is_weapon_blacklisted = is_weapon_blacklisted;
+
+local sight_height = 0
+if not projectiles["pro_use_player_offset"] then
+    sight_height = 0
+else
+    sight_height = projectiles["pro_sight_height"];
+end
+
+local PLAYER_MUZZLE_OFFSET = Vector(0, 0, -sight_height)
+
+local function get_muzzle_pos(shooter, weapon, fallback_src)
+    if not IsValid(shooter) then return fallback_src end
+    if not IsValid(weapon) then return fallback_src end
+
+
+    if shooter:IsPlayer() then
+        local eye_ang = shooter:EyeAngles()
+        local forward = eye_ang:Forward()
+        local right   = eye_ang:Right()
+        local up      = eye_ang:Up()
+
+        local offset = 
+            forward * PLAYER_MUZZLE_OFFSET.x +
+            right   * PLAYER_MUZZLE_OFFSET.y +
+            up      * PLAYER_MUZZLE_OFFSET.z
+
+        return shooter:GetShootPos() + offset
+    end
+
+    local att = weapon:LookupAttachment("muzzle")
+        or weapon:LookupAttachment("Muzzle")
+        or weapon:LookupAttachment("muzzle1")
+        or weapon:LookupAttachment("muzzle_silencer")
+        or weapon:LookupAttachment("barrel")
+        or weapon:LookupAttachment("muzzle_flash")
+        or weapon:LookupAttachment("muzzleflash")
+        or weapon:LookupAttachment("1")
+
+    if att and att > 0 then
+        local data = weapon:GetAttachment(att)
+        if data and data.Pos then
+            return data.Pos
+        end
+    end
+
+    return fallback_src
+end
 
 if SERVER then
     local player_meta = FindMetaTable("Player");
@@ -117,6 +169,7 @@ if SERVER then
         local inflictor;
         local is_gmod_turret = false;
         local is_npc = shooter:IsNPC();
+        local is_nextbot = shooter:IsNextBot();
         local is_player = shooter:IsPlayer();
         local is_weapon = shooter:IsWeapon();
         local lean_amount = get_lean_amount and is_player and get_lean_amount(shooter) or 0.0;
@@ -124,6 +177,8 @@ if SERVER then
             local shooter_class = get_class(shooter);
             if is_player then--if is_player(shooter) then
                 inflictor = player_get_active_weapon(shooter);
+            elseif is_nextbot then
+                inflictor = shooter:GetActiveWeapon();
             elseif is_npc then--elseif is_npc(shooter) then
                 if not TURRET_AND_MOUNTED_WEAPONS_WHITELIST[shooter_class] then
                     inflictor = npc_get_active_weapon(shooter);
@@ -155,11 +210,19 @@ if SERVER then
             return;
         end
 
-        local damage = get_weapon_damage(inflictor, inflictor_class, data.Damage);
+        local damage = get_weapon_damage(inflictor, inflictor_class, data.Damage, data.AmmoType);
         local speed = get_weapon_speed(inflictor, inflictor_class, damage, data.AmmoType);
         damage = damage * projectiles["pro_weapon_damage_scale"];
         speed = speed * projectiles["pro_speed_scale"];
         local src = calculate_lean_pos and calculate_lean_pos(data.Src, angle(data.Dir), lean_amount, shooter) or data.Src;
+
+
+        if projectiles["pro_use_player_offset"] and is_player then
+            src = get_muzzle_pos(shooter, inflictor, src)
+        end
+        if is_npc or is_nextbot then
+        src = get_muzzle_pos(shooter, inflictor, src)
+        end
         
         if is_npc then
             local npc_offset = projectiles["pro_npc_shootpos_forward"];
@@ -167,11 +230,15 @@ if SERVER then
                 src = src + data.Dir * npc_offset;
             end
         end
-        local penetration_power = get_weapon_penetration_power(inflictor, inflictor_class) * projectiles["pro_penetration_power_scale"];
+        local penetration_power = get_weapon_penetration_power(inflictor, inflictor_class, speed, data.AmmoType) * projectiles["pro_penetration_power_scale"];
         local penetration_count = get_weapon_penetration_count(inflictor, inflictor_class);
-        local drag = get_weapon_drag(inflictor, inflictor_class);
-        local mass = get_weapon_mass(inflictor, inflictor_class);
+        local shape = get_weapon_shape(inflictor, inflictor_class, data.AmmoType);
+        local coefficient = get_weapon_coefficient(inflictor, inflictor_class, data.AmmoType);
+        local drag = get_weapon_drag(inflictor, inflictor_class, data.AmmoType);
+        local mass = get_weapon_mass(inflictor, inflictor_class, data.AmmoType);
+        local caliber = get_weapon_caliber(inflictor, inflictor_class, data.AmmoType);
         local drop = get_weapon_drop(inflictor, inflictor_class);
+        local zero_range = get_weapon_zero_range(inflictor, inflictor_class, speed);
         local min_speed = get_weapon_min_speed(inflictor, inflictor_class);
         local max_distance = get_weapon_max_distance(inflictor, inflictor_class);
         local tracer_colors = get_weapon_tracer_colors(inflictor, inflictor_class);
@@ -180,10 +247,146 @@ if SERVER then
         local dropoff_end = get_weapon_dropoff_end(inflictor, inflictor_class);
         local dropoff_min_multiplier = get_weapon_dropoff_min_multiplier(inflictor, inflictor_class);
         local dir = data.Dir;
+
+    local function get_zero_compensation(dir, speed, zero_range, sight_height, drop)
+        if zero_range <= 0 then return zero_vec end
+        
+        local gravity = cv_sv_gravity:GetFloat() * drop * projectiles["pro_gravity_multiplier"]
+        
+        local t = zero_range / speed
+
+        if projectiles["pro_drag_enabled"] then 
+            t = CalculateFlightTime(speed, drag, coefficient, zero_range)
+        end
+        
+        local drop_units = 0.5 * gravity * t^2
+
+        local compensation_rad = (drop_units + sight_height) / (zero_range)
+        local up_comp = dir:Angle():Up() * compensation_rad
+        return up_comp
+    end
+
+    --target leading
+    local function lead_target_ballistic(shooter, src, speed, drop)
+        if not IsValid(shooter) then return nil end
+
+        local enemy = shooter.GetEnemy and shooter:GetEnemy()
+        if not IsValid(enemy) then return nil end
+
+        local target_pos = enemy:WorldSpaceCenter()
+        local target_vel = enemy:GetVelocity()
+
+        -- get shooter velocity if enabled
+        local inherit = projectiles["pro_inherit_shooter_velocity"] and (projectiles.shooter_velocities[shooter] or shooter:GetVelocity()) or Vector(0,0,0)
+        if projectiles["pro_inherit_ground_entity_velocity"] then
+            local ground = shooter:GetGroundEntity()
+            if IsValid(ground) then
+                inherit = inherit + ground:GetVelocity()
+            end
+        end
+        local scale = projectiles["pro_inherit_shooter_velocity_scale"] or 1
+        inherit = inherit * scale
+
+        local to_target = target_pos - src
+        local distance = to_target:Length()
+        if distance <= 0 or speed <= 0 then return nil end
+
+        -- estimate travel time
+        local t = distance / speed
+
+        if projectiles["pro_drag_enabled"] then 
+           t = CalculateFlightTime(speed, drag, coefficient, distance)
+        end
+            t = t  * math.Rand(0.95, 1.1)
+
+        -- predict target position including shooter motion
+        local predicted = target_pos + target_vel * t - inherit * t
+
+        -- compute aim direction
+        local dir = (predicted - src)
+        normalize(dir)
+
+        -- gravity compensation
+        if projectiles["pro_gravity_enabled"] then
+            local gravity = cv_sv_gravity:GetFloat() * drop * (projectiles["pro_gravity_multiplier"] or 1)
+            local drop_comp = 0.5 * gravity * t * t
+            dir.z = dir.z + drop_comp / distance
+            normalize(dir)
+        end
+
+        
+        return dir
+    end
+
+        function CalculateFlightTime(speed, drag, coefficient, zero_range)
+            local v0 = speed * 0.0254
+            local distance = zero_range * 0.0254
+        
+            local drag_multiplier = projectiles["pro_drag_multiplier"] or 1.0
+            local rho = 1.225
+            local cd_ref = 0.2629
+        
+            local tof
+            local tick_interval = engine.TickInterval();
+        
+            if projectiles["pro_drag_quadratic"] then
+                local bc_g1 = coefficient
+                local bc_si = bc_g1 * 703.07
+                local bc_code = cd_ref / bc_si
+                local k = 0.75 * bc_code * rho / 2 * drag_multiplier   -- 1/m
+        
+                if k <= 1e-6 or v0 <= 0 then
+                    return distance / v0
+                end
+        
+                local exp_term = math.exp(k * distance)
+                tof = (exp_term - 1) / (k * v0)
+        
+            else
+                local b = drag  * drag_multiplier
+        
+                if b <= 1e-6 or v0 <= 0 then
+                    return distance / v0
+                end
+        
+                local arg = b * distance / v0
+        
+                if arg >= 1 then
+                    return math.huge
+                end
+        
+                tof = -math.log(1 - arg) / b
+            end
+        
+            return tof
+        end
+
+        local flight_time = CalculateFlightTime(speed, drag, coefficient, zero_range)
+        
+        --print(string.format("TOF to %.0f m: %.4f seconds", zero_range*0.0254, flight_time))
+
+        -- NPC / NextBot target leading + spread
+        if is_npc or is_nextbot then
+            local base_dir = shooter:GetAimVector() -- or weapon forward
+            local spread_offset = data.Dir - base_dir
+            local lead_dir = lead_target_ballistic(shooter, src, speed, drop)
+            if lead_dir then
+                dir = lead_dir + spread_offset
+            else
+                dir = data.Dir
+            end
+        end
         local spread = data.Spread;
         for idx = 1, data.Num do
             local final_dir = get_weapon_spread(inflictor, inflictor_class, dir, spread, idx * 1000);
             local final_speed = speed;
+
+            if projectiles["pro_gravity_enabled"] and is_player then
+            local upward_comp = get_zero_compensation(final_dir, final_speed, zero_range, sight_height, drop)
+
+            final_dir = final_dir + upward_comp
+            normalize(final_dir)
+            end
 
             --print("SERVER, before", final_dir, final_speed, dir, data.Src, data.Damage);
 
@@ -214,11 +417,15 @@ if SERVER then
                 final_dir, 
                 final_speed,
                 damage,
+                shape,
+                coefficient,
                 drag,
                 penetration_power,
                 penetration_count,
                 mass,
+                caliber,
                 drop,
+                zero_range,
                 min_speed,
                 max_distance,
                 tracer_colors,
@@ -232,6 +439,8 @@ if SERVER then
                 idx
             );
         end
+
+        src = src - Vector(0, 0, projectiles["pro_spawn_height_offset"] or 4)
 
         npc_pistol_effect_fix(shooter, data);
 
@@ -287,7 +496,7 @@ if CLIENT then
     local vec_length = vector_meta.Length;
     
     local create_new_projectile_store = create_new_projectile_store;
-    local function create_local_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, tracer_flags, dropoff_start, dropoff_end, dropoff_min_multiplier, ammo_type, bullet_idx)
+    local function create_local_projectile(shooter, weapon, pos, dir, speed, damage, shape, coefficient, drag, penetration_power, penetration_count, mass, caliber, drop, zero_range, min_speed, max_distance, tracer_colors, tracer_flags, dropoff_start, dropoff_end, dropoff_min_multiplier, ammo_type, bullet_idx)
         local entindex = entindex(shooter);
         if not projectile_store[entindex] then 
             create_new_projectile_store(entindex);
@@ -310,15 +519,21 @@ if CLIENT then
         projectile.dir.y = dir.y;
         projectile.dir.z = dir.z;
         projectile.speed = speed;
+        projectile.speed_initial = speed;
         projectile.damage = damage;
         projectile.damage_initial = damage;
+        projectile.shape = shape;
+        projectile.coefficient = coefficient;
         projectile.drag = drag;
         projectile.penetration_power = penetration_power;
+        projectile.penetration_power_initial = penetration_power;
         projectile.penetration_count = penetration_count;
         projectile.last_hit_entity = nil;
         projectile.hit = false;
         projectile.mass = mass;
+        projectile.caliber = caliber;
         projectile.drop = drop;
+        projectile.zero_range = zero_range;
         projectile.min_speed = min_speed;
         projectile.distance_traveled = 0.0;
         projectile.max_distance = max_distance;
@@ -380,17 +595,26 @@ if CLIENT then
             return;
         end
 
-        local damage = get_weapon_damage(inflictor, inflictor_class, data.Damage);
+        local damage = get_weapon_damage(inflictor, inflictor_class, data.Damage, data.AmmoType);
         local speed = get_weapon_speed(inflictor, inflictor_class, damage, data.AmmoType);
         damage = damage * projectiles["pro_weapon_damage_scale"];
         speed = speed * projectiles["pro_speed_scale"];
         local lean_amount = get_lean_amount and get_lean_amount(shooter) or 0.0;
         local src = calculate_lean_pos and calculate_lean_pos(data.Src, angle(data.Dir), lean_amount, shooter) or data.Src;
-        local penetration_power = get_weapon_penetration_power(inflictor, inflictor_class) * projectiles["pro_penetration_power_scale"];
+
+        if shooter:IsPlayer() or shooter:IsNPC() then
+            src = get_muzzle_pos(shooter, inflictor, src)
+        end
+        
+        local penetration_power = get_weapon_penetration_power(inflictor, inflictor_class, speed, data.AmmoType) * projectiles["pro_penetration_power_scale"];
         local penetration_count = get_weapon_penetration_count(inflictor, inflictor_class);
-        local drag = get_weapon_drag(inflictor, inflictor_class);
-        local mass = get_weapon_mass(inflictor, inflictor_class);
+        local shape = get_weapon_shape(inflictor, inflictor_class, data.AmmoType);
+        local coefficient = get_weapon_coefficient(inflictor, inflictor_class, data.AmmoType);
+        local drag = get_weapon_drag(inflictor, inflictor_class, data.AmmoType);
+        local mass = get_weapon_mass(inflictor, inflictor_class, data.AmmoType);
+        local caliber = get_weapon_caliber(inflictor, inflictor_class, data.AmmoType);
         local drop = get_weapon_drop(inflictor, inflictor_class);
+        local zero_range = get_weapon_zero_range(inflictor, inflictor_class, speed);
         local min_speed = get_weapon_min_speed(inflictor, inflictor_class);
         local max_distance = get_weapon_max_distance(inflictor, inflictor_class);
         local tracer_colors = get_weapon_tracer_colors(inflictor, inflictor_class);
@@ -398,11 +622,29 @@ if CLIENT then
         local dropoff_start = get_weapon_dropoff_start(inflictor, inflictor_class);
         local dropoff_end = get_weapon_dropoff_end(inflictor, inflictor_class);
         local dropoff_min_multiplier = get_weapon_dropoff_min_multiplier(inflictor, inflictor_class);
-        local dir = data.Dir;
+        local dir = data.Dir ;
+        -- NPC / NextBot target leading + spread
+        if is_npc or is_nextbot then
+            local base_dir = shooter:GetAimVector()
+            local spread_offset = data.Dir - base_dir
+            local lead_dir = lead_target_ballistic(shooter, src, speed, drop)
+            if lead_dir then
+                dir = lead_dir + spread_offset
+            else
+                dir = data.Dir
+            end
+        end
         local spread = data.Spread;
         for idx = 1, data.Num do
             local final_dir = get_weapon_spread(inflictor, inflictor_class, dir, spread, idx * 1000);
             local final_speed = speed;
+
+            if projectiles["pro_gravity_enabled"] then
+            local upward_comp = get_zero_compensation(final_dir, final_speed, zero_range, sight_height, drop)
+
+            final_dir = final_dir + upward_comp
+            normalize(final_dir)
+            end
 
             --print("CLIENT, before", final_dir, final_speed, dir, data.Src, data.Damage);
 
@@ -436,11 +678,15 @@ if CLIENT then
                 final_dir,
                 final_speed,
                 damage,
+                shape,
+                coefficient,
                 drag,
                 penetration_power,
                 penetration_count,
                 mass,
+                caliber,
                 drop,
+                zero_range,
                 min_speed,
                 max_distance,
                 tracer_colors,
@@ -453,6 +699,8 @@ if CLIENT then
             );
         end
 
+        src = src - Vector(0, 0, projectiles["pro_spawn_height_offset"] or 4)
+        
         return false;
     end);
 end

@@ -44,14 +44,20 @@ function create_new_projectile_store(entindex)
             pos = vector(),
             dir = vector(),
             speed = 0.0,
+            speed_initial = 0.0,
             damage = 0.0,
             damage_initial = 0.0,
+            shape = 0.0,
+            coefficient = 0.0,
             drag = 0.0,
             penetration_power = 0.0,
+            penetration_power_initial = 0.0,
             penetration_count = 0,
             last_hit_entity = NULL,
             mass = 0.0,
+            caliber = 0.0,
             drop = 0.0,
+            zero_range = 0.0,
             min_speed = 0.0,
             distance_traveled = 0.0,
             max_distance = 0.0,
@@ -119,7 +125,7 @@ if SERVER then
         return band(h, 0x7FFFFFFF);
     end
 
-    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, drag, penetration_power, penetration_count, mass, drop, min_speed, max_distance, tracer_colors, tracer_flags, is_gmod_turret, dropoff_start, dropoff_end, dropoff_min_multiplier, ammo_type, reliable, bullet_idx, is_debug)
+    function broadcast_projectile(shooter, weapon, pos, dir, speed, damage, shape, coefficient, drag, penetration_power, penetration_count, mass, caliber, drop, zero_range, min_speed, max_distance, tracer_colors, tracer_flags, is_gmod_turret, dropoff_start, dropoff_end, dropoff_min_multiplier, ammo_type, reliable, bullet_idx, is_debug)
         --weapon.bullet_idx = (weapon.bullet_idx or 0) + 1;
 
         local time = cur_time();
@@ -140,10 +146,14 @@ if SERVER then
         write_uint(speed, 16);
         write_uint(damage, 16);
         write_uint(penetration_count, 8);
+        write_float(shape);
+        write_float(coefficient);
         write_float(drag);
         write_float(penetration_power);
         write_float(mass);
+        write_float(caliber);
         write_float(drop);
+        write_float(zero_range);
         write_float(min_speed);
         write_float(max_distance);
         write_uint(seed_counter, 32); -- random seed for ricochet
@@ -184,15 +194,21 @@ if SERVER then
         projectile.dir.y = dir.y;
         projectile.dir.z = dir.z;
         projectile.speed = speed;
+        projectile.speed_initial = speed;
         projectile.damage = damage;
         projectile.damage_initial = damage;
+        projectile.shape = shape;
+        projectile.coefficient = coefficient;
         projectile.drag = drag;
         projectile.penetration_power = penetration_power;
+        projectile.penetration_power_initial = penetration_power;
         projectile.penetration_count = penetration_count;
         projectile.last_hit_entity = nil;
         projectile.hit = false;
         projectile.mass = mass;
+        projectile.caliber = caliber;
         projectile.drop = drop;
+        projectile.zero_range = zero_range;
         projectile.min_speed = min_speed;
         projectile.distance_traveled = 0.0;
         projectile.max_distance = max_distance;
@@ -251,10 +267,14 @@ if CLIENT then
         local speed = read_uint(16);
         local damage = read_uint(16);
         local penetration_count = read_uint(8);
+        local shape = read_float();
+        local coefficient = read_float();
         local drag = read_float();
         local penetration_power = read_float();
         local mass = read_float();
+        local caliber = read_float();
         local drop = read_float();
+        local zero_range = read_float();
         local min_speed = read_float();
         local max_distance = read_float();
         local random_seed = read_uint(32);
@@ -286,15 +306,21 @@ if CLIENT then
         projectile.dir.y = dir_y;
         projectile.dir.z = dir_z;
         projectile.speed = speed;
+        projectile.speed_initial = speed;
         projectile.damage = damage;
         projectile.damage_initial = damage;
+        projectile.shape = shape;
+        projectile.coefficient = coefficient;
         projectile.drag = drag;
         projectile.penetration_power = penetration_power;
+        projectile.penetration_power_initial = penetration_power;
         projectile.penetration_count = penetration_count;
         projectile.last_hit_entity = nil;
         projectile.hit = false;
         projectile.mass = mass;
+        projectile.caliber = caliber;
         projectile.drop = drop;
+        projectile.zero_range = zero_range;
         projectile.min_speed = min_speed;
         projectile.distance_traveled = 0.0;
         projectile.max_distance = max_distance;

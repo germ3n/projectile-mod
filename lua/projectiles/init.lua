@@ -17,5 +17,6 @@ include("props.lua");
 include("config.lua");
 include("backup.lua");
 include("debug.lua");
+include("ballistic_tables.lua")
 
 print("ProjectileMod+ loaded");
