@@ -266,16 +266,17 @@ local function apply_drag(projectile_data)
             }
             local ref_cd = REF_CD_BY_SHAPE[projectile_data.shape] or 1
             local BC = 0.2629 / (projectile_data.coefficient * 703.07)
-            local rho = 1.225
+            local air_density = 1.225
+            local water_density = air_density * 816
+            local rho = air_density
+            if in_water then
+                rho = water_density
+            end
             
             -- Use relative air speed in air, ground speed in water
             local speed_for_drag = in_water and speed or v_rel_speed
-            drag_factor = 0.0254 * BC  * (rho) / 2 * speed_for_drag * tick_interval * projectiles["pro_drag_multiplier"] * 0.75 -- 0.75 because hammer units or smth
-            
-            if in_water then
-                drag_factor = drag_factor * projectiles["pro_drag_water_multiplier"]
-            end
-            
+            drag_factor = BC  * (rho) / 2 * speed_for_drag * 0.0254 * tick_interval * projectiles["pro_drag_multiplier"] * 0.75 -- 0.75 because hammer units or smth
+    
             if projectiles["pro_ballistic_tables"] then
                 local sound_speed = projectiles["pro_sound_speed"] or (343.0 / 0.0254)
                 local mach = v_rel_speed / sound_speed
@@ -334,7 +335,7 @@ local function apply_drag(projectile_data)
             drag_factor = projectile_data.drag * tick_interval * projectiles["pro_drag_multiplier"]
             
             if in_water then
-                drag_factor = drag_factor * projectiles["pro_drag_water_multiplier"]^0.5
+                drag_factor = drag_factor * projectiles["pro_drag_water_multiplier"]
             end
             
             if in_water then 
@@ -422,7 +423,7 @@ local function move_projectile(shooter, projectile_data)
         --current_velocity.x = current_velocity.x + wind_vector.x * tick_interval;
         --current_velocity.y = current_velocity.y + wind_vector.y * tick_interval;
 
-        projectile_data.wind = wind_vector --for use in render
+        projectile_data.wind = wind_vector
     end
 
     if projectiles["pro_gravity_enabled"] or projectiles["pro_wind_enabled"] then

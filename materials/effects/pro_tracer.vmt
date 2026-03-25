@@ -1,0 +1,9 @@
+"UnlitGeneric"
+{
+    "$basetexture" "effects/pro_tracer"
+    "$vertexcolor" "1"
+    "$vertexalpha" "1"
+    "$additive" "1"
+    "$translucent" "1"
+    "$nocull" "1"
+}

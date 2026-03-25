@@ -462,6 +462,7 @@ end
                 { type = "bool", cvar = "pro_render_disable_tracer_smoke", label = "Disable Tracer Smoke", client = true },                
                 { type = "bool", cvar = "pro_distance_scale_enabled", label = "Enable Distance Scaling", client = true },
                 { type = "bool", cvar = "pro_render_wind_hud", label = "Enable Wind HUD", client = true },
+                { type = "float", cvar = "pro_render_tracer_size", label = "Tracer Size", min = 0.0, max = 10.0, decimals = 2, client = true },
                 { type = "float", cvar = "pro_spawn_fade_distance", label = "Trail Fade Distance", min = 0.0, max = 1000.0, decimals = 0, client = true },
                 { type = "float", cvar = "pro_spawn_fade_time", label = "Trail Fade Time", min = 0.0, max = 2.0, decimals = 3, client = true },
                 { type = "float", cvar = "pro_spawn_offset", label = "Spawn Trail Offset", min = 0.0, max = 200.0, decimals = 0, client = true },
@@ -1544,9 +1545,9 @@ end
                     end
 
                     if projectiles["pro_auto_calculate_damage"] or projectiles["pro_auto_calculate_penetration"] or projectiles["pro_auto_calculate_drag"]then
-                        local slider, actual_value = create_slider_row("Bullet Mass (g)", "mass", CONFIG_TYPES["mass"]["default"], 0, 5000, 3);
+                        local slider, actual_value = create_slider_row("Bullet Mass (g)", "mass", CONFIG_TYPES["mass"]["default"], 0, 1000, 3);
                         slider:SetTooltip(string.format("%.1f", actual_value*15.4324) .. " Grain")
-                        local slider, actual_value = create_slider_row("Bullet Caliber (mm)", "caliber", CONFIG_TYPES["caliber"]["default"], 0, 100, 3);
+                        local slider, actual_value = create_slider_row("Bullet Caliber (mm)", "caliber", CONFIG_TYPES["caliber"]["default"], 0, 50, 3);
                         slider:SetTooltip(string.format("%.3f", actual_value*1/25.4) .. " Inch")
                     end
 

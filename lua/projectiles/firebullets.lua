@@ -221,7 +221,7 @@ if SERVER then
             src = get_muzzle_pos(shooter, inflictor, src)
         end
         if is_npc or is_nextbot then
-        src = get_muzzle_pos(shooter, inflictor, src)
+        --src = get_muzzle_pos(shooter, inflictor, src)
         end
         
         if is_npc then
