@@ -227,7 +227,7 @@ function handle_penetration(shooter, projectile_data, src, dir, penetration_powe
         local mat_chance = RICOCHET_MAT_CHANCE_MULTIPLIERS[enter_name];
         --print(SERVER and "server" or "client", "seed_base: " .. seed_base, "chance: " .. chance, "mat_chance: " .. mat_chance);
         local angle_scale = 1.0 + dot_result;
-        local chance_threshold = projectiles["pro_ricochet_chance"] * mat_chance * angle_scale;
+        local chance_threshold = projectiles["pro_ricochet_chance"] * mat_chance * angle_scale * (1+5000/projectile_data.speed); --slow bullets are more likely to ricochet
         if chance < chance_threshold then
             local reflect = dir - (2 * dot_result * hit_normal);
             local spread_x = seeded_random(seed_base * 73856093, -1, 1);
@@ -240,6 +240,23 @@ function handle_penetration(shooter, projectile_data, src, dir, penetration_powe
             projectile_data.speed = projectile_data.speed * projectiles["pro_ricochet_speed_multiplier"];
             projectile_data.damage = projectile_data.damage * projectiles["pro_ricochet_damage_multiplier"];
             projectile_data.pos = enter_trace.HitPos + (projectile_data.dir * 2);
+
+            if projectiles["pro_ricochet_sounds_enabled"] then
+                local ricochet_sounds = {
+                    "weapons/fx/rics/ric1.wav",
+                    "weapons/fx/rics/ric2.wav",
+                    "weapons/fx/rics/ric3.wav",
+                    "weapons/fx/rics/ric4.wav",
+                    "weapons/fx/rics/ric5.wav"
+                }
+                local snd = ricochet_sounds[math.random(#ricochet_sounds)]
+                
+                -- Volume/pitch based on speed & angle (steeper = louder/sharper)
+                local vol = math.Clamp(projectile_data.speed / 8000, 0.6, 1.0)
+                local pitch = math.Clamp(1.0 + (1.0 - math.abs(dot(dir, hit_normal))) * 0.3, 0.5, 2)
+                
+                sound.Play(snd, enter_trace.HitPos, SNDLVL_85dB, math.random(95, 105) * pitch, vol)
+            end
     
             if projectiles["pro_debug_ricochet"] then debug_ricochet(projectile_data, enter_trace, chance, reflect, spread); end
 
@@ -292,12 +309,25 @@ function handle_penetration(shooter, projectile_data, src, dir, penetration_powe
 
     projectile_data.damage = projectile_data.damage - dmg_loss;
 
+    local speed_tax_per_unit = projectiles["pro_penetration_speed_tax_per_unit"];
+    local speed_loss = speed_tax_per_unit * dist * (resistance + entry_cost + exit_cost) * thickness_scale;
+
+    projectile_data.speed = projectile_data.speed - speed_loss;
+
     if projectile_data.damage < 1.0 then
         return true, nil, nil;
     end
 
     projectile_data.penetration_count = projectile_data.penetration_count - 1;
-    projectile_data.penetration_power = projectile_data.penetration_power - power_cost;
+    projectile_data.penetration_power = projectile_data.penetration_power - power_cost; --works badly with speed tax
+
+    local seed_base = projectile_data.random_seed + projectile_data.penetration_count * 1000;
+    local spread_x = seeded_random(seed_base * 73856093, -1, 1);
+    local spread_y = seeded_random(seed_base * 19349663, -1, 1);
+    local spread_z = seeded_random(seed_base * 83492791, -1, 1);
+    local spread = vector(spread_x, spread_y, spread_z);    
+    vec_mul(spread, projectiles["pro_penetration_spread"] * power_cost/projectile_data.penetration_power);
+    projectile_data.dir = get_normalized(projectile_data.dir + spread);
     
     return false, exit_trace.HitPos, exit_trace;
 end
@@ -315,12 +345,28 @@ local HITGROUP_MULTIPLIERS = {
     [HITGROUP_GEAR] = 1.0,
 };
 
+local HITGROUP_MULTIPLIERS_FIREBULLETS = { -- to offset base hitgrop damage
+    [HITGROUP_GENERIC] = HITGROUP_MULTIPLIERS[HITGROUP_GENERIC],
+    [HITGROUP_HEAD] = HITGROUP_MULTIPLIERS[HITGROUP_HEAD] / 2,
+    [HITGROUP_CHEST] = HITGROUP_MULTIPLIERS[HITGROUP_CHEST],
+    [HITGROUP_STOMACH] = HITGROUP_MULTIPLIERS[HITGROUP_STOMACH],
+    [HITGROUP_LEFTARM] = HITGROUP_MULTIPLIERS[HITGROUP_LEFTARM] / 0.25,
+    [HITGROUP_RIGHTARM] = HITGROUP_MULTIPLIERS[HITGROUP_RIGHTARM] / 0.25,
+    [HITGROUP_LEFTLEG] = HITGROUP_MULTIPLIERS[HITGROUP_LEFTLEG] / 0.25 ,
+    [HITGROUP_RIGHTLEG] = HITGROUP_MULTIPLIERS[HITGROUP_RIGHTLEG] / 0.25, 
+    [HITGROUP_GEAR] = HITGROUP_MULTIPLIERS[HITGROUP_GEAR],
+};
+
 function get_damage_multiplier(hitgroup)
     if not projectiles["pro_damage_scaling"] then
         return 1.0;
     end
 
+    if not projectiles["pro_use_firebullets"] then
     return HITGROUP_MULTIPLIERS[hitgroup] or 1.0;
+    else
+    return HITGROUP_MULTIPLIERS_FIREBULLETS[hitgroup] or 1.0;
+    end
 end
 
 print("loaded projectiles penetration");

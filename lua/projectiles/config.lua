@@ -1,5 +1,7 @@
 AddCSLuaFile();
 
+local cv_sv_gravity = GetConVar("sv_gravity");
+
 if SERVER then
     util.AddNetworkString("projectile_update_cvar");
 
@@ -66,6 +68,97 @@ if CLIENT then
         divider = Color(60, 60, 65)
     };
 
+
+local function get_units()
+    local unit_map = { ["0"]="ms", ["1"]="fps" }
+    local speed_unit_index = GetConVar("pro_speed_unit"):GetString()
+    local speed_unit = unit_map[speed_unit_index] or "ms"
+    return speed_unit
+end
+
+get_units()
+
+local function ToDist(units)
+    local converted
+    speed_unit = get_units()
+
+    if speed_unit == "fps" then
+        converted = units * 0.0254 * 1.093613 --yards
+    else
+        converted = units * 0.0254
+    end
+    return converted
+end
+
+local function ToSpeed(units)
+    local converted
+    speed_unit = get_units()
+
+    if speed_unit == "fps" then
+        converted = units * 0.0254 * 3.28084 --fps
+    else
+        converted = units * 0.0254
+    end
+    return converted
+end
+
+local function ToThick(units)
+    local converted
+    speed_unit = get_units()
+
+    if speed_unit == "fps" then
+        converted = units --inches
+    else
+        converted = units * 0.0254
+    end
+    return converted
+end
+
+local function ToDistStr(units, decimals)
+    speed_unit = get_units()
+    decimals = decimals or 1
+    return string.format("%." .. decimals .. "f %s", ToDist(units), (speed_unit == "fps" and "yd") or "m")
+end
+
+local function ToThickStr(units, decimals)
+
+    speed_unit = get_units()
+    if speed_unit == "fps" then
+        converted = units
+    else
+        converted = units * 25.4
+    end
+
+    decimals = decimals or 1
+    return string.format("%." .. decimals .. "f %s", converted, (speed_unit == "fps" and "in") or "mm")
+end
+
+local function ToSpeedStr(raw_value, unit_type, decimals)
+    decimals = decimals or 1
+    local converted
+    speed_unit = get_units()
+    if speed_unit == "fps" then
+        converted = raw_value * 0.0254 * 3.28084
+    else
+        converted = raw_value * 0.0254
+    end
+    return string.format("%." .. decimals .. "f %s", converted, speed_unit == "fps" and "fps" or "m/s")
+end
+
+if CLIENT then
+    cvars.AddChangeCallback("pro_speed_unit", function(convar_name, old_value, new_value)
+
+        if IsValid(frame) and frame:IsVisible() then
+            frame:Close()  
+            timer.Simple(0.1, function()
+                RunConsoleCommand("pro_config") 
+            end)
+        end
+
+        print("[ProjectileMod+] Speed unit changed to " .. new_value .. "")
+    end)
+end
+
     local function CreateControl(parent, data)
         if data.type == "header" then
             local panel = vgui.Create("DPanel", parent);
@@ -120,13 +213,13 @@ if CLIENT then
 
             local slider = vgui.Create("DNumSlider", panel);
             slider:Dock(FILL);
-            slider:DockMargin(10, 0, 10, 0);
+            slider:DockMargin(10, 0, 90, 0);
             slider:SetText(data.label);
             slider:SetMin(data.min);
             slider:SetMax(data.max);
             slider:SetDecimals(data.decimals);
-            --slider:SetConVar(data.cvar);
             slider:SetValue(GetConVar(data.cvar):GetFloat());
+            
             slider.OnValueChanged = function(s, value)
                 if math.abs(GetConVar(data.cvar):GetFloat() - value) < 0.001 then return end
                 
@@ -145,8 +238,85 @@ if CLIENT then
             
             slider.Label:SetTextColor(THEME.text)
             slider.TextArea:SetTextColor(THEME.text)
+
+        local btn_reset = vgui.Create("DButton", panel)
+        btn_reset:SetText("Reset")
+        btn_reset:SetWide(60)
+        btn_reset:SetTextColor(THEME.text)
+    
+        btn_reset.Paint = function(s, w, h)
+            draw.RoundedBox(4, 0, 0, w, h, s:IsHovered() and Color(80, 80, 80) or Color(60, 60, 60))
+        end
+    
+        btn_reset.DoClick = function()
+            local default = GetConVar(data.cvar):GetDefault()
+            if default then
+
+                slider:SetValue(tonumber(default))
+    
+                timer.Create("projectile_update_cvar_timer_" .. data.cvar, 0.25, 1, function()
+                    net.Start("projectile_update_cvar")
+                    net.WriteString(data.cvar)
+                    net.WriteString(default)
+                    net.SendToServer()
+                end)
+    
+            end
+        end
+ 
+        panel.PerformLayout = function(s, w, h)
+            btn_reset:SetPos(w - 75, (h - 28) / 2)
+            btn_reset:SetSize(60, 28)
+        end
+
+        btn_reset:SetTooltip("Reset to default value (" .. GetConVar(data.cvar):GetDefault() .. ")")
+
+            local speed_cvrs = {
+                ["pro_sound_speed"] = true,
+                ["pro_wind_strength"] = true,
+                ["pro_penetration_speed_tax_per_unit"] = true,
+            }
+        
+            local dist_cvrs = {
+                ["pro_render_min_distance"] = true,
+                ["pro_spawn_fade_distance"] = true,
+                ["pro_spawn_offset_max_dist"] = true,
+                ["pro_distance_scale_start"] = true,
+                ["pro_flyby_distance"] = true,
+            }
+        
+            local thick_cvrs = {
+                ["pro_sight_height"] = true,
+                ["pro_penetration_trace_to_exit_max_distance"] = true,
+                ["pro_penetration_trace_to_exit_step_size"] = true,
+                ["pro_penetration_thin_material_threshold"] = true,
+            }
+        
+            slider.Think = function(s)
+                local raw_value = GetConVar(data.cvar):GetFloat()
+                local unit_type = GetConVar("pro_speed_unit"):GetString() or "ms"
+        
+                local tooltip = data.label
+        
+                if speed_cvrs[data.cvar] then
+                    local converted = ToSpeedStr(raw_value, unit_type, data.decimals or 1)
+                    tooltip = tooltip .. ": " .. converted .. " (" .. string.format("%.2f u", raw_value) .. " u/s)"
+                elseif dist_cvrs[data.cvar] then
+                    local converted = ToDistStr(raw_value, unit_type, data.decimals or 1)
+                    tooltip = tooltip .. ": " .. converted .. " (" .. string.format("%.2f u", raw_value) .. " u)"
+                elseif thick_cvrs[data.cvar] then
+                    local converted = ToThickStr(raw_value, unit_type, data.decimals or 1)
+                    tooltip = tooltip .. ": " .. converted .. " (" .. string.format("%.2f u", raw_value) .. " u)"
+                end
+        
+                if tooltip ~= s:GetTooltip() then
+                    s:SetTooltip(tooltip)
+                end
+            end
             
-            return panel;
+            slider.Think(slider)
+
+            return panel, slider
         elseif data.type == "color" then
             local panel = vgui.Create("DPanel", parent);
             panel:SetTall(160);
@@ -256,21 +426,25 @@ if CLIENT then
             icon = "icon16/wrench.png",
             vars = {
                 { type = "header", label = "Global Settings" },
+                { type = "dropdown", cvar = "pro_speed_unit", label = "Speed Unit", options = { "m/s", "fps" }, values = {"ms", "fps"} },
                 { type = "bool", cvar = "pro_projectiles_enabled", label = "Enable Projectiles" },
                 { type = "bool", cvar = "pro_ricochet_enabled", label = "Enable Ricochet" },
                 { type = "bool", cvar = "pro_drag_enabled", label = "Enable Drag" },
                 { type = "bool", cvar = "pro_gravity_enabled", label = "Enable Gravity" },
                 { type = "bool", cvar = "pro_damage_scaling", label = "Enable Damage Scaling" },
                 { type = "bool", cvar = "pro_damage_dropoff_enabled", label = "Enable Damage Dropoff" },
+                { type = "bool", cvar = "pro_damage_speed_dropoff_enabled", label = "Enable Damage Dropoff With Speed" },
                 { type = "bool", cvar = "pro_disable_clientside_prediction", label = "Disable Clientside FireBullets Prediction (for debug)" },
                 { type = "bool", cvar = "pro_use_firebullets", label = "Use FireBullets (might help resolve issues with some mods/missing decals)" },
                 { type = "bool", cvar = "pro_wind_enabled", label = "Enable Wind (Experimental)" },
                 { type = "bool", cvar = "pro_auto_calculate_speed", label = "Automatically Calculate Projectile Speed (Experimental)" },
+                { type = "bool", cvar = "pro_auto_calculate_speed_kinetic", label = "Automatically Calculate Projectile Speed Based Damage on Caliber And Mass" },
+                { type = "float", cvar = "pro_auto_calculate_speed_mult", label = "Auto Speed Kinetic Mult", min = 0.1, max = 5.0, decimals = 3 },
                 { type = "bool", cvar = "pro_blood_splatter_enabled", label = "Enable Blood Splatters" },
-                { type = "float", cvar = "pro_speed_scale", label = "Speed Scale", min = 0.1, max = 5.0, decimals = 2 },
+                { type = "float", cvar = "pro_speed_scale", label = "Speed Scale", min = 0.1, max = 5.0, decimals = 3 },
                 { type = "float", cvar = "pro_weapon_damage_scale", label = "Damage Scale", min = 0.1, max = 5.0, decimals = 2 },
                 { type = "float", cvar = "pro_penetration_power_scale", label = "Power Scale", min = 0.1, max = 5.0, decimals = 2 },
-                { type = "float", cvar = "pro_damage_force_multiplier", label = "Damage Force Multiplier", min = 0.0, max = 50.0, decimals = 3 },
+                { type = "float", cvar = "pro_damage_force_multiplier", label = "Damage Force Multiplier", min = 0.0, max = 1.0, decimals = 3 },
                 { type = "float", cvar = "pro_npc_shootpos_forward", label = "NPC Shoot Position Forward Offset", min = 0.0, max = 200.0, decimals = 0 },
                 --{ type = "float", cvar = "pro_blood_splatter_scale", label = "Blood Splatter Scale", min = 0.0, max = 10.0, decimals = 2 },
                 { type = "bool", cvar = "pro_inherit_shooter_velocity", label = "Inherit Shooter Velocity" },
@@ -285,10 +459,12 @@ if CLIENT then
                 { type = "header", label = "Render Settings" },
                 { type = "bool", cvar = "pro_render_enabled", label = "Enable Projectile Rendering", client = true },
                 { type = "bool", cvar = "pro_render_disable_tracers", label = "Disable Tracers", client = true },
+                { type = "bool", cvar = "pro_render_disable_tracer_smoke", label = "Disable Tracer Smoke", client = true },                
                 { type = "bool", cvar = "pro_distance_scale_enabled", label = "Enable Distance Scaling", client = true },
                 { type = "bool", cvar = "pro_render_wind_hud", label = "Enable Wind HUD", client = true },
+                { type = "float", cvar = "pro_render_tracer_size", label = "Tracer Size", min = 0.0, max = 10.0, decimals = 2, client = true },
                 { type = "float", cvar = "pro_spawn_fade_distance", label = "Trail Fade Distance", min = 0.0, max = 1000.0, decimals = 0, client = true },
-                { type = "float", cvar = "pro_spawn_fade_time", label = "Trail Fade Time", min = 0.0, max = 2.0, decimals = 2, client = true },
+                { type = "float", cvar = "pro_spawn_fade_time", label = "Trail Fade Time", min = 0.0, max = 2.0, decimals = 3, client = true },
                 { type = "float", cvar = "pro_spawn_offset", label = "Spawn Trail Offset", min = 0.0, max = 200.0, decimals = 0, client = true },
                 { type = "float", cvar = "pro_spawn_offset_max_dist", label = "Spawn Offset Max Distance", min = 0.0, max = 500.0, decimals = 0, client = true },
                 { type = "float", cvar = "pro_min_trail_length", label = "Min Trail Length", min = 0.0, max = 100.0, decimals = 0, client = true },
@@ -297,6 +473,14 @@ if CLIENT then
                 { type = "float", cvar = "pro_render_min_distance", label = "Min Render Distance", min = 0.0, max = 1000.0, decimals = 0, client = true },
                 { type = "float", cvar = "pro_max_interp_distance", label = "Max Interpolation Distance", min = 0.0, max = 10000.0, decimals = 0, client = true },
                 { type = "float", cvar = "pro_max_interp_camera_distance", label = "Max Distance to Camera to Interpolate", min = 0.0, max = 50000.0, decimals = 0, client = true },
+                { type = "header", label = "Audio" },
+                { type = "bool", cvar = "pro_ricochet_sounds_enabled", label = "Enable Ricochet Sounds" },
+                { type = "bool", cvar = "pro_flyby_sounds_enabled", label = "Enable Flyby Sounds", client = true },
+                { type = "float", cvar = "pro_flyby_distance", label = "Flyby Distance", min = 20, max = 200, decimals = 0 },
+                { type = "float", cvar = "pro_flyby_volume_scale", label = "Flyby base volume", min = 0, max = 5, decimals = 1 },
+                { type = "float", cvar = "pro_flyby_pitch_scale", label = "Flyby pitch scale based on speed", min = 0.5, max = 2, decimals = 1 },
+                { type = "float", cvar = "pro_flyby_shake_strenght", label = "Flyby shake strenght", min = 0, max = 20, decimals = 1 },
+                { type = "float", cvar = "pro_flyby_shake_cooldown", label = "Flyby shake cooldown", min = 0.0, max = 1, decimals = 2 },
             }
         },
         {
@@ -310,12 +494,14 @@ if CLIENT then
                 { type = "float", cvar = "pro_penetration_entry_cost_multiplier", label = "Entry Cost Multiplier", min = 0.0, max = 5.0, decimals = 2 },
                 { type = "float", cvar = "pro_penetration_exit_cost_multiplier", label = "Exit Cost Multiplier", min = 0.0, max = 5.0, decimals = 2 },
                 { type = "float", cvar = "pro_penetration_dmg_tax_per_unit", label = "Damage Tax (Per Unit)", min = 0.0, max = 10.0, decimals = 1 },
+                { type = "float", cvar = "pro_penetration_speed_tax_per_unit", label = "Speed Tax (Per Unit)", min = 0.0, max = 2000.0, decimals = 1 },
                 { type = "header", label = "Thin Material Optimization" },
                 { type = "float", cvar = "pro_penetration_thin_material_threshold", label = "Thin Material Threshold (Units)", min = 0.0, max = 100.0, decimals = 0 },
                 { type = "float", cvar = "pro_penetration_thin_material_scale", label = "Thin Material Min Scale", min = 0.0, max = 1.0, decimals = 2 },
                 { type = "header", label = "Exit Trace Settings" },
+                { type = "float", cvar = "pro_penetration_spread", label = "Spread", min = 0.0, max = 1.0, decimals = 2 },
                 { type = "float", cvar = "pro_penetration_trace_to_exit_max_distance", label = "Max Trace Distance (Units)", min = 0.0, max = 1000.0, decimals = 0 },
-                { type = "float", cvar = "pro_penetration_trace_to_exit_step_size", label = "Trace Step Size (Units)", min = 0.0, max = 30.0, decimals = 1 },
+                { type = "float", cvar = "pro_penetration_trace_to_exit_step_size", label = "Trace Step Size (Units)", min = 0.1, max = 30.0, decimals = 1 },
             }
         },
         {
@@ -392,15 +578,19 @@ if CLIENT then
             vars = {
                 { type = "header", label = "Drag" },
                 { type = "bool", cvar = "pro_drag_enabled", label = "Enable Drag" },
-                { type = "float", cvar = "pro_drag_multiplier", label = "Drag Multiplier", min = 0.0, max = 5.0, decimals = 2 },
-                { type = "float", cvar = "pro_drag_water_multiplier", label = "Water Drag Multiplier", min = 1.0, max = 10.0, decimals = 1 },
+                { type = "bool", cvar = "pro_drag_quadratic", label = "Use Quadratic Drag Model" },
+                { type = "bool", cvar = "pro_ballistic_tables", label = "Use Ballistic Tables For Supersonic Bullets" },
+                { type = "float", cvar = "pro_drag_multiplier", label = "Drag Multiplier", min = 0.0, max = 10.0, decimals = 2 },
+                { type = "float", cvar = "pro_drag_water_multiplier", label = "Water Drag Multiplier", min = 1.0, max = 1000.0, decimals = 1 },
+                { type = "float", cvar = "pro_sound_speed", label = "Mach 1, Speed of Sound", min = 1, max = 50000.0, decimals = 2 },
+                { type = "float", cvar = "pro_transonic_turbulence_strenght", label = "Transonic Bullet Wobble Strenght", min = 0.0, max = 1.0, decimals = 2 },
                 { type = "header", label = "Gravity" },
                 { type = "bool", cvar = "pro_gravity_enabled", label = "Enable Gravity" },
                 { type = "float", cvar = "pro_gravity_multiplier", label = "Gravity Multiplier", min = 0.0, max = 5.0, decimals = 2 },
                 { type = "float", cvar = "pro_gravity_water_multiplier", label = "Water Gravity Multiplier", min = 0.0, max = 200.0, decimals = 0 },
                 { type = "header", label = "Wind" },
                 { type = "bool", cvar = "pro_wind_enabled", label = "Enable Wind" },
-                { type = "float", cvar = "pro_wind_strength", label = "Wind Strength (u/s)", min = 0.0, max = 100.0, decimals = 1 },
+                { type = "float", cvar = "pro_wind_strength", label = "Wind Strength (u/s)", min = 0.0, max = 1000.0, decimals = 1 },
                 { type = "float", cvar = "pro_wind_strength_min_variance", label = "Min Variance Multiplier", min = 0.0, max = 2.0, decimals = 2 },
                 { type = "float", cvar = "pro_wind_strength_max_variance", label = "Max Variance Multiplier", min = 0.0, max = 2.0, decimals = 2 },
                 { type = "float", cvar = "pro_wind_min_update_interval", label = "Min Update Interval (s)", min = 5.0, max = 300.0, decimals = 0 },
@@ -926,10 +1116,52 @@ if CLIENT then
                                 actual_value = current_val;
                             else
                                 local def = current_table and current_table["default"];
+                                
                                 if def and type(def) == "number" then
+                                    local function get_ammo_type(class_name)
+                                        if HL2_WEAPON_AMMO_MAP[class_name] then
+                                            return HL2_WEAPON_AMMO_MAP[class_name]
+                                        end
+                                        
+                                        local wep = weapons.Get(class_name)
+                                        if wep and wep.Primary and wep.Primary.Ammo and wep.Primary.Ammo ~= "" then
+                                            return wep.Primary.Ammo
+                                        end
+                                        
+                                        return nil   -- will fall back to "default" ammo characteristics
+                                    end
+                                    local ammo = get_ammo_type(class_name)
+                                    local get_damage = get_weapon_damage(nil, class_name, nil, ammo)
+                                    local get_speed = get_weapon_speed(nil, class_name, get_damage, ammo) * projectiles["pro_speed_scale"]
                                     actual_value = def;
-                                    is_using_default = true;
                                     default_source = "global default";
+                                    if cfg_type == "speed" then
+                                        actual_value = get_weapon_speed(nil, class_name, get_damage, ammo)
+                                        if projectiles["pro_auto_calculate_speed"] then default_source = "auto calculated speed"; end
+                                    elseif cfg_type == "damage" then
+                                        actual_value = get_damage
+                                        default_source = "damage from weapon";
+                                    elseif cfg_type == "penetration_power" then
+                                        actual_value = get_weapon_penetration_power(nil, class_name, get_speed, ammo)
+                                        if projectiles["pro_auto_calculate_penetration"] then default_source = "auto calculated penetration"; end
+                                    elseif cfg_type == "coefficient" then
+                                        actual_value = get_weapon_coefficient(nil, class_name, ammo)
+                                        if projectiles["pro_auto_calculate_drag"] then default_source = "auto calculated coefficient"; end
+                                    elseif cfg_type == "drag" then
+                                        actual_value = get_weapon_drag(nil, class_name, ammo)
+                                        if projectiles["pro_auto_calculate_drag"] then default_source = "auto calculated drag"; end
+                                    elseif cfg_type == "mass" then
+                                        actual_value = get_weapon_mass(nil, class_name, ammo)
+                                        default_source = "mass from ammo type";
+                                    elseif cfg_type == "caliber" then
+                                        actual_value = get_weapon_caliber(nil, class_name, ammo)
+                                        default_source = "caliber from ammo type";
+                                    elseif cfg_type == "zero_range" then
+                                        actual_value = get_weapon_zero_range(nil, get_speed, get_speed)
+                                        if projectiles["pro_auto_calculate_zero"] then default_source = "auto calculated zero"; end
+                                    end
+                                    is_using_default = true;
+                                   
                                 else
                                     actual_value = default_val;
                                     is_using_default = true;
@@ -1088,6 +1320,8 @@ if CLIENT then
                             send_update();
                             slider.HasChanged = false;
                         end
+
+                        return slider, actual_value
                     end
 
                     local function create_checkbox_row(label_text, cfg_type, default_val)
@@ -1279,6 +1513,9 @@ if CLIENT then
                         end
                     end
 
+                    local speed_scale = GetConVar("pro_speed_scale"):GetString()
+                    local pen_scale = GetConVar("pro_penetration_power_scale"):GetString()
+
                         create_checkbox_row("Disabled/Blacklisted", "blacklist", false);
 
                     local div_blacklist = vgui.Create("DPanel", config_scroll);
@@ -1287,18 +1524,55 @@ if CLIENT then
                     div_blacklist:DockMargin(0, 5, 0, 10);
                     div_blacklist.Paint = function(s, w, h) draw.RoundedBox(0, 0, 0, w, h, THEME.divider) end
 
-                    create_slider_row("Speed (Units/s)", "speed", CONFIG_TYPES["speed"]["default"], 0, 50000, 0);
+                    local slider, actual_value = create_slider_row("Speed (u/s)", "speed", CONFIG_TYPES["speed"]["default"], 0, 70000, 0)
+                    slider:SetTooltip("Speed: " .. ToSpeedStr(actual_value * speed_scale,nil, 1) .. " (" .. math.floor(actual_value) .. " x "..string.format("%.3f", speed_scale).." u/s)")
+
                     create_slider_row("Damage", "damage", CONFIG_TYPES["damage"]["default"], 0, 1000, 0);
-                    create_slider_row("Penetration Power", "penetration_power", CONFIG_TYPES["penetration_power"]["default"], 0, 50, 2);
+
+                    local slider, actual_value = create_slider_row("Penetration Power", "penetration_power", CONFIG_TYPES["penetration_power"]["default"], 0, 50, 2);
+                    slider:SetTooltip("Penetration Power: " .. ToThickStr(actual_value * pen_scale,nil, 1) .. " (" .. string.format("%.3f", actual_value)  .. " x "..string.format("%.3f", pen_scale).." u)")
+
                     create_slider_row("Max Penetration Count", "penetration_count", CONFIG_TYPES["penetration_count"]["default"], 0, 50, 0);
-                    create_slider_row("Drag Multiplier", "drag", CONFIG_TYPES["drag"]["default"], 0, 10, 3);
-                    create_slider_row("Drop Multiplier", "drop", CONFIG_TYPES["drop"]["default"], 0, 10, 3);
-                    create_slider_row("Min Speed (Units/s)", "min_speed", CONFIG_TYPES["min_speed"]["default"], 0, 50000, 0);
-                    create_slider_row("Max Dist (Units)", "max_distance", CONFIG_TYPES["max_distance"]["default"], 0, 200000, 0);
+
+                    if projectiles["pro_drag_enabled"] and not projectiles["pro_drag_quadratic"] then
+                    create_slider_row("Drag Multiplier", "drag", CONFIG_TYPES["drag"]["default"], 0, 100, 3);
+                    end
+
+                    if projectiles["pro_drag_quadratic"] and projectiles["pro_drag_enabled"] then
+                    local slider, actual_value = create_slider_row("Ballistic Coefficient G1", "coefficient", CONFIG_TYPES["coefficient"]["default"], 0, 2, 3);
+                    create_slider_row("Bullet Shape (G1, G7, Gs)", "shape", CONFIG_TYPES["shape"]["default"], 1, 3, 0);
+                    slider:SetTooltip("G1: " .. string.format("%.3f", actual_value) .. " G7: " .. string.format("%.3f", (0.1198/0.2629)*actual_value) .. " Gs: "..string.format("%.3f", (0.4662/0.2629)*actual_value))
+                    end
+
+                    if projectiles["pro_auto_calculate_damage"] or projectiles["pro_auto_calculate_penetration"] or projectiles["pro_auto_calculate_drag"]then
+                        local slider, actual_value = create_slider_row("Bullet Mass (g)", "mass", CONFIG_TYPES["mass"]["default"], 0, 1000, 3);
+                        slider:SetTooltip(string.format("%.1f", actual_value*15.4324) .. " Grain")
+                        local slider, actual_value = create_slider_row("Bullet Caliber (mm)", "caliber", CONFIG_TYPES["caliber"]["default"], 0, 50, 3);
+                        slider:SetTooltip(string.format("%.3f", actual_value*1/25.4) .. " Inch")
+                    end
+
+                    local slider, actual_value = create_slider_row("Drop Multiplier", "drop", CONFIG_TYPES["drop"]["default"], 0, 10, 3);
+                    slider:SetTooltip(ToSpeedStr(cv_sv_gravity:GetFloat() * actual_value, 2) .. "² (" .. math.floor(cv_sv_gravity:GetFloat()) .. " x "..string.format("%.2f", (actual_value * projectiles["pro_gravity_multiplier"])).." u/s)")
+                    local slider, actual_value = create_slider_row("Zero Range", "zero_range", CONFIG_TYPES["zero_range"]["default"], 0, 40000, 1)
+                    slider:SetTooltip("Zero Range: " .. ToDistStr(actual_value, nil, 1) .. " (" .. math.floor(actual_value) .. " u)")
+
+                    local slider, actual_value = create_slider_row("Min Speed (u/s)", "min_speed", CONFIG_TYPES["min_speed"]["default"], 0, 50000, 0)
+                    slider:SetTooltip("Min Speed: " .. ToSpeedStr(actual_value,nil, 2) .. " (" .. actual_value .. " u/s)")
+
+                    local slider, actual_value = create_slider_row("Max Distance", "max_distance", CONFIG_TYPES["max_distance"]["default"], 0, 100000, 0)
+                    slider:SetTooltip("Max Distance: " .. ToDistStr(actual_value,nil, 1) .. " (" .. math.floor(actual_value) .. " u)")
+
                     create_slider_row("Spread Bias", "spread_bias", CONFIG_TYPES["spread_bias"]["default"], -1.0, 1.0, 2);
-                    create_slider_row("Dropoff Start Distance (Units)", "dropoff_start", CONFIG_TYPES["dropoff_start"]["default"], 0, 200000, 0);
-                    create_slider_row("Dropoff End Distance (Units)", "dropoff_end", CONFIG_TYPES["dropoff_end"]["default"], 0, 200000, 0);
+                    if projectiles["pro_damage_dropoff_enabled"] and not projectiles["pro_damage_speed_dropoff_enabled"] then
+
+                    local slider, actual_value = create_slider_row("Dropoff Start Distance", "dropoff_start", CONFIG_TYPES["dropoff_start"]["default"], 0, 200000, 0)
+                    slider:SetTooltip("Dropoff Start: " .. ToDistStr(actual_value,nil, 1) .. " (" .. math.floor(actual_value) .. " u)")
+
+                    local slider, actual_value = create_slider_row("Dropoff End Distance", "dropoff_end", CONFIG_TYPES["dropoff_end"]["default"], 0, 200000, 0)
+                    slider:SetTooltip("Dropoff End: " .. ToDistStr(actual_value,nil, 1) .. " (" .. math.floor(actual_value) .. " u)")
+
                     create_slider_row("Dropoff Min Damage Multiplier", "dropoff_min_multiplier", CONFIG_TYPES["dropoff_min_multiplier"]["default"], 0.0, 1.0, 2);
+                    end
 
                     local tracer_panel = vgui.Create("DPanel", config_scroll);
                     tracer_panel:Dock(TOP);

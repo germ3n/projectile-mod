@@ -60,17 +60,40 @@ local WEAPON_PENETRATION_COUNTS = {
     ["default"] = 10,
 };
 
+local WEAPON_SHAPE = {
+    ["weapon_shotgun"] = 3,
+    ["weapon_ar2"] = 3,
+    ["default"] = 1,
+};
+
+local WEAPON_COEFFICIENT = {
+    ["weapon_pistol"] = 0.165,
+    ["weapon_357"] = 0.21,
+    ["weapon_shotgun"] = 0.039,
+    ["weapon_smg1"] = 0.15,
+    ["weapon_ar2"] = 0.3,
+    ["default"] = 0.1,
+};
+
 local WEAPON_DRAG = {
     ["weapon_shotgun"] = 0.9,
     ["default"] = 0.1,
 };
 
 local WEAPON_MASS = {
-    ["default"] = 1.0,
+    ["default"] = 8.0,
+};
+
+local WEAPON_CALIBER = {
+    ["default"] = 10,
 };
 
 local WEAPON_DROP = {
-    ["default"] = 0.005,
+    ["default"] = 1.0,
+};
+
+local WEAPON_ZERO_RANGE = {
+    ["default"] = 3937,
 };
 
 local WEAPON_MIN_SPEED = {
@@ -78,19 +101,19 @@ local WEAPON_MIN_SPEED = {
 };
 
 local WEAPON_MAX_DISTANCE = {
-    ["default"] = 10000.0,
-    ["weapon_shotgun"] = 1500.0,
-    ["weapon_annabelle"] = 2000.0,
+    ["default"] = 60000.0,
+    ["weapon_shotgun"] = 60000.0,
+    ["weapon_annabelle"] = 60000.0,
 };
 
 local WEAPON_TRACER_COLORS = {
-    ["default"] = { Color(255, 200, 100, 255), Color(255, 140, 0, 150) },
-    ["weapon_ar2"] = { Color(200, 255, 255, 255), Color(60, 120, 255, 180) },
-    ["npc_turret_floor"] = { Color(255, 255, 255, 255), Color(60, 120, 255, 185) },
-    ["npc_turret_ceiling"] = { Color(255, 255, 255, 255), Color(60, 120, 255, 185) },
-    ["npc_turret_ground"] = { Color(255, 255, 255, 255), Color(60, 120, 255, 185) },
-    ["prop_vehicle_airboat"] = { Color(255, 255, 255, 255), Color(60, 120, 255, 185) },
-    ["func_tank"] = { Color(255, 255, 255, 255), Color(60, 120, 255, 185) },
+    ["default"] = { Color(255, 200, 100, 255), Color(255, 100, 100, 150) },
+    ["weapon_ar2"] = { Color(200, 255, 255, 255), Color(60, 255, 180, 185) },
+    ["npc_turret_floor"] = { Color(200, 255, 255, 255), Color(60, 255, 180, 185) },
+    ["npc_turret_ceiling"] = { Color(200, 255, 255, 255), Color(60, 255, 180, 185) },
+    ["npc_turret_ground"] = { Color(200, 255, 255, 255), Color(60, 255, 180, 185) },
+    ["prop_vehicle_airboat"] = { Color(200, 255, 255, 255), Color(60, 255, 180, 185) },
+    ["func_tank"] = { Color(200, 255, 255, 255), Color(60, 255, 180, 185) },
 };
 
 local WEAPON_TRACER_FLAGS = {
@@ -124,9 +147,13 @@ CONFIG_TYPES = {
     ["damage"] = WEAPON_DAMAGES,
     ["penetration_power"] = WEAPON_PENETRATION_POWERS,
     ["penetration_count"] = WEAPON_PENETRATION_COUNTS,
+    ["shape"] = WEAPON_SHAPE,
+    ["coefficient"] = WEAPON_COEFFICIENT,
     ["drag"] = WEAPON_DRAG,
     ["mass"] = WEAPON_MASS,
+    ["caliber"] = WEAPON_CALIBER,
     ["drop"] = WEAPON_DROP,
+    ["zero_range"] = WEAPON_ZERO_RANGE,
     ["min_speed"] = WEAPON_MIN_SPEED,
     ["max_distance"] = WEAPON_MAX_DISTANCE,
     ["tracer_colors"] = WEAPON_TRACER_COLORS,
@@ -145,34 +172,59 @@ function is_weapon_blacklisted(weapon, class_name)
 end
 
 local AMMO_CHARACTERISTICS = { -- todo: make configurable? 
-    ["Pistol"] = { base_speed = 6000, mass = 1.0, caliber_factor = 0.9 },
-    ["357"] = { base_speed = 7500, mass = 1.2, caliber_factor = 1.1 },
-    ["SMG1"] = { base_speed = 6500, mass = 0.8, caliber_factor = 0.85 },
-    ["AR2"] = { base_speed = 9000, mass = 1.0, caliber_factor = 1.0 },
-    ["Buckshot"] = { base_speed = 5500, mass = 1.5, caliber_factor = 0.7 },
-    ["SniperRound"] = { base_speed = 12000, mass = 1.3, caliber_factor = 1.2 },
-    ["HelicopterGun"] = { base_speed = 9000, mass = 1.2, caliber_factor = 1.1 },
-    ["default"] = { base_speed = 8000, mass = 1.0, caliber_factor = 1.0 },
+    ["Pistol"] = { base_speed = 3000, mass = 8.0, caliber = 9, caliber_factor = 0.9 , drag_coef = 0.25, shape = 1},
+    ["357"] = { base_speed = 3500, mass = 16, caliber = 10.9, caliber_factor = 1.1 , drag_coef = 0.2, shape = 1},
+    ["SMG1"] = { base_speed = 6500, mass = 3.5, caliber = 5.7, caliber_factor = 0.85 , drag_coef = 0.17, shape = 2},
+    ["AR2"] = { base_speed = 9000, mass = 10, caliber = 7.8, caliber_factor = 1.0 , drag_coef = 0.15, shape = 2},
+    ["Buckshot"] = { base_speed = 4500, mass = 3.5, caliber = 8.4, caliber_factor = 0.7, drag_coef = 0.47, shape = 3},
+    ["SniperRound"] = { base_speed = 12000, mass = 50, caliber = 13, caliber_factor = 1.2 , drag_coef = 0.13, shape = 2},
+    ["HelicopterGun"] = { base_speed = 9000, mass = 16, caliber = 8, caliber_factor = 1.1 , drag_coef = 0.15, shape = 3},
+    ["default"] = { base_speed = 8000, mass = 8.0, caliber = 7.62, caliber_factor = 1.0 , drag_coef = 0.2629, shape = 1},
 };
+
+function get_ammo_property(ammo_type, property)
+    local key = ammo_type
+    if not AMMO_CHARACTERISTICS[key] then
+        key = "default"
+    end
+
+    local char = AMMO_CHARACTERISTICS[key]
+    if char and char[property] ~= nil then
+        return char[property]
+    else
+        return AMMO_CHARACTERISTICS["default"][property]
+    end
+end
 
 local clamp = math.Clamp;
 function get_weapon_speed(weapon, class_name, damage, ammo_type)
     local has_speed_entry = WEAPON_SPEEDS[class_name] ~= nil;
-    local auto_calc_enabled = projectiles["pro_auto_calculate_speed"];
+    local auto_calc_speed_enabled = projectiles["pro_auto_calculate_speed"];
 
-    if not has_speed_entry and auto_calc_enabled then
-        local char = AMMO_CHARACTERISTICS[ammo_type] or AMMO_CHARACTERISTICS["default"];
-        local damage_influence = 1.0 + ((damage - 10) / 150);
-        damage_influence = clamp(damage_influence, 0.7, 2.5);
-        local calculated_speed = clamp(char.base_speed * char.caliber_factor * damage_influence, 50.0, 25000.0);
-        --print(CLIENT and "CLIENT" or "SERVER", "Calculated speed:", calculated_speed, class_name, ammo_type, damage, damage_influence);
+    if not has_speed_entry and auto_calc_speed_enabled then
+        damage = damage or get_weapon_damage(weapon, class_name, damage, ammo_type) or WEAPON_DAMAGES["default"];
+        local speed_multiplier = projectiles["pro_speed_scale"]; 
+        local auto_multiplier = projectiles["pro_auto_calculate_speed_mult"]; 
+        local calculated_speed = speed
+        if not projectiles["pro_auto_calculate_speed_kinetic"] then  
+            local damage_influence = 1.0 + ((damage - 10) / 150);
+            damage_influence = clamp(damage_influence, 0.7, 2.5); 
+            calculated_speed = clamp(get_ammo_property(ammo_type, "base_speed") * get_ammo_property(ammo_type, "caliber_factor") * damage_influence, 50.0, 25000.0);
+        else
+            local caliber = WEAPON_CALIBER[class_name] or get_ammo_property(ammo_type, "caliber")
+            local mass = WEAPON_MASS[class_name] or get_ammo_property(ammo_type, "mass")
+            --print(CLIENT and "CLIENT" or "SERVER", "Weapon:", class_name, "Ammo type:", ammo_type, "Damage:",  damage, damage_influence, "Caliber:", caliber, "Mass:",  mass);
+            calculated_speed = ((2 * damage^2) / ((mass / 1000) * caliber^0.3))^0.5 * auto_multiplier * 1/0.0254;
+        end
+        --print(CLIENT and "CLIENT" or "SERVER", "Calculated speed:", calculated_speed*speed_multiplier);
         return calculated_speed;
     end
 
     return WEAPON_SPEEDS[class_name] or WEAPON_SPEEDS["default"];
 end
 
-function get_weapon_damage(weapon, class_name, damage)
+
+function get_weapon_damage(weapon, class_name, damage, ammo_type)
     if WEAPON_DAMAGES[class_name] then
         return WEAPON_DAMAGES[class_name];
     end
@@ -181,27 +233,139 @@ function get_weapon_damage(weapon, class_name, damage)
         return weapon:GetDamage(0, true);
     end
 
-    return damage > 0 and damage or WEAPON_DAMAGES["default"];
+    if IsValid(weapon) and weapon:IsWeapon() then
+        if weapon.Primary and weapon.Primary.Damage then
+            return weapon.Primary.Damage
+        end
+
+        local dmg = weapon:GetNWInt("Damage", 0) or 0
+        if dmg > 0 then return dmg end
+    end
+
+    local wep_tbl = weapons.GetStored(class_name)
+    if wep_tbl then
+        if wep_tbl.Primary and wep_tbl.Primary.Damage then
+            return wep_tbl.Primary.Damage
+        end
+        if wep_tbl.Damage then
+            return wep_tbl.Damage
+        end
+    end
+
+    local wep_tbl = weapons.GetStored(class_name)
+    if wep_tbl and (wep_tbl.TacRP or string.find(class_name:lower(), "^tacrp_")) then
+        local dmg = wep_tbl.Damage_Max 
+                 or wep_tbl.DamageMax 
+                 or (wep_tbl.BalanceStats and wep_tbl.BalanceStats[TacRP.BALANCE_SBOX] and wep_tbl.BalanceStats[TacRP.BALANCE_SBOX].Damage_Max)
+                 or wep_tbl.Damage
+
+        if wep_tbl.BalanceStats then
+            local mode = TacRP.BALANCE_SBOX
+            if wep_tbl.BalanceStats[mode] and wep_tbl.BalanceStats[mode].Damage_Max then
+                dmg = wep_tbl.BalanceStats[mode].Damage_Max
+            end
+        end
+
+        return dmg
+    end
+
+    if damage and damage > 0 then
+        return damage
+    else
+        return WEAPON_DAMAGES["default"]
+    end;
 end
 
-function get_weapon_penetration_power(weapon, class_name)
-    return WEAPON_PENETRATION_POWERS[class_name] or WEAPON_PENETRATION_POWERS["default"];
+function get_weapon_penetration_power(weapon, class_name, speed, ammo_type)
+    local has_pen_entry = WEAPON_PENETRATION_POWERS[class_name] ~= nil
+    local auto_calc_pen_enabled = projectiles["pro_auto_calculate_penetration"]
+
+    if auto_calc_pen_enabled and not has_pen_entry then
+        local speed = (speed or WEAPON_SPEEDS["default"]) * 0.0254;
+        
+        local caliber = WEAPON_CALIBER[class_name] or get_ammo_property(ammo_type, "caliber")
+        local mass = WEAPON_MASS[class_name] or get_ammo_property(ammo_type, "mass")
+        -- De Marre penetration formula
+        local calculated_pen = ((speed/2400)^1.43) * (((mass/1000)^0.71)/((caliber/100)^1.07)) * 100 * 1/25.4
+        --print(CLIENT and "CLIENT" or "SERVER", "Calculated pen:", calculated_pen, "Weapon:", class_name, "Ammo type:", ammo_type, "Caliber:", caliber, "Mass:",  mass, "Speed:",  speed);
+        return calculated_pen
+    end
+
+    return WEAPON_PENETRATION_POWERS[class_name] or WEAPON_PENETRATION_POWERS["default"]
 end
 
 function get_weapon_penetration_count(weapon, class_name)
     return WEAPON_PENETRATION_COUNTS[class_name] or WEAPON_PENETRATION_COUNTS["default"];
 end
 
-function get_weapon_drag(weapon, class_name)
+function get_weapon_shape(weapon, class_name, ammo_type)
+    if WEAPON_SHAPE[class_name] then
+        return WEAPON_SHAPE[class_name]
+    end
+
+    local shape = get_ammo_property(ammo_type, "shape")
+    return shape
+end
+
+function get_weapon_coefficient(weapon, class_name, ammo_type)
+    local has_coef_entry = WEAPON_COEFFICIENT[class_name] ~= nil;
+    local auto_calc_drag_enabled = projectiles["pro_auto_calculate_drag"];
+    if auto_calc_drag_enabled and not has_coef_entry then
+        local cd = get_ammo_property(ammo_type, "drag_coef")
+        local caliber = WEAPON_CALIBER[class_name] or get_ammo_property(ammo_type, "caliber")
+        local mass = WEAPON_MASS[class_name] or get_ammo_property(ammo_type, "mass")
+        local shape = WEAPON_SHAPE[class_name] or get_ammo_property(ammo_type, "shape")
+        if shape == 3 then
+            cd = 0.47
+        end
+        local calculated_coefficient = ((mass * 15.4324) / ((caliber / 25.4) ^ 2 * 7000)) / (cd / 0.2629);
+        return calculated_coefficient;
+    end
+
+    return WEAPON_COEFFICIENT[class_name] or WEAPON_COEFFICIENT["default"];
+end
+
+function get_weapon_drag(weapon, class_name, ammo_type)
+    local has_drag_entry = WEAPON_DRAG[class_name] ~= nil;
+    local auto_calc_drag_enabled = projectiles["pro_auto_calculate_drag"];
+    if auto_calc_drag_enabled and not has_drag_entry then
+        local caliber = WEAPON_CALIBER[class_name] or get_ammo_property(ammo_type, "caliber")
+        local mass = WEAPON_MASS[class_name] or get_ammo_property(ammo_type, "mass")
+        local calculated_drag = caliber / mass * 0.4;
+        return calculated_drag;
+    end
+
     return WEAPON_DRAG[class_name] or WEAPON_DRAG["default"];
 end
 
-function get_weapon_mass(weapon, class_name)
-    return WEAPON_MASS[class_name] or WEAPON_MASS["default"];
+function get_weapon_mass(weapon, class_name, ammo_type)
+    if WEAPON_MASS[class_name] then
+        return WEAPON_MASS[class_name]
+    end
+        local mass = get_ammo_property(ammo_type, "mass")
+    return mass
+end
+
+function get_weapon_caliber(weapon, class_name, ammo_type)
+    if WEAPON_CALIBER[class_name] then
+        return WEAPON_CALIBER[class_name]
+    end
+    local caliber = get_ammo_property(ammo_type, "caliber")
+    return caliber
 end
 
 function get_weapon_drop(weapon, class_name)
     return WEAPON_DROP[class_name] or WEAPON_DROP["default"];
+end
+
+function get_weapon_zero_range(weapon, class_name, speed)
+    local has_zero_entry = WEAPON_ZERO_RANGE[class_name] ~= nil;
+    local auto_calc_zero_enabled = projectiles["pro_auto_calculate_zero"];
+    if auto_calc_zero_enabled and not has_zero_entry then
+    local calculated_zero = (speed*0.0254)^0.75*1/0.0254
+    return calculated_zero;
+end
+    return WEAPON_ZERO_RANGE[class_name] or WEAPON_ZERO_RANGE["default"];
 end
 
 function get_weapon_min_speed(weapon, class_name)
@@ -447,9 +611,13 @@ if SERVER then
             WEAPON_DAMAGES,
             WEAPON_PENETRATION_POWERS,
             WEAPON_PENETRATION_COUNTS,
+            WEAPON_SHAPE,
+            WEAPON_COEFFICIENT,
             WEAPON_DRAG,
             WEAPON_MASS,
+            WEAPON_CALIBER,
             WEAPON_DROP,
+            WEAPON_ZERO_RANGE,
             WEAPON_MIN_SPEED,
             WEAPON_MAX_DISTANCE,
             WEAPON_TRACER_COLORS,
@@ -514,9 +682,13 @@ if SERVER then
         table.CopyFromTo(ORIGINAL_TABLES["damage"], WEAPON_DAMAGES);
         table.CopyFromTo(ORIGINAL_TABLES["penetration_power"], WEAPON_PENETRATION_POWERS);
         table.CopyFromTo(ORIGINAL_TABLES["penetration_count"], WEAPON_PENETRATION_COUNTS);
+        table.CopyFromTo(ORIGINAL_TABLES["shape"], WEAPON_SHAPE);
+        table.CopyFromTo(ORIGINAL_TABLES["coefficient"], WEAPON_COEFFICIENT);
         table.CopyFromTo(ORIGINAL_TABLES["drag"], WEAPON_DRAG);
         table.CopyFromTo(ORIGINAL_TABLES["mass"], WEAPON_MASS);
+        table.CopyFromTo(ORIGINAL_TABLES["caliber"], WEAPON_CALIBER);
         table.CopyFromTo(ORIGINAL_TABLES["drop"], WEAPON_DROP);
+        table.CopyFromTo(ORIGINAL_TABLES["zero_range"], WEAPON_ZERO_RANGE);
         table.CopyFromTo(ORIGINAL_TABLES["min_speed"], WEAPON_MIN_SPEED);
         table.CopyFromTo(ORIGINAL_TABLES["max_distance"], WEAPON_MAX_DISTANCE);
         table.CopyFromTo(ORIGINAL_TABLES["tracer_colors"], WEAPON_TRACER_COLORS);
@@ -530,9 +702,13 @@ if SERVER then
         CONFIG_TYPES["damage"] = WEAPON_DAMAGES;
         CONFIG_TYPES["penetration_power"] = WEAPON_PENETRATION_POWERS;
         CONFIG_TYPES["penetration_count"] = WEAPON_PENETRATION_COUNTS;
+        CONFIG_TYPES["shape"] = WEAPON_SHAPE;
+        CONFIG_TYPES["coefficient"] = WEAPON_COEFFICIENT;
         CONFIG_TYPES["drag"] = WEAPON_DRAG;
         CONFIG_TYPES["mass"] = WEAPON_MASS;
+        CONFIG_TYPES["caliber"] = WEAPON_CALIBER;
         CONFIG_TYPES["drop"] = WEAPON_DROP;
+        CONFIG_TYPES["zero_range"] = WEAPON_ZERO_RANGE;
         CONFIG_TYPES["min_speed"] = WEAPON_MIN_SPEED;
         CONFIG_TYPES["max_distance"] = WEAPON_MAX_DISTANCE;
         CONFIG_TYPES["tracer_colors"] = WEAPON_TRACER_COLORS;
@@ -827,17 +1003,21 @@ if CLIENT then
             WEAPON_DAMAGES = config_data[3];
             WEAPON_PENETRATION_POWERS = config_data[4];
             WEAPON_PENETRATION_COUNTS = config_data[5];
-            WEAPON_DRAG = config_data[6];
-            WEAPON_MASS = config_data[7];
-            WEAPON_DROP = config_data[8];
-            WEAPON_MIN_SPEED = config_data[9];
-            WEAPON_MAX_DISTANCE = config_data[10];
-            WEAPON_TRACER_COLORS = config_data[11];
-            WEAPON_SPREAD_BIAS = config_data[12];
-            WEAPON_DROPOFF_START = config_data[13];
-            WEAPON_DROPOFF_END = config_data[14];
-            WEAPON_DROPOFF_MIN_MULTIPLIER = config_data[15];
-            WEAPON_TRACER_FLAGS = config_data[16] or {};
+            WEAPON_SHAPE = config_data[6];
+            WEAPON_COEFFICIENT = config_data[7];
+            WEAPON_DRAG = config_data[8];
+            WEAPON_MASS = config_data[9];
+            WEAPON_CALIBER = config_data[10];
+            WEAPON_DROP = config_data[11];
+            WEAPON_ZERO_RANGE = config_data[12];
+            WEAPON_MIN_SPEED = config_data[13];
+            WEAPON_MAX_DISTANCE = config_data[14];
+            WEAPON_TRACER_COLORS = config_data[15];
+            WEAPON_SPREAD_BIAS = config_data[16];
+            WEAPON_DROPOFF_START = config_data[17];
+            WEAPON_DROPOFF_END = config_data[18];
+            WEAPON_DROPOFF_MIN_MULTIPLIER = config_data[19];
+            WEAPON_TRACER_FLAGS = config_data[20] or {};
             if not WEAPON_TRACER_FLAGS["default"] then
                 WEAPON_TRACER_FLAGS["default"] = 0;
             end
@@ -847,9 +1027,13 @@ if CLIENT then
             CONFIG_TYPES["damage"] = WEAPON_DAMAGES;
             CONFIG_TYPES["penetration_power"] = WEAPON_PENETRATION_POWERS;
             CONFIG_TYPES["penetration_count"] = WEAPON_PENETRATION_COUNTS;
+            CONFIG_TYPES["shape"] = WEAPON_SHAPE;
+            CONFIG_TYPES["coefficient"] = WEAPON_COEFFICIENT;
             CONFIG_TYPES["drag"] = WEAPON_DRAG;
             CONFIG_TYPES["mass"] = WEAPON_MASS;
+            CONFIG_TYPES["caliber"] = WEAPON_CALIBER;
             CONFIG_TYPES["drop"] = WEAPON_DROP;
+            CONFIG_TYPES["zero_range"] = WEAPON_ZERO_RANGE;
             CONFIG_TYPES["min_speed"] = WEAPON_MIN_SPEED;
             CONFIG_TYPES["max_distance"] = WEAPON_MAX_DISTANCE;
             CONFIG_TYPES["tracer_colors"] = WEAPON_TRACER_COLORS;
